@@ -59,7 +59,6 @@ export default function App() {
   // Form states
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState('🧙‍♂️');
 
   // Interactive placement states
   const [hoverCoord, setHoverCoord] = useState<{ x: number; y: number } | null>(null);
@@ -110,11 +109,9 @@ export default function App() {
       setError('Username and Room Code are required.');
       return;
     }
-    const matchedHero = HEROES.find(h => h.emoji === selectedEmoji);
-    const playerColor = matchedHero ? matchedHero.color : '#00E5FF';
     sendEvent({
       event: 'JOIN_ROOM',
-      payload: { username, roomCode, color: playerColor, emoji: selectedEmoji }
+      payload: { username, roomCode, color: '', emoji: '' }
     });
   };
 
@@ -193,44 +190,6 @@ export default function App() {
             />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-300">Select Your Hero</label>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, 42px)',
-                gap: '6px',
-                justifyContent: 'center',
-                marginTop: '4px'
-              }}
-            >
-              {HEROES.map(hero => (
-                <button
-                  type="button"
-                  key={hero.emoji}
-                  onClick={() => setSelectedEmoji(hero.emoji)}
-                  style={{
-                    fontSize: '24px',
-                    width: '42px',
-                    height: '42px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: selectedEmoji === hero.emoji ? `2.5px solid ${hero.color}` : '1px solid var(--border-light)',
-                    borderRadius: '8px',
-                    backgroundColor: selectedEmoji === hero.emoji ? `${hero.color}22` : 'rgba(0, 0, 0, 0.2)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: selectedEmoji === hero.emoji ? `0 0 10px ${hero.color}` : 'none'
-                  }}
-                  className="hover:scale-110"
-                  title={hero.name}
-                >
-                  {hero.emoji}
-                </button>
-              ))}
-            </div>
-          </div>
 
           <button type="submit" className="btn-primary w-full mt-2">
             Connect to Lobby
