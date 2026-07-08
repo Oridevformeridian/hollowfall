@@ -59,7 +59,7 @@ export default function App() {
   // Form states
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState('🧙');
+  const [selectedEmoji, setSelectedEmoji] = useState('🧙‍♂️');
 
   // Interactive placement states
   const [hoverCoord, setHoverCoord] = useState<{ x: number; y: number } | null>(null);
@@ -198,9 +198,10 @@ export default function App() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: '8px',
-                justifyItems: 'center'
+                gridTemplateColumns: 'repeat(5, 42px)',
+                gap: '6px',
+                justifyContent: 'center',
+                marginTop: '4px'
               }}
             >
               {HEROES.map(hero => (
@@ -209,18 +210,18 @@ export default function App() {
                   key={hero.emoji}
                   onClick={() => setSelectedEmoji(hero.emoji)}
                   style={{
-                    fontSize: '32px',
-                    width: '60px',
-                    height: '60px',
+                    fontSize: '24px',
+                    width: '42px',
+                    height: '42px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     border: selectedEmoji === hero.emoji ? `2.5px solid ${hero.color}` : '1px solid var(--border-light)',
-                    borderRadius: '12px',
+                    borderRadius: '8px',
                     backgroundColor: selectedEmoji === hero.emoji ? `${hero.color}22` : 'rgba(0, 0, 0, 0.2)',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: selectedEmoji === hero.emoji ? `0 0 12px ${hero.color}` : 'none'
+                    boxShadow: selectedEmoji === hero.emoji ? `0 0 10px ${hero.color}` : 'none'
                   }}
                   className="hover:scale-110"
                   title={hero.name}
@@ -288,9 +289,9 @@ export default function App() {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(5, 1fr)',
-                    gap: '8px',
-                    justifyItems: 'center',
+                    gridTemplateColumns: 'repeat(5, 42px)',
+                    gap: '6px',
+                    justifyContent: 'center',
                     marginTop: '8px'
                   }}
                 >
@@ -304,9 +305,9 @@ export default function App() {
                         onClick={() => !isTaken && handleSelectHero(hero.emoji)}
                         disabled={isTaken}
                         style={{
-                          fontSize: '28px',
-                          width: '54px',
-                          height: '54px',
+                          fontSize: '24px',
+                          width: '42px',
+                          height: '42px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -315,7 +316,7 @@ export default function App() {
                             : isTaken
                             ? '1px dashed #334155'
                             : '1px solid var(--border-light)',
-                          borderRadius: '12px',
+                          borderRadius: '8px',
                           backgroundColor: isSelected
                             ? `${hero.color}22`
                             : 'rgba(0, 0, 0, 0.2)',

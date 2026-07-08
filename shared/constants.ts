@@ -118,14 +118,14 @@ export interface Hero {
 }
 
 export const HEROES: Hero[] = [
-  { emoji: '🧙', color: '#00E5FF', name: 'Mage' },
-  { emoji: '👻', color: '#E2E8F0', name: 'Spirit' },
-  { emoji: '🧝', color: '#00E676', name: 'Elf' },
-  { emoji: '🦁', color: '#FF6D00', name: 'Beast' },
-  { emoji: '🧛', color: '#FF1744', name: 'Vampire' },
-  { emoji: '🤖', color: '#90A4AE', name: 'Golem' },
-  { emoji: '🦊', color: '#FFD600', name: 'Fox' },
-  { emoji: '🐦', color: '#80D8FF', name: 'Owl' },
-  { emoji: '🐉', color: '#A7FFEB', name: 'Dragon' },
-  { emoji: '💀', color: '#D500F9', name: 'Reaper' }
+  { emoji: '🧙‍♂️', color: '#00E5FF', name: 'Man Mage' },
+  { emoji: '🧙‍♀️', color: '#E0F7FA', name: 'Woman Mage' },
+  { emoji: '🧝‍♂️', color: '#00E676', name: 'Man Elf' },
+  { emoji: '🧝‍♀️', color: '#B9F6CA', name: 'Woman Elf' },
+  { emoji: '🤴', color: '#FFD600', name: 'Prince' },
+  { emoji: '👸', color: '#F50057', name: 'Princess' },
+  { emoji: '🧚‍♂️', color: '#FF6D00', name: 'Man Fairy' },
+  { emoji: '🧚‍♀️', color: '#FFAB40', name: 'Woman Fairy' },
+  { emoji: '🧞', color: '#D500F9', name: 'Genie' },
+  { emoji: '🦄', color: '#E2E8F0', name: 'Unicorn' }
 ];

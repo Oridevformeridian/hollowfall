@@ -98,8 +98,8 @@ io.on('connection', (socket) => {
           let playerEmoji = emoji;
           const assignedEmojis = existingPlayers.map(p => p.emoji);
           if (assignedEmojis.includes(playerEmoji)) {
-            const availableEmojis = ['🧙', '👻', '🧝', '🦁', '🧛', '🤖', '🦊', '🐦', '🐉', '💀'];
-            playerEmoji = availableEmojis.find(e => !assignedEmojis.includes(e)) || '🧙';
+            const availableEmojis = ['🧙‍♂️', '🧙‍♀️', '🧝‍♂️', '🧝‍♀️', '🤴', '👸', '🧚‍♂️', '🧚‍♀️', '🧞', '🦄'];
+            playerEmoji = availableEmojis.find(e => !assignedEmojis.includes(e)) || '🧙‍♂️';
           }
 
           // Add player
