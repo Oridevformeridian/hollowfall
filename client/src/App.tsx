@@ -168,48 +168,91 @@ export default function App() {
   // Render Join / Lobby
   if (!gameState) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <form onSubmit={handleJoin} className="glass-panel w-full max-w-md p-8 flex flex-col gap-6 pulse-glow">
-          <div className="text-center">
-            <h1 className="text-3xl font-extrabold text-[#00E5FF] m-0 mb-2 tracking-wide">HOLLOWFALL</h1>
-            <p className="text-gray-400 text-sm m-0">Thresholds Board Setup & Lobby</p>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          padding: '24px',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}
+      >
+        <form
+          onSubmit={handleJoin}
+          className="glass-panel pulse-glow"
+          style={{
+            width: '100%',
+            maxWidth: '440px',
+            padding: '32px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+            alignItems: 'center',
+            textAlign: 'center',
+            boxSizing: 'border-box'
+          }}
+        >
+          <div>
+            <h1 className="text-3xl font-extrabold text-[#00E5FF] m-0 mb-2 tracking-wide" style={{ textAlign: 'center' }}>
+              HOLLOWFALL
+            </h1>
+            <p className="text-gray-400 text-sm m-0" style={{ textAlign: 'center' }}>
+              Thresholds Board Setup & Lobby
+            </p>
           </div>
 
           {error && (
-            <div className="bg-[rgba(255,23,68,0.1)] border border-[var(--accent-crimson)] text-[var(--accent-crimson)] p-3 rounded-lg text-sm text-center">
+            <div
+              style={{
+                backgroundColor: 'rgba(255,23,68,0.1)',
+                border: '1px solid var(--accent-crimson)',
+                color: 'var(--accent-crimson)',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                textAlign: 'center',
+                width: '100%'
+              }}
+            >
               {error}
             </div>
           )}
 
-          <div className="flex flex-col gap-2 items-center text-center">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center' }}>
             <label className="text-sm font-semibold text-gray-300">Your Name</label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
               placeholder="Spirit Walker"
-              className="input-field text-center w-full"
+              className="input-field text-center"
+              style={{ width: '100%', textAlign: 'center' }}
               maxLength={15}
             />
           </div>
 
-          <div className="flex flex-col gap-2 items-center text-center">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center' }}>
             <label className="text-sm font-semibold text-gray-300">Room Code</label>
             <input
               type="text"
               value={roomCode}
               onChange={e => setRoomCode(e.target.value)}
               placeholder="e.g. THRESH"
-              className="input-field text-center w-full"
+              className="input-field text-center"
+              style={{ width: '100%', textAlign: 'center' }}
               maxLength={6}
             />
           </div>
 
-
           <button
             type="submit"
-            className="btn-primary w-full mt-2"
+            className="btn-primary"
             style={{
+              width: '100%',
+              marginTop: '8px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -226,8 +269,30 @@ export default function App() {
   // Render Lobby screen (waiting for start)
   if (gameState.phase === 'LOBBY') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6">
-        <div className="glass-panel w-full max-w-3xl p-8 flex flex-col gap-6">
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          padding: '24px',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div
+          className="glass-panel"
+          style={{
+            width: '100%',
+            maxWidth: '768px',
+            padding: '32px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '24px',
+            boxSizing: 'border-box'
+          }}
+        >
           <div className="flex flex-col items-center justify-center border-b border-[var(--border-light)] pb-4 text-center gap-1.5">
             <h2 className="text-2xl font-bold text-[var(--accent-cyan)] m-0">Lobby Room: {gameState.roomCode}</h2>
             <p className="text-gray-400 text-xs m-0">Waiting for 2 players to start...</p>
@@ -235,7 +300,18 @@ export default function App() {
           </div>
 
           {error && (
-            <div className="bg-[rgba(255,23,68,0.1)] border border-[var(--accent-crimson)] text-[var(--accent-crimson)] p-3 rounded-lg text-sm text-center">
+            <div
+              style={{
+                backgroundColor: 'rgba(255,23,68,0.1)',
+                border: '1px solid var(--accent-crimson)',
+                color: 'var(--accent-crimson)',
+                padding: '12px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                textAlign: 'center',
+                width: '100%'
+              }}
+            >
               {error}
             </div>
           )}
@@ -251,11 +327,16 @@ export default function App() {
             }}
           >
             {/* Column 1: Connected Players */}
-            <div className="flex flex-col gap-3">
-              <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider">Connected Players ({playersList.length}/2)</h3>
-              <div className="flex flex-col gap-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider" style={{ textAlign: 'center' }}>
+                Connected Players ({playersList.length}/2)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {playersList.map(player => (
-                  <div key={player.id} className="flex justify-between items-center bg-[rgba(255,255,255,0.03)] p-4 rounded-xl border border-gray-800">
+                  <div
+                    key={player.id}
+                    className="flex justify-between items-center bg-[rgba(255,255,255,0.03)] p-4 rounded-xl border border-gray-800"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
                       <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -331,7 +412,20 @@ export default function App() {
           </div>
 
           {/* Centered Ready/Start buttons below both elements */}
-          <div className="flex gap-4 mt-6 border-t border-[var(--border-light)] pt-6 justify-center w-full max-w-md mx-auto">
+          <div
+            style={{
+              display: 'flex',
+              gap: '16px',
+              marginTop: '24px',
+              borderTop: '1px solid var(--border-light)',
+              paddingTop: '24px',
+              justifyContent: 'center',
+              width: '100%',
+              maxWidth: '440px',
+              marginLeft: 'auto',
+              marginRight: 'auto'
+            }}
+          >
             <button
               onClick={handleToggleReady}
               disabled={!self?.emoji}
