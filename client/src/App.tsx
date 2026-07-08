@@ -181,32 +181,32 @@ export default function App() {
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 items-center text-center">
             <label className="text-sm font-semibold text-gray-300">Your Name</label>
             <input
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
               placeholder="Spirit Walker"
-              className="input-field"
+              className="input-field text-center w-full"
               maxLength={15}
             />
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 items-center text-center">
             <label className="text-sm font-semibold text-gray-300">Room Code</label>
             <input
               type="text"
               value={roomCode}
               onChange={e => setRoomCode(e.target.value)}
               placeholder="e.g. THRESH"
-              className="input-field"
+              className="input-field text-center w-full"
               maxLength={6}
             />
           </div>
 
 
-          <button type="submit" className="btn-primary w-full mt-2">
+          <button type="submit" className="btn-primary w-full mt-2 self-center">
             Connect to Lobby
           </button>
         </form>
