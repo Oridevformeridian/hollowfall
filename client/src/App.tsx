@@ -30,11 +30,11 @@ const renderTileSvgContent = (_layout: TileLayout, playerColor: string) => {
 
       {/* Starting Star in Center */}
       <polygon
-        points="50,43 52,48 57,48 53,51 55,56 50,53 45,56 47,51 43,48 48,48"
+        points="50,36 54,46 64,46 56,52 60,62 50,56 40,62 44,52 36,46 46,46"
         fill={playerColor}
         stroke={playerColor}
         strokeWidth="1"
-        className="pulse-glow"
+        style={{ filter: `drop-shadow(0 0 5px ${playerColor})` }}
       />
 
       {/* Solid Outer border */}
@@ -202,18 +202,18 @@ export default function App() {
                   key={hero.emoji}
                   onClick={() => setSelectedEmoji(hero.emoji)}
                   style={{
-                    fontSize: '20px',
-                    width: '40px',
-                    height: '40px',
+                    fontSize: '32px',
+                    width: '60px',
+                    height: '60px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     border: selectedEmoji === hero.emoji ? `2.5px solid ${hero.color}` : '1px solid var(--border-light)',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
                     backgroundColor: selectedEmoji === hero.emoji ? `${hero.color}22` : 'rgba(0, 0, 0, 0.2)',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: selectedEmoji === hero.emoji ? `0 0 10px ${hero.color}` : 'none'
+                    boxShadow: selectedEmoji === hero.emoji ? `0 0 12px ${hero.color}` : 'none'
                   }}
                   className="hover:scale-110"
                   title={hero.name}
@@ -258,7 +258,10 @@ export default function App() {
                 <div key={player.id} className="flex justify-between items-center bg-[rgba(255,255,255,0.03)] p-4 rounded-xl border border-gray-800">
                   <div className="flex items-center gap-3">
                     <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
-                    <span className="font-semibold text-white">{player.emoji} {player.username} {player.id === socket?.id && '(You)'}</span>
+                    <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '26px', lineHeight: '1' }}>{player.emoji}</span>
+                      <span>{player.username} {player.id === socket?.id && '(You)'}</span>
+                    </span>
                   </div>
                   <span className={`text-xs px-3 py-1.5 rounded-full font-bold ${player.isReady ? 'bg-[rgba(0,230,118,0.15)] text-[var(--accent-green)]' : 'bg-gray-800 text-gray-400'}`}>
                     {player.isReady ? 'READY' : 'NOT READY'}
@@ -355,7 +358,10 @@ export default function App() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: player.color }} />
-                      <span className="font-semibold text-sm">{player.emoji} {player.username}</span>
+                      <span className="font-semibold text-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '20px', lineHeight: '1' }}>{player.emoji}</span>
+                        <span>{player.username}</span>
+                      </span>
                     </div>
                     {isActive && <span style={{ fontSize: '10px', backgroundColor: 'var(--accent-gold)', color: 'black', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px' }}>ACTIVE</span>}
                   </div>
@@ -448,7 +454,7 @@ export default function App() {
                             key={pId}
                             style={{
                               position: 'absolute',
-                              fontSize: '26px',
+                              fontSize: '44px',
                               lineHeight: '1',
                               display: 'flex',
                               alignItems: 'center',
