@@ -59,6 +59,21 @@ export default function App() {
   // Form states
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
+  const [dimensions, setDimensions] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1200,
+    height: typeof window !== 'undefined' ? window.innerHeight : 800
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Interactive placement states
   const [hoverCoord, setHoverCoord] = useState<{ x: number; y: number } | null>(null);
@@ -345,6 +360,19 @@ export default function App() {
   const subCellSize = cellWidth / 5;
   const tokenSize = Math.floor(subCellSize * 0.8);
 
+  const isMobile = dimensions.width <= 768;
+  const availableWidth = dimensions.width - (isMobile ? 0 : 320) - 80;
+  const availableHeight = dimensions.height - (isMobile ? 300 : 0) - 80;
+
+  const cols = maxX - minX + 1;
+  const rows = maxY - minY + 1;
+  const boardW = cols * cellWidth + (cols - 1) * 16 + 48;
+  const boardH = rows * cellWidth + (rows - 1) * 16 + 48;
+
+  const scaleX = availableWidth / boardW;
+  const scaleY = availableHeight / boardH;
+  const scaleFactor = Math.max(0.3, Math.min(1.5, scaleX, scaleY));
+
   // Validate if a coordinates placement is allowed
   const isPlacementValid = (x: number, y: number) => {
     if (!isActiveTurn || gameState.phase !== 'PLACEMENT') return false;
@@ -400,7 +428,7 @@ export default function App() {
       </div>
 
       {/* Main Board Space */}
-      <div className="main-content">
+      <div className="main-content" style={{ overflow: 'hidden' }}>
         {/* Turn Indicator Overlay (Top Right) */}
         {gameState.turnOrder.length > 0 && (
           <div
@@ -456,7 +484,10 @@ export default function App() {
         <div
           className="board-container"
           style={{
-            gridTemplateColumns: `repeat(${maxX - minX + 1}, ${cellWidth}px)`
+            gridTemplateColumns: `repeat(${maxX - minX + 1}, ${cellWidth}px)`,
+            transform: `scale(${scaleFactor})`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.15s ease-out'
           }}
         >
           {macroGrid.map(({ x, y }) => {
