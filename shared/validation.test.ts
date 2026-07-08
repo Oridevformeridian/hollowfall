@@ -7,11 +7,11 @@ describe('validateTilePlacement', () => {
     const placedTiles: Record<string, PlacedTile> = {};
     
     // Placement at 0,0 should succeed
-    const res1 = validateTilePlacement(0, 0, 0, 'player1', placedTiles);
+    const res1 = validateTilePlacement(0, 0, 0, 'player1', placedTiles, 2);
     expect(res1.valid).toBe(true);
 
     // Placement at other coords should fail
-    const res2 = validateTilePlacement(1, 0, 0, 'player1', placedTiles);
+    const res2 = validateTilePlacement(1, 0, 0, 'player1', placedTiles, 2);
     expect(res2.valid).toBe(false);
     expect(res2.error).toContain('first tile must be placed at (0, 0)');
   });
@@ -21,7 +21,7 @@ describe('validateTilePlacement', () => {
       '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'player1' }
     };
 
-    const res = validateTilePlacement(0, 0, 1, 'player2', placedTiles);
+    const res = validateTilePlacement(0, 0, 1, 'player2', placedTiles, 2);
     expect(res.valid).toBe(false);
     expect(res.error).toContain('already placed');
   });
@@ -32,26 +32,25 @@ describe('validateTilePlacement', () => {
     };
 
     // Diagonal coordinate (1, 1) should fail
-    const diagonalRes = validateTilePlacement(1, 1, 1, 'player2', placedTiles);
+    const diagonalRes = validateTilePlacement(1, 1, 1, 'player2', placedTiles, 2);
     expect(diagonalRes.valid).toBe(false);
     expect(diagonalRes.error).toContain('placed adjacent to an existing tile');
 
     // Orthogonal coordinate (1, 0) should succeed
-    const orthogonalRes = validateTilePlacement(1, 0, 1, 'player2', placedTiles);
+    const orthogonalRes = validateTilePlacement(1, 0, 1, 'player2', placedTiles, 2);
     expect(orthogonalRes.valid).toBe(true);
   });
 
-  it('should cap the board size at 4 tiles total', () => {
+  it('should cap the board size at the player count limit', () => {
+    // Under a 2-player game limit (maxTiles = 2)
     const placedTiles: Record<string, PlacedTile> = {
       '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
-      '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' },
-      '1,1': { tileId: 3, position: { x: 1, y: 1 }, rotation: 0, placedBy: 'p1' },
-      '0,1': { tileId: 4, position: { x: 0, y: 1 }, rotation: 0, placedBy: 'p2' }
+      '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
     };
 
-    const res = validateTilePlacement(2, 0, 1, 'p1', placedTiles);
+    const res = validateTilePlacement(1, 1, 1, 'p1', placedTiles, 2);
     expect(res.valid).toBe(false);
-    expect(res.error).toContain('All 4 tiles have already been placed');
+    expect(res.error).toContain('All 2 tiles have already been placed');
   });
 });
 

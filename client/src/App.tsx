@@ -293,7 +293,7 @@ export default function App() {
     if (!isActiveTurn || gameState.phase !== 'PLACEMENT') return false;
     const tileIndex = self?.assignedTileIndex;
     if (tileIndex === null || tileIndex === undefined) return false;
-    return validateTilePlacement(x, y, tileIndex, socket?.id || '', gameState.placedTiles).valid;
+    return validateTilePlacement(x, y, tileIndex, socket?.id || '', gameState.placedTiles, gameState.turnOrder.length).valid;
   };
 
   return (

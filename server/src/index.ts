@@ -140,30 +140,13 @@ io.on('connection', (socket) => {
           room.turnOrder = playerIds.sort(() => random() - 0.5);
           room.activePlayerIndex = 0;
 
-          // Distribute the 4 fixed tiles: 2 to P1, 2 to P2
+          // Distribute 1 starting tile to each player
           // Shuffled indexes: 0, 1, 2, 3 correspond to FIXED_TILES
           const tileIndices = [0, 1, 2, 3].sort(() => random() - 0.5);
-          room.players[room.turnOrder[0]].assignedTileIndex = tileIndices[0]; // first tile index
-          room.players[room.turnOrder[1]].assignedTileIndex = tileIndices[1];
-          // We can store remaining tile pools in custom room state if needed, or simply assign multiple.
-          // Let's store unplaced tile indexes for players: P1 gets [tileIndices[0], tileIndices[2]], P2 gets [tileIndices[1], tileIndices[3]]
-          // Wait! Let's extend Player definition or keep it simple.
-          // To keep it strictly matching our Player interface, we can just change the active assignedTileIndex during their turn, or 
-          // distribute them in a way that we keep track of which tile they have remaining.
-          // Let's store a list of unplaced tiles for each player locally in the room state, or we can add a mapping of player -> tileIds list.
-          // Since our shared Player type only has `assignedTileIndex: number | null`, let's make it so that:
-          // P1 has tileIndices[0] active first. When P1 places it, they get assigned tileIndices[2].
-          // P2 has tileIndices[1] active first. When P2 places it, they get assigned tileIndices[3].
-          // This is incredibly elegant and fits the existing Player interface perfectly without modifying it!
-          // Let's store the secondary tiles in a helper map in the room object (we will cast room or keep a separate metadata map).
-          
-          // Store secondary tiles
-          roomMetadata.set(currentRoomCode, {
-            secondaryTiles: {
-              [room.turnOrder[0]]: tileIndices[2],
-              [room.turnOrder[1]]: tileIndices[3]
-            }
-          });
+          for (let i = 0; i < room.turnOrder.length; i++) {
+            const pId = room.turnOrder[i];
+            room.players[pId].assignedTileIndex = tileIndices[i];
+          }
 
           broadcastState(currentRoomCode, room);
           break;
@@ -191,7 +174,7 @@ io.on('connection', (socket) => {
           }
 
           // VALIDATION RULES
-          const validation = validateTilePlacement(x, y, tileId, playerId, room.placedTiles);
+          const validation = validateTilePlacement(x, y, tileId, playerId, room.placedTiles, room.turnOrder.length);
           if (!validation.valid) {
             sendError(socket, validation.error || 'Invalid placement.');
             return;
@@ -208,20 +191,12 @@ io.on('connection', (socket) => {
 
           room.placedTiles[key] = placedTile;
 
-          // Handle secondary tile distribution
-          const meta = roomMetadata.get(currentRoomCode);
-          if (meta && meta.secondaryTiles[activePlayerId] !== undefined) {
-            // Move secondary tile to active slot
-            activePlayer.assignedTileIndex = meta.secondaryTiles[activePlayerId];
-            delete meta.secondaryTiles[activePlayerId];
-          } else {
-            // Player has placed both of their tiles
-            activePlayer.assignedTileIndex = null;
-          }
+          // Player has placed their starting tile
+          activePlayer.assignedTileIndex = null;
 
-          // Check if all tiles are placed (4 tiles total)
+          // Check if all tiles are placed (number of placed tiles equals player count)
           const newPlacedCount = Object.keys(room.placedTiles).length;
-          if (newPlacedCount === 4) {
+          if (newPlacedCount === room.turnOrder.length) {
             room.phase = 'GAMEPLAY'; // Board finalized, start gameplay phase
             
             // Set initial token positions to player Lairs

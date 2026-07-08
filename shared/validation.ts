@@ -54,13 +54,14 @@ export function validateTilePlacement(
   y: number,
   _tileId: number,
   _placedBy: string,
-  placedTiles: Record<string, PlacedTile>
+  placedTiles: Record<string, PlacedTile>,
+  maxTiles: number
 ): { valid: boolean; error?: string } {
   const placedCount = Object.keys(placedTiles).length;
 
   // Rule 1: Max tiles limit
-  if (placedCount >= 4) {
-    return { valid: false, error: 'All 4 tiles have already been placed.' };
+  if (placedCount >= maxTiles) {
+    return { valid: false, error: `All ${maxTiles} tiles have already been placed.` };
   }
 
   // Rule 2: First tile must be at (0, 0)
