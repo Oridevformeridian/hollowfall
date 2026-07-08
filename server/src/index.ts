@@ -87,7 +87,7 @@ io.on('connection', (socket) => {
           }
 
           // Ensure color is unique
-          let playerColor = color;
+          let playerColor = color || '#00E5FF';
           const assignedColors = existingPlayers.map(p => p.color);
           if (assignedColors.includes(playerColor)) {
             const availableColors = ['#00E5FF', '#FFD600', '#FF1744', '#00E676', '#D500F9', '#FF6D00'];
@@ -95,7 +95,7 @@ io.on('connection', (socket) => {
           }
 
           // Ensure emoji is unique
-          let playerEmoji = emoji;
+          let playerEmoji = emoji || '🧙‍♂️';
           const assignedEmojis = existingPlayers.map(p => p.emoji);
           if (assignedEmojis.includes(playerEmoji)) {
             const availableEmojis = ['🧙‍♂️', '🧙‍♀️', '🧝‍♂️', '🧝‍♀️', '🤴', '👸', '🧚‍♂️', '🧚‍♀️', '🧞', '🦄'];
@@ -130,6 +130,10 @@ io.on('connection', (socket) => {
 
           const player = room.players[playerId];
           if (player) {
+            if (!player.emoji) {
+              sendError(socket, 'You must select a hero before readying up.');
+              return;
+            }
             player.isReady = !player.isReady;
             broadcastState(currentRoomCode, room);
           }

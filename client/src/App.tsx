@@ -314,6 +314,7 @@ export default function App() {
           <div className="flex gap-4 mt-4 border-t border-[var(--border-light)] pt-6">
             <button
               onClick={handleToggleReady}
+              disabled={!self?.emoji}
               className={`flex-1 ${self?.isReady ? 'btn-secondary' : 'btn-primary'}`}
             >
               {self?.isReady ? 'Cancel Ready' : 'Ready Up'}
