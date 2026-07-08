@@ -439,7 +439,7 @@ export default function App() {
               >
                 {tile ? (
                   // Placed Tile
-                  <div style={{ position: 'absolute', top: '8px', left: '8px', right: '8px', bottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
                     <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100">
                       <g transform={`rotate(${tile.rotation} 50 50)`}>
                         {renderTileSvgContent(FIXED_TILES[tile.tileId - 1], gameState.players[tile.placedBy]?.color || '#00E5FF')}
@@ -454,12 +454,16 @@ export default function App() {
                             key={pId}
                             style={{
                               position: 'absolute',
-                              fontSize: '44px',
-                              lineHeight: '1',
+                              left: `${pos.c * 22}px`,
+                              top: `${pos.r * 22}px`,
+                              width: '22px',
+                              height: '22px',
+                              fontSize: '18px', // ~80% of cell height (22px)
+                              lineHeight: '22px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              filter: `drop-shadow(0 0 8px ${player?.color})`
+                              filter: `drop-shadow(0 0 6px ${player?.color})`
                             }}
                             className="floating-emoji"
                           >
@@ -472,7 +476,7 @@ export default function App() {
                   </div>
                 ) : isHovered && isValid && activeTileLayout ? (
                   // Placement Preview Hover
-                  <div style={{ position: 'absolute', top: '8px', left: '8px', right: '8px', bottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6 }}>
                     <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100">
                       <g transform={`rotate(${rotation} 50 50)`}>
                         {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF')}
