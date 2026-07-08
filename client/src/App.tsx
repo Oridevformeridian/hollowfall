@@ -377,7 +377,7 @@ export default function App() {
       {/* Main Board Space */}
       <div className="main-content">
         {/* Turn Indicator Overlay (Top Right) */}
-        {activePlayerId && (
+        {gameState.turnOrder.length > 0 && (
           <div
             style={{
               position: 'absolute',
@@ -385,25 +385,40 @@ export default function App() {
               right: '24px',
               zIndex: 40,
               display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
+              gap: '12px',
               backgroundColor: 'rgba(15, 23, 42, 0.85)',
               backdropFilter: 'blur(8px)',
-              border: `2px solid ${gameState.players[activePlayerId]?.color || 'var(--border-light)'}`,
-              padding: '10px 18px',
+              border: '1px solid var(--border-light)',
+              padding: '8px 12px',
               borderRadius: '12px',
-              boxShadow: `0 0 15px ${gameState.players[activePlayerId]?.color || '#000000'}22`
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)'
             }}
           >
-            <span style={{ fontSize: '24px', lineHeight: '1' }}>{gameState.players[activePlayerId]?.emoji}</span>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 'bold' }}>
-                {gameState.phase === 'PLACEMENT' ? 'Tile Placement Turn' : 'Active Turn'}
-              </span>
-              <span style={{ fontSize: '14px', fontWeight: 'black', color: 'white' }}>
-                {gameState.players[activePlayerId]?.username} {activePlayerId === socket?.id && '(You)'}
-              </span>
-            </div>
+            {gameState.turnOrder.map((pId) => {
+              const player = gameState.players[pId];
+              const isActive = pId === activePlayerId;
+              return (
+                <div
+                  key={pId}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: isActive ? `2px solid ${player.color}` : '2px solid transparent',
+                    boxShadow: isActive ? `0 0 10px ${player.color}44` : 'none',
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.03)' : 'transparent',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <span style={{ fontSize: '22px', lineHeight: '1' }}>{player.emoji}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+                    {player.username} {pId === socket?.id && '(You)'}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
         {error && (
