@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES } from './shared/constants.ts';
+import { validateTilePlacement } from './shared/validation.ts';
 
 const SERVER_URL = 'http://localhost:3001';
 
@@ -245,20 +246,9 @@ export default function App() {
   // Validate if a coordinates placement is allowed
   const isPlacementValid = (x: number, y: number) => {
     if (!isActiveTurn || gameState.phase !== 'PLACEMENT') return false;
-    const placedCount = placedList.length;
-    if (placedCount === 0) {
-      return x === 0 && y === 0;
-    }
-    // Check if slot is empty
-    if (gameState.placedTiles[`${x},${y}`]) return false;
-    // Must be adjacent
-    const adjacent = [
-      `${x+1},${y}`,
-      `${x-1},${y}`,
-      `${x},${y+1}`,
-      `${x},${y-1}`
-    ];
-    return adjacent.some(coord => !!gameState.placedTiles[coord]);
+    const tileIndex = self?.assignedTileIndex;
+    if (tileIndex === null || tileIndex === undefined) return false;
+    return validateTilePlacement(x, y, tileIndex, socket?.id || '', gameState.placedTiles).valid;
   };
 
   return (

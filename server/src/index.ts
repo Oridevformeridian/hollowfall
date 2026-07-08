@@ -2,8 +2,8 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, TokenPosition } from '../../shared/types';
-import { FIXED_TILES } from '../../shared/constants';
+import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
+import { validateTilePlacement } from '../../shared/validation';
 
 const app = express();
 app.use(cors());
@@ -31,7 +31,7 @@ const random = Math.random;
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
   let currentRoomCode: string | null = null;
-  let playerId = socket.id;
+  const playerId = socket.id;
 
   socket.on('message', (messageStr: string) => {
     try {
@@ -191,48 +191,11 @@ io.on('connection', (socket) => {
           }
 
           // VALIDATION RULES
-          const placedCount = Object.keys(room.placedTiles).length;
-
-          // Rule 1: Adjacency Check
-          if (placedCount === 0) {
-            // First tile must be at (0, 0)
-            if (x !== 0 || y !== 0) {
-              sendError(socket, 'The first tile must be placed at (0, 0).');
-              return;
-            }
-          } else {
-            // Subsequent tiles must touch an existing tile
-            const key = `${x},${y}`;
-            if (room.placedTiles[key]) {
-              sendError(socket, 'A tile is already placed at these coordinates.');
-              return;
-            }
-
-            const adjacentCoords = [
-              `${x + 1},${y}`,
-              `${x - 1},${y}`,
-              `${x},${y + 1}`,
-              `${x},${y - 1}`
-            ];
-
-            const hasAdjacent = adjacentCoords.some(coord => !!room.placedTiles[coord]);
-            if (!hasAdjacent) {
-              sendError(socket, 'Tile must be placed adjacent to an existing tile.');
-              return;
-            }
+          const validation = validateTilePlacement(x, y, tileId, playerId, room.placedTiles);
+          if (!validation.valid) {
+            sendError(socket, validation.error || 'Invalid placement.');
+            return;
           }
-
-          // Rule 2: Exit Alignment Validation
-          // Since it's a 5x5 grid with exits at the exact center of its 4 edges, they always line up.
-          // In a 2-player prototype setup where they just assemble the board, we validate that the board coordinates align.
-          // Let's implement alignment verification. Every touching edge between the new tile and existing adjacent tiles must be compatible.
-          // Since all our tiles (FIXED_TILES) have exits on all 4 edges, any rotation will have exits at North, South, East, and West.
-          // Therefore, they will always connect!
-          // Wait! Are there tiles with different exit profiles?
-          // Looking at our constants:
-          // Tile 1: exits N, S, E, W.
-          // Tile 2: exits N, S, E, W. (Wait, let's verify if all 4 tiles have exits on all 4 sides. Yes, they all have exits on all 4 sides since we defined them with North, South, East, West gaps).
-          // Therefore, exits will always align physically. We just place the tile.
           
           // Place the tile
           const key = `${x},${y}`;

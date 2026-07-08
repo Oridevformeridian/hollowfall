@@ -1,0 +1,47 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, feature/* ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-node: 20
+        cache: 'npm'
+
+    - name: Install Root Dependencies
+      run: npm ci
+
+    - name: Install Server Dependencies
+      run: npm --prefix server ci
+
+    - name: Install Client Dependencies
+      run: npm --prefix client ci
+
+    - name: Create Shared Symlink in Client
+      run: |
+        rm -rf client/src/shared
+        ln -s ../../shared client/src/shared
+
+    - name: Run ESLint
+      run: npm run lint
+
+    - name: Run Unit Tests
+      run: npm run test
+
+    - name: Compile Server
+      run: npm --prefix server run build
+
+    - name: Compile Client
+      run: npm --prefix client run build

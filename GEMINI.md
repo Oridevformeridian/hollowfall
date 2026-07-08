@@ -27,3 +27,12 @@ This file contains behavioral guidelines, workflows, and developer preferences t
 
 *   **No Protected References**: Do not reference the name "Wiz-War" (or variants like "Wiz War" or "Wizards") in any specification, documentation, or code file. The game is legally distinct and uses original animist/spirit-duel vocabulary (e.g. Walkers, Lairs, Hearths, Rites, and Thresholds).
 
+---
+
+## 4. Testing & Quality Standards
+
+*   **Unit Testing**: You must write unit tests for any critical in-path functions used to implement a feature (e.g. game validation, state progression, parsing, rotation calculations).
+*   **Linting**: Run basic lint checks (e.g. ESLint) locally on code before proposing commits.
+*   **Continuous Integration**: Maintain a GitHub Actions workflow that runs linting and unit tests on every pull request, blocking PR merges unless they pass.
+
+
