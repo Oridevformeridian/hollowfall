@@ -4,8 +4,6 @@ import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES } from './shared/constants.ts';
 import { validateTilePlacement } from './shared/validation.ts';
 
-const SERVER_URL = 'http://localhost:3001';
-
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -22,7 +20,7 @@ export default function App() {
 
   // Initialize socket connection
   useEffect(() => {
-    const s = io(SERVER_URL);
+    const s = io();
     setSocket(s);
 
     s.on('connect', () => {
