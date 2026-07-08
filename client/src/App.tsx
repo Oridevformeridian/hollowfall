@@ -1,8 +1,111 @@
 import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
-import { FIXED_TILES } from './shared/constants.ts';
+import { FIXED_TILES, TileLayout } from './shared/constants.ts';
 import { validateTilePlacement } from './shared/validation.ts';
+
+const renderTileSvgContent = (layout: TileLayout, playerColor: string) => {
+  const cells = [];
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      cells.push(
+        <rect
+          key={`cell-${r}-${c}`}
+          x={c * 20}
+          y={r * 20}
+          width="20"
+          height="20"
+          fill="rgba(255, 255, 255, 0.01)"
+          stroke="rgba(255, 255, 255, 0.05)"
+          strokeWidth="0.5"
+        />
+      );
+    }
+  }
+
+  return (
+    <>
+      {/* 5x5 Grid Cells */}
+      {cells}
+
+      {/* Starting Star in Center */}
+      <polygon
+        points="50,43 52,48 57,48 53,51 55,56 50,53 45,56 47,51 43,48 48,48"
+        fill={playerColor}
+        stroke={playerColor}
+        strokeWidth="1"
+        className="pulse-glow"
+      />
+
+      {/* Outer borders (with gaps for exits) */}
+      <line x1="0" y1="0" x2="40" y2="0" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+      <line x1="60" y1="0" x2="100" y2="0" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+      
+      <line x1="0" y1="100" x2="40" y2="100" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+      <line x1="60" y1="100" x2="100" y2="100" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+      
+      <line x1="0" y1="0" x2="0" y2="40" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+      <line x1="0" y1="60" x2="0" y2="100" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+      
+      <line x1="100" y1="0" x2="100" y2="40" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+      <line x1="100" y1="60" x2="100" y2="100" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+
+      {/* Internal Walls (Crimson) */}
+      {layout.vWalls.map((w, i) => (
+        <line
+          key={`vw-${i}`}
+          x1={(w.c + 1) * 20}
+          y1={w.r * 20}
+          x2={(w.c + 1) * 20}
+          y2={(w.r + 1) * 20}
+          stroke="var(--accent-crimson)"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+      ))}
+      {layout.hWalls.map((w, i) => (
+        <line
+          key={`hw-${i}`}
+          x1={w.c * 20}
+          y1={(w.r + 1) * 20}
+          x2={(w.c + 1) * 20}
+          y2={(w.r + 1) * 20}
+          stroke="var(--accent-crimson)"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+      ))}
+
+      {/* Internal Doors (Gold Dashed) */}
+      {layout.vDoors.map((w, i) => (
+        <line
+          key={`vd-${i}`}
+          x1={(w.c + 1) * 20}
+          y1={w.r * 20}
+          x2={(w.c + 1) * 20}
+          y2={(w.r + 1) * 20}
+          stroke="var(--accent-gold)"
+          strokeWidth="3.5"
+          strokeDasharray="4,3"
+          strokeLinecap="round"
+        />
+      ))}
+      {layout.hDoors.map((w, i) => (
+        <line
+          key={`hd-${i}`}
+          x1={w.c * 20}
+          y1={(w.r + 1) * 20}
+          x2={(w.c + 1) * 20}
+          y2={(w.r + 1) * 20}
+          stroke="var(--accent-gold)"
+          strokeWidth="3.5"
+          strokeDasharray="4,3"
+          strokeLinecap="round"
+        />
+      ))}
+    </>
+  );
+};
 
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -290,31 +393,7 @@ export default function App() {
                 {/* SVG Render of Tile layout */}
                 <svg className="w-36 h-36 border border-gray-800 rounded bg-black" viewBox="0 0 100 100">
                   <g transform={`rotate(${rotation} 50 50)`}>
-                    {/* Draw Paths */}
-                    {/* (This is a simplified visual representation of paths) */}
-                    <rect x="0" y="0" width="100" height="100" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-                    {/* Draw Tile layout specifics based on ID */}
-                    <path
-                      d={
-                        activeTileLayout.id === 1 ? 'M 50 0 L 50 100 M 0 50 L 100 50' : // Crossroads
-                        activeTileLayout.id === 2 ? 'M 50 0 L 50 50 L 100 50' :        // Corner
-                        activeTileLayout.id === 3 ? 'M 50 0 L 50 100' :               // Straight
-                        'M 50 0 L 50 50 M 0 50 L 100 50'                              // T-Junction
-                      }
-                      fill="none"
-                      stroke="var(--accent-cyan)"
-                      strokeWidth="6"
-                      strokeLinecap="round"
-                    />
-                    {/* Exits */}
-                    <circle cx="50" cy="5" r="4" fill="var(--accent-cyan)" />
-                    {activeTileLayout.id !== 2 && <circle cx="50" cy="95" r="4" fill="var(--accent-cyan)" />}
-                    {activeTileLayout.id !== 3 && <circle cx="95" cy="50" r="4" fill="var(--accent-cyan)" />}
-                    {activeTileLayout.id !== 2 && activeTileLayout.id !== 3 && <circle cx="5" cy="50" r="4" fill="var(--accent-cyan)" />}
-                    
-                    {/* Center Lair */}
-                    <circle cx="50" cy="50" r="6" fill="#000" stroke="var(--accent-gold)" strokeWidth="2" />
-                    <text x="50" y="53" textAnchor="middle" fill="var(--accent-gold)" fontSize="8" fontWeight="bold">S</text>
+                    {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF')}
                   </g>
                 </svg>
               </div>
@@ -380,27 +459,7 @@ export default function App() {
                   <div className="absolute inset-2 flex items-center justify-center">
                     <svg className="w-full h-full" viewBox="0 0 100 100">
                       <g transform={`rotate(${tile.rotation} 50 50)`}>
-                        <rect x="0" y="0" width="100" height="100" fill="none" stroke="rgba(255,255,255,0.05)" />
-                        <path
-                          d={
-                            tile.tileId === 1 ? 'M 50 0 L 50 100 M 0 50 L 100 50' :
-                            tile.tileId === 2 ? 'M 50 0 L 50 50 L 100 50' :
-                            tile.tileId === 3 ? 'M 50 0 L 50 100' :
-                            'M 50 0 L 50 50 M 0 50 L 100 50'
-                          }
-                          fill="none"
-                          stroke="var(--accent-cyan)"
-                          strokeWidth="6"
-                          strokeLinecap="round"
-                        />
-                        <circle cx="50" cy="5" r="4" fill="var(--accent-cyan)" />
-                        {tile.tileId !== 2 && <circle cx="50" cy="95" r="4" fill="var(--accent-cyan)" />}
-                        {tile.tileId !== 3 && <circle cx="95" cy="50" r="4" fill="var(--accent-cyan)" />}
-                        {tile.tileId !== 2 && tile.tileId !== 3 && <circle cx="5" cy="50" r="4" fill="var(--accent-cyan)" />}
-                        
-                        {/* Center Lair */}
-                        <circle cx="50" cy="50" r="6" fill="#000" stroke="var(--accent-gold)" strokeWidth="2" />
-                        <text x="50" y="53" textAnchor="middle" fill="var(--accent-gold)" fontSize="8" fontWeight="bold">S</text>
+                        {renderTileSvgContent(FIXED_TILES[tile.tileId - 1], gameState.players[tile.placedBy]?.color || '#00E5FF')}
                       </g>
                     </svg>
                     {/* Render spawn Token (in gameplay phase) */}
@@ -428,18 +487,7 @@ export default function App() {
                   <div className="absolute inset-2 flex items-center justify-center opacity-70">
                     <svg className="w-full h-full" viewBox="0 0 100 100">
                       <g transform={`rotate(${rotation} 50 50)`}>
-                        <path
-                          d={
-                            activeTileLayout.id === 1 ? 'M 50 0 L 50 100 M 0 50 L 100 50' :
-                            activeTileLayout.id === 2 ? 'M 50 0 L 50 50 L 100 50' :
-                            activeTileLayout.id === 3 ? 'M 50 0 L 50 100' :
-                            'M 50 0 L 50 50 M 0 50 L 100 50'
-                          }
-                          fill="none"
-                          stroke="var(--accent-green)"
-                          strokeWidth="6"
-                          strokeLinecap="round"
-                        />
+                        {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF')}
                       </g>
                     </svg>
                   </div>
