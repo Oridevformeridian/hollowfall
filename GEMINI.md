@@ -20,3 +20,10 @@ This file contains behavioral guidelines, workflows, and developer preferences t
     4.  Push the feature branch to the remote repository (`origin`).
     5.  Request the user to review and merge the branch.
 *   **No Direct Push to Main**: Do not commit directly to `main` unless explicitly requested.
+
+---
+
+## 3. Clean-Room & Intellectual Property Guidelines
+
+*   **No Protected References**: Do not reference the name "Wiz-War" (or variants like "Wiz War" or "Wizards") in any specification, documentation, or code file. The game is legally distinct and uses original animist/spirit-duel vocabulary (e.g. Walkers, Lairs, Hearths, Rites, and Thresholds).
+
