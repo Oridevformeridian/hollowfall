@@ -297,32 +297,42 @@ export default function App() {
   };
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row h-screen overflow-hidden">
+    <div className="app-layout">
       {/* Sidebar - Players & Game Phase Info */}
-      <div className="w-full md:w-80 bg-[var(--bg-dark)] border-b md:border-b-0 md:border-r border-[var(--border-light)] p-6 flex flex-col justify-between overflow-y-auto">
-        <div className="flex flex-col gap-6">
+      <div className="sidebar">
+        <div className="sidebar-section">
           <div>
             <h1 className="text-xl font-black text-[var(--accent-cyan)] m-0 tracking-wider">HOLLOWFALL</h1>
             <p className="text-gray-400 text-xs m-0">Setup Phase — Contiguous Exit Match</p>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="sidebar-section" style={{ gap: '12px' }}>
             <h3 className="text-xs font-bold text-gray-500 m-0 uppercase tracking-widest">Turn Rotation</h3>
-            <div className="flex flex-col gap-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {gameState.turnOrder.map((pId) => {
                 const player = gameState.players[pId];
                 const isActive = pId === activePlayerId;
                 return (
                   <div
                     key={pId}
-                    style={{ borderColor: isActive ? 'var(--accent-gold)' : 'var(--border-light)' }}
-                    className={`flex justify-between items-center p-3 rounded-xl border ${isActive ? 'bg-[rgba(255,214,0,0.05)] pulse-glow' : 'bg-transparent'}`}
+                    style={{
+                      borderColor: isActive ? 'var(--accent-gold)' : 'var(--border-light)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      borderWidth: '1px',
+                      borderStyle: 'solid',
+                      backgroundColor: isActive ? 'rgba(255,214,0,0.05)' : 'transparent'
+                    }}
+                    className={isActive ? 'pulse-glow' : ''}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: player.color }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: player.color }} />
                       <span className="font-semibold text-sm">{player.username}</span>
                     </div>
-                    {isActive && <span className="text-[10px] bg-[var(--accent-gold)] text-black font-extrabold px-1.5 py-0.5 rounded">ACTIVE</span>}
+                    {isActive && <span style={{ fontSize: '10px', backgroundColor: 'var(--accent-gold)', color: 'black', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px' }}>ACTIVE</span>}
                   </div>
                 );
               })}
@@ -330,9 +340,9 @@ export default function App() {
           </div>
 
           {gameState.phase === 'PLACEMENT' && activeTileLayout && (
-            <div className="flex flex-col gap-4 bg-[rgba(255,255,255,0.02)] p-4 rounded-xl border border-gray-800">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', backgroundColor: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid #1a1f26' }}>
               <h3 className="text-xs font-bold text-gray-400 m-0 uppercase tracking-widest">Your Assigned Tile</h3>
-              <div className="flex flex-col items-center">
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <span className="text-sm font-bold text-white mb-2">{activeTileLayout.name}</span>
                 {/* SVG Render of Tile layout */}
                 <svg className="w-36 h-36 border border-gray-800 rounded bg-black" viewBox="0 0 100 100">
@@ -351,31 +361,31 @@ export default function App() {
           )}
 
           {gameState.phase === 'GAMEPLAY' && (
-            <div className="bg-[rgba(0,230,118,0.05)] border border-[var(--accent-green)] p-4 rounded-xl text-center">
-              <h3 className="text-sm font-bold text-[var(--accent-green)] m-0 mb-1">MAZE READY</h3>
-              <p className="text-xs text-gray-300 m-0">All 4 board sectors successfully placed and aligned.</p>
+            <div style={{ backgroundColor: 'rgba(0,230,118,0.05)', borderColor: 'var(--accent-green)', borderWidth: '1px', borderStyle: 'solid', padding: '16px', borderRadius: '12px', textAlign: 'center' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--accent-green)', margin: '0 0 4px 0' }}>MAZE READY</h3>
+              <p style={{ fontSize: '12px', color: '#cbd5e1', margin: '0' }}>All 4 board sectors successfully placed and aligned.</p>
             </div>
           )}
         </div>
 
-        <div className="mt-6 border-t border-[var(--border-light)] pt-4 text-center">
-          <span className="text-[10px] text-gray-500 font-mono">Room: {gameState.roomCode}</span>
+        <div style={{ marginTop: '24px', borderTop: '1px solid var(--border-light)', paddingTop: '16px', textAlign: 'center' }}>
+          <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>Room: {gameState.roomCode}</span>
         </div>
       </div>
 
       {/* Main Board Space */}
-      <div className="flex-1 bg-[var(--bg-deep)] overflow-auto p-6 flex items-center justify-center relative">
+      <div className="main-content">
         {error && (
-          <div className="absolute top-6 left-6 right-6 z-50 bg-[rgba(255,23,68,0.9)] border border-[var(--accent-crimson)] text-white p-3 rounded-lg text-sm text-center shadow-lg">
+          <div style={{ position: 'absolute', top: '24px', left: '24px', right: '24px', zIndex: 50, backgroundColor: 'rgba(255,23,68,0.9)', border: '1px solid var(--accent-crimson)', color: 'white', padding: '12px', borderRadius: '8px', fontSize: '14px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
             {error}
           </div>
         )}
 
         {/* 2D Board Rendering */}
         <div
-          className="grid gap-4 p-6 border border-gray-800 rounded-3xl bg-[rgba(255,255,255,0.01)]"
+          className="board-container"
           style={{
-            gridTemplateColumns: `repeat(${maxX - minX + 1}, minmax(100px, 120px))`
+            gridTemplateColumns: `repeat(${maxX - minX + 1}, 110px)`
           }}
         >
           {macroGrid.map(({ x, y }) => {
@@ -390,18 +400,16 @@ export default function App() {
                 onMouseEnter={() => setHoverCoord({ x, y })}
                 onMouseLeave={() => setHoverCoord(null)}
                 onClick={() => isValid && handlePlaceTile(x, y)}
-                style={{
-                  aspectRatio: '1',
-                  borderColor: isHovered && isValid ? 'var(--accent-green)' : tile ? 'var(--border-light)' : 'rgba(255,255,255,0.03)'
-                }}
-                className={`relative flex items-center justify-center border-2 border-dashed rounded-2xl transition-all cursor-pointer ${
-                  tile ? 'bg-black border-solid' : isValid ? 'hover:bg-[rgba(0,230,118,0.05)]' : 'opacity-40 cursor-not-allowed'
+                className={`board-cell ${
+                  tile ? 'placed-tile' :
+                  isValid ? 'valid-placement' :
+                  'disabled-cell'
                 }`}
               >
                 {tile ? (
                   // Placed Tile
-                  <div className="absolute inset-2 flex items-center justify-center">
-                    <svg className="w-full h-full" viewBox="0 0 100 100">
+                  <div style={{ position: 'absolute', top: '8px', left: '8px', right: '8px', bottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100">
                       <g transform={`rotate(${tile.rotation} 50 50)`}>
                         {renderTileSvgContent(FIXED_TILES[tile.tileId - 1], gameState.players[tile.placedBy]?.color || '#00E5FF')}
                       </g>
@@ -414,12 +422,20 @@ export default function App() {
                           <div
                             key={pId}
                             style={{
+                              position: 'absolute',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              border: '1.5px solid white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               backgroundColor: player?.color,
-                              boxShadow: `0 0 10px ${player?.color}`
+                              boxShadow: `0 0 12px ${player?.color}`
                             }}
-                            className="absolute w-5 h-5 rounded-full border border-white pulse-glow flex items-center justify-center"
+                            className="pulse-glow"
                           >
-                            <span className="text-[8px] text-black font-extrabold">{player?.username.charAt(0)}</span>
+                            <span style={{ fontSize: '10px', color: 'black', fontWeight: 'extrabold' }}>{player?.username.charAt(0)}</span>
                           </div>
                         );
                       }
@@ -428,8 +444,8 @@ export default function App() {
                   </div>
                 ) : isHovered && isValid && activeTileLayout ? (
                   // Placement Preview Hover
-                  <div className="absolute inset-2 flex items-center justify-center opacity-70">
-                    <svg className="w-full h-full" viewBox="0 0 100 100">
+                  <div style={{ position: 'absolute', top: '8px', left: '8px', right: '8px', bottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.6 }}>
+                    <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100">
                       <g transform={`rotate(${rotation} 50 50)`}>
                         {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF')}
                       </g>
@@ -437,7 +453,7 @@ export default function App() {
                   </div>
                 ) : (
                   // Coordinate display for empty grid cells
-                  <span className="text-[10px] font-mono text-gray-600">{x}, {y}</span>
+                  <span className="board-cell-coords">{x}, {y}</span>
                 )}
               </div>
             );
