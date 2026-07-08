@@ -287,3 +287,19 @@ h1, h2, h3, h4 {
   padding: 32px;
 }
 
+@keyframes floatEmoji {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.floating-emoji {
+  animation: floatEmoji 2s infinite ease-in-out;
+  pointer-events: none;
+  z-index: 10;
+}
+
+

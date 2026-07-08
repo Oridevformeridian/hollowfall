@@ -5,6 +5,7 @@ export interface Player {
   id: PlayerId;
   username: string;
   color: string;
+  emoji: string;
   isReady: boolean;
   isHost: boolean;
   assignedTileIndex: number | null; // 0..3 index of distributed fixed tiles
@@ -41,7 +42,7 @@ export interface GameState {
 }
 
 export type ClientMessage =
-  | { event: 'JOIN_ROOM'; payload: { username: string; roomCode: string; color: string } }
+  | { event: 'JOIN_ROOM'; payload: { username: string; roomCode: string; color: string; emoji: string } }
   | { event: 'TOGGLE_READY' }
   | { event: 'START_GAME' }
   | { event: 'PLACE_TILE'; payload: { x: number; y: number; rotation: 0 | 90 | 180 | 270 } }

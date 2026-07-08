@@ -60,6 +60,7 @@ export default function App() {
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
   const [selectedColor, setSelectedColor] = useState('#00E5FF');
+  const [selectedEmoji, setSelectedEmoji] = useState('🧙');
 
   // Interactive placement states
   const [hoverCoord, setHoverCoord] = useState<{ x: number; y: number } | null>(null);
@@ -112,7 +113,7 @@ export default function App() {
     }
     sendEvent({
       event: 'JOIN_ROOM',
-      payload: { username, roomCode, color: selectedColor }
+      payload: { username, roomCode, color: selectedColor, emoji: selectedEmoji }
     });
   };
 
@@ -199,6 +200,42 @@ export default function App() {
             </div>
           </div>
 
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-semibold text-gray-300">Select Your Hero</label>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: '8px',
+                justifyItems: 'center'
+              }}
+            >
+              {['🧙', '👻', '🧝', '🦁', '🧛', '🤖', '🦊', '🐦', '🐉', '💀'].map(emoji => (
+                <button
+                  type="button"
+                  key={emoji}
+                  onClick={() => setSelectedEmoji(emoji)}
+                  style={{
+                    fontSize: '20px',
+                    width: '40px',
+                    height: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: selectedEmoji === emoji ? '2px solid var(--accent-cyan)' : '1px solid var(--border-light)',
+                    borderRadius: '8px',
+                    backgroundColor: selectedEmoji === emoji ? 'rgba(0, 229, 255, 0.1)' : 'rgba(0, 0, 0, 0.2)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  className="hover:scale-110"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button type="submit" className="btn-primary w-full mt-2">
             Connect to Lobby
           </button>
@@ -233,7 +270,7 @@ export default function App() {
                 <div key={player.id} className="flex justify-between items-center bg-[rgba(255,255,255,0.03)] p-4 rounded-xl border border-gray-800">
                   <div className="flex items-center gap-3">
                     <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
-                    <span className="font-semibold text-white">{player.username} {player.id === socket?.id && '(You)'}</span>
+                    <span className="font-semibold text-white">{player.emoji} {player.username} {player.id === socket?.id && '(You)'}</span>
                   </div>
                   <span className={`text-xs px-3 py-1.5 rounded-full font-bold ${player.isReady ? 'bg-[rgba(0,230,118,0.15)] text-[var(--accent-green)]' : 'bg-gray-800 text-gray-400'}`}>
                     {player.isReady ? 'READY' : 'NOT READY'}
@@ -330,7 +367,7 @@ export default function App() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: player.color }} />
-                      <span className="font-semibold text-sm">{player.username}</span>
+                      <span className="font-semibold text-sm">{player.emoji} {player.username}</span>
                     </div>
                     {isActive && <span style={{ fontSize: '10px', backgroundColor: 'var(--accent-gold)', color: 'black', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px' }}>ACTIVE</span>}
                   </div>
@@ -423,19 +460,16 @@ export default function App() {
                             key={pId}
                             style={{
                               position: 'absolute',
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '50%',
-                              border: '1.5px solid white',
+                              fontSize: '26px',
+                              lineHeight: '1',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              backgroundColor: player?.color,
-                              boxShadow: `0 0 12px ${player?.color}`
+                              filter: `drop-shadow(0 0 8px ${player?.color})`
                             }}
-                            className="pulse-glow"
+                            className="floating-emoji"
                           >
-                            <span style={{ fontSize: '10px', color: 'black', fontWeight: 'extrabold' }}>{player?.username.charAt(0)}</span>
+                            {player?.emoji}
                           </div>
                         );
                       }

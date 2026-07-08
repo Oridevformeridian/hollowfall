@@ -40,7 +40,7 @@ io.on('connection', (socket) => {
 
       switch (message.event) {
         case 'JOIN_ROOM': {
-          const { username, roomCode, color } = message.payload;
+          const { username, roomCode, color, emoji } = message.payload;
           const targetRoomCode = roomCode.toUpperCase().trim();
 
           if (!targetRoomCode) {
@@ -77,12 +77,29 @@ io.on('connection', (socket) => {
             return;
           }
 
+          // Ensure color is unique
+          let playerColor = color;
+          const assignedColors = existingPlayers.map(p => p.color);
+          if (assignedColors.includes(playerColor)) {
+            const availableColors = ['#00E5FF', '#FFD600', '#FF1744', '#00E676', '#D500F9', '#FF6D00'];
+            playerColor = availableColors.find(c => !assignedColors.includes(c)) || getRandomColor();
+          }
+
+          // Ensure emoji is unique
+          let playerEmoji = emoji;
+          const assignedEmojis = existingPlayers.map(p => p.emoji);
+          if (assignedEmojis.includes(playerEmoji)) {
+            const availableEmojis = ['🧙', '👻', '🧝', '🦁', '🧛', '🤖', '🦊', '🐦', '🐉', '💀'];
+            playerEmoji = availableEmojis.find(e => !assignedEmojis.includes(e)) || '🧙';
+          }
+
           // Add player
           const isHost = existingPlayers.length === 0;
           const player: Player = {
             id: playerId,
             username: username.trim() || `Player_${playerId.substring(0, 4)}`,
-            color: color || getRandomColor(),
+            color: playerColor,
+            emoji: playerEmoji,
             isReady: false,
             isHost,
             assignedTileIndex: null
