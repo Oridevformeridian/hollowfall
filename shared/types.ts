@@ -1,0 +1,53 @@
+export type PlayerId = string;
+export type GamePhase = 'LOBBY' | 'DRAFT' | 'PLACEMENT' | 'GAMEPLAY' | 'GAME_OVER';
+
+export interface Player {
+  id: PlayerId;
+  username: string;
+  color: string;
+  isReady: boolean;
+  isHost: boolean;
+  assignedTileIndex: number | null; // 0..3 index of distributed fixed tiles
+}
+
+export interface Coordinate {
+  x: number; // Macro grid X coordinate (0,0 is start)
+  y: number; // Macro grid Y coordinate
+}
+
+export interface PlacedTile {
+  tileId: number; // 1..4 corresponding to the fixed tiles
+  position: Coordinate;
+  rotation: 0 | 90 | 180 | 270;
+  placedBy: PlayerId;
+}
+
+export interface TokenPosition {
+  tileX: number;
+  tileY: number;
+  r: number; // micro grid cell row (0..4)
+  c: number; // micro grid cell col (0..4)
+}
+
+export interface GameState {
+  roomCode: string;
+  phase: GamePhase;
+  players: Record<PlayerId, Player>;
+  turnOrder: PlayerId[];
+  activePlayerIndex: number;
+  placedTiles: Record<string, PlacedTile>; // Key format: "x,y"
+  doorsState: Record<string, 'OPEN' | 'CLOSED'>; // Key format: "x,y:r,c:direction"
+  tokenPositions: Record<PlayerId, TokenPosition>;
+}
+
+export type ClientMessage =
+  | { event: 'JOIN_ROOM'; payload: { username: string; roomCode: string; color: string } }
+  | { event: 'TOGGLE_READY' }
+  | { event: 'START_GAME' }
+  | { event: 'PLACE_TILE'; payload: { x: number; y: number; rotation: 0 | 90 | 180 | 270 } }
+  | { event: 'INTERACT_DOOR'; payload: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' } }
+  | { event: 'MOVE_TOKEN'; payload: TokenPosition };
+
+export type ServerMessage =
+  | { event: 'STATE_UPDATE'; payload: GameState }
+  | { event: 'ERROR'; payload: { message: string } };
