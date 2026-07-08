@@ -335,43 +335,9 @@ export default function App() {
         <div className="sidebar-section">
           <div>
             <h1 className="text-xl font-black text-[var(--accent-cyan)] m-0 tracking-wider">HOLLOWFALL</h1>
-            <p className="text-gray-400 text-xs m-0">Setup Phase — Contiguous Exit Match</p>
-          </div>
-
-          <div className="sidebar-section" style={{ gap: '12px' }}>
-            <h3 className="text-xs font-bold text-gray-500 m-0 uppercase tracking-widest">Turn Rotation</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {gameState.turnOrder.map((pId) => {
-                const player = gameState.players[pId];
-                const isActive = pId === activePlayerId;
-                return (
-                  <div
-                    key={pId}
-                    style={{
-                      borderColor: isActive ? 'var(--accent-gold)' : 'var(--border-light)',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      backgroundColor: isActive ? 'rgba(255,214,0,0.05)' : 'transparent'
-                    }}
-                    className={isActive ? 'pulse-glow' : ''}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: player.color }} />
-                      <span className="font-semibold text-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '20px', lineHeight: '1' }}>{player.emoji}</span>
-                        <span>{player.username}</span>
-                      </span>
-                    </div>
-                    {isActive && <span style={{ fontSize: '10px', backgroundColor: 'var(--accent-gold)', color: 'black', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px' }}>ACTIVE</span>}
-                  </div>
-                );
-              })}
-            </div>
+            <p className="text-gray-400 text-xs m-0">
+              {gameState.phase === 'PLACEMENT' ? 'Tile Setup' : 'Gameplay Phase'}
+            </p>
           </div>
 
           {gameState.phase === 'PLACEMENT' && activeTileLayout && (
@@ -411,7 +377,7 @@ export default function App() {
       {/* Main Board Space */}
       <div className="main-content">
         {/* Turn Indicator Overlay (Top Right) */}
-        {gameState.phase === 'GAMEPLAY' && (
+        {activePlayerId && (
           <div
             style={{
               position: 'absolute',
@@ -419,38 +385,25 @@ export default function App() {
               right: '24px',
               zIndex: 40,
               display: 'flex',
-              gap: '12px',
+              alignItems: 'center',
+              gap: '10px',
               backgroundColor: 'rgba(15, 23, 42, 0.85)',
               backdropFilter: 'blur(8px)',
-              border: '1px solid var(--border-light)',
-              padding: '8px 16px',
+              border: `2px solid ${gameState.players[activePlayerId]?.color || 'var(--border-light)'}`,
+              padding: '10px 18px',
               borderRadius: '12px',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)'
+              boxShadow: `0 0 15px ${gameState.players[activePlayerId]?.color || '#000000'}22`
             }}
           >
-            {gameState.turnOrder.map((pId) => {
-              const player = gameState.players[pId];
-              const isActive = pId === activePlayerId;
-              return (
-                <div
-                  key={pId}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    border: isActive ? `2px solid ${player.color}` : '2px solid transparent',
-                    boxShadow: isActive ? `0 0 10px ${player.color}44` : 'none',
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.03)' : 'transparent',
-                    transition: 'all 0.3s'
-                  }}
-                >
-                  <span style={{ fontSize: '22px', lineHeight: '1' }}>{player.emoji}</span>
-                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'white' }}>{player.username}</span>
-                </div>
-              );
-            })}
+            <span style={{ fontSize: '24px', lineHeight: '1' }}>{gameState.players[activePlayerId]?.emoji}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <span style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', fontWeight: 'bold' }}>
+                {gameState.phase === 'PLACEMENT' ? 'Tile Placement Turn' : 'Active Turn'}
+              </span>
+              <span style={{ fontSize: '14px', fontWeight: 'black', color: 'white' }}>
+                {gameState.players[activePlayerId]?.username} {activePlayerId === socket?.id && '(You)'}
+              </span>
+            </div>
           </div>
         )}
         {error && (
