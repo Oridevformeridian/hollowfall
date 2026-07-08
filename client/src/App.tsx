@@ -206,7 +206,16 @@ export default function App() {
           </div>
 
 
-          <button type="submit" className="btn-primary w-full mt-2 self-center">
+          <button
+            type="submit"
+            className="btn-primary w-full mt-2"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center'
+            }}
+          >
             Connect to Lobby
           </button>
         </form>
