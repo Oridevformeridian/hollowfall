@@ -316,6 +316,10 @@ export default function App() {
     }
   }
 
+  const cellWidth = gameState.phase === 'GAMEPLAY' ? 220 : 110;
+  const subCellSize = cellWidth / 5;
+  const tokenSize = Math.floor(subCellSize * 0.8);
+
   // Validate if a coordinates placement is allowed
   const isPlacementValid = (x: number, y: number) => {
     if (!isActiveTurn || gameState.phase !== 'PLACEMENT') return false;
@@ -416,7 +420,7 @@ export default function App() {
         <div
           className="board-container"
           style={{
-            gridTemplateColumns: `repeat(${maxX - minX + 1}, 110px)`
+            gridTemplateColumns: `repeat(${maxX - minX + 1}, ${cellWidth}px)`
           }}
         >
           {macroGrid.map(({ x, y }) => {
@@ -431,6 +435,11 @@ export default function App() {
                 onMouseEnter={() => setHoverCoord({ x, y })}
                 onMouseLeave={() => setHoverCoord(null)}
                 onClick={() => isValid && handlePlaceTile(x, y)}
+                style={{
+                  width: `${cellWidth}px`,
+                  height: `${cellWidth}px`,
+                  visibility: (!tile && gameState.phase === 'GAMEPLAY') ? 'hidden' : 'visible'
+                }}
                 className={`board-cell ${
                   tile ? 'placed-tile' :
                   isValid ? 'valid-placement' :
@@ -454,12 +463,12 @@ export default function App() {
                             key={pId}
                             style={{
                               position: 'absolute',
-                              left: `${pos.c * 22}px`,
-                              top: `${pos.r * 22}px`,
-                              width: '22px',
-                              height: '22px',
-                              fontSize: '18px', // ~80% of cell height (22px)
-                              lineHeight: '22px',
+                              left: `${pos.c * subCellSize}px`,
+                              top: `${pos.r * subCellSize}px`,
+                              width: `${subCellSize}px`,
+                              height: `${subCellSize}px`,
+                              fontSize: `${tokenSize}px`,
+                              lineHeight: `${subCellSize}px`,
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
