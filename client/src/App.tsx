@@ -122,6 +122,13 @@ export default function App() {
     sendEvent({ event: 'TOGGLE_READY' });
   };
 
+  const handleSelectHero = (emoji: string) => {
+    sendEvent({
+      event: 'SELECT_HERO',
+      payload: { emoji }
+    });
+  };
+
   const handleStartGame = () => {
     sendEvent({ event: 'START_GAME' });
   };
@@ -270,6 +277,64 @@ export default function App() {
               ))}
             </div>
           </div>
+
+          {(() => {
+            const takenEmojis = playersList
+              .filter(p => p.id !== socket?.id)
+              .map(p => p.emoji);
+            return (
+              <div className="flex flex-col gap-2 border-t border-[var(--border-light)] pt-4 mt-2">
+                <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider font-bold">Choose Your Hero</h3>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(5, 1fr)',
+                    gap: '8px',
+                    justifyItems: 'center',
+                    marginTop: '8px'
+                  }}
+                >
+                  {HEROES.map(hero => {
+                    const isTaken = takenEmojis.includes(hero.emoji);
+                    const isSelected = self?.emoji === hero.emoji;
+                    return (
+                      <button
+                        type="button"
+                        key={hero.emoji}
+                        onClick={() => !isTaken && handleSelectHero(hero.emoji)}
+                        disabled={isTaken}
+                        style={{
+                          fontSize: '28px',
+                          width: '54px',
+                          height: '54px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: isSelected
+                            ? `2.5px solid ${hero.color}`
+                            : isTaken
+                            ? '1px dashed #334155'
+                            : '1px solid var(--border-light)',
+                          borderRadius: '12px',
+                          backgroundColor: isSelected
+                            ? `${hero.color}22`
+                            : 'rgba(0, 0, 0, 0.2)',
+                          cursor: isTaken ? 'not-allowed' : 'pointer',
+                          opacity: isTaken ? 0.25 : 1,
+                          transition: 'all 0.2s',
+                          boxShadow: isSelected ? `0 0 10px ${hero.color}` : 'none'
+                        }}
+                        className={isTaken ? '' : 'hover:scale-110'}
+                        title={isTaken ? `${hero.name} (Already Taken)` : hero.name}
+                      >
+                        {hero.emoji}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="flex gap-4 mt-4 border-t border-[var(--border-light)] pt-6">
             <button

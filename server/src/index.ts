@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
 import { validateTilePlacement } from '../../shared/validation';
+import { HEROES } from '../../shared/constants';
 
 const app = express();
 app.use(cors());
@@ -74,6 +75,14 @@ io.on('connection', (socket) => {
 
           if (room.phase !== 'LOBBY') {
             sendError(socket, 'Game has already started.');
+            return;
+          }
+
+          // Ensure username is unique in this room
+          const requestedName = username.trim() || `Player_${playerId.substring(0, 4)}`;
+          const nameExists = existingPlayers.some(p => p.id !== playerId && p.username.toLowerCase() === requestedName.toLowerCase());
+          if (nameExists) {
+            sendError(socket, 'Username is already taken in this room.');
             return;
           }
 
@@ -166,6 +175,29 @@ io.on('connection', (socket) => {
           }
 
           broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'SELECT_HERO': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'LOBBY') return;
+
+          const { emoji } = message.payload;
+
+          // Ensure emoji is not already taken by another player
+          const isTaken = Object.values(room.players).some(p => p.id !== playerId && p.emoji === emoji);
+          if (isTaken) {
+            sendError(socket, 'That hero is already selected by another player.');
+            return;
+          }
+
+          const matchedHero = HEROES.find(h => h.emoji === emoji);
+          if (matchedHero) {
+            room.players[playerId].emoji = emoji;
+            room.players[playerId].color = matchedHero.color;
+            broadcastState(currentRoomCode, room);
+          }
           break;
         }
 

@@ -47,7 +47,8 @@ export type ClientMessage =
   | { event: 'START_GAME' }
   | { event: 'PLACE_TILE'; payload: { x: number; y: number; rotation: 0 | 90 | 180 | 270 } }
   | { event: 'INTERACT_DOOR'; payload: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' } }
-  | { event: 'MOVE_TOKEN'; payload: TokenPosition };
+  | { event: 'MOVE_TOKEN'; payload: TokenPosition }
+  | { event: 'SELECT_HERO'; payload: { emoji: string } };
 
 export type ServerMessage =
   | { event: 'STATE_UPDATE'; payload: GameState }
