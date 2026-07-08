@@ -4,7 +4,7 @@ import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout } from './shared/constants.ts';
 import { validateTilePlacement } from './shared/validation.ts';
 
-const renderTileSvgContent = (layout: TileLayout, playerColor: string) => {
+const renderTileSvgContent = (_layout: TileLayout, playerColor: string) => {
   const cells = [];
   for (let r = 0; r < 5; r++) {
     for (let c = 0; c < 5; c++) {
@@ -37,72 +37,16 @@ const renderTileSvgContent = (layout: TileLayout, playerColor: string) => {
         className="pulse-glow"
       />
 
-      {/* Outer borders (with gaps for exits) */}
-      <line x1="0" y1="0" x2="40" y2="0" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-      <line x1="60" y1="0" x2="100" y2="0" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-      
-      <line x1="0" y1="100" x2="40" y2="100" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-      <line x1="60" y1="100" x2="100" y2="100" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-      
-      <line x1="0" y1="0" x2="0" y2="40" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-      <line x1="0" y1="60" x2="0" y2="100" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-      
-      <line x1="100" y1="0" x2="100" y2="40" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-      <line x1="100" y1="60" x2="100" y2="100" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
-
-      {/* Internal Walls (Crimson) */}
-      {layout.vWalls.map((w, i) => (
-        <line
-          key={`vw-${i}`}
-          x1={(w.c + 1) * 20}
-          y1={w.r * 20}
-          x2={(w.c + 1) * 20}
-          y2={(w.r + 1) * 20}
-          stroke="var(--accent-crimson)"
-          strokeWidth="3.5"
-          strokeLinecap="round"
-        />
-      ))}
-      {layout.hWalls.map((w, i) => (
-        <line
-          key={`hw-${i}`}
-          x1={w.c * 20}
-          y1={(w.r + 1) * 20}
-          x2={(w.c + 1) * 20}
-          y2={(w.r + 1) * 20}
-          stroke="var(--accent-crimson)"
-          strokeWidth="3.5"
-          strokeLinecap="round"
-        />
-      ))}
-
-      {/* Internal Doors (Gold Dashed) */}
-      {layout.vDoors.map((w, i) => (
-        <line
-          key={`vd-${i}`}
-          x1={(w.c + 1) * 20}
-          y1={w.r * 20}
-          x2={(w.c + 1) * 20}
-          y2={(w.r + 1) * 20}
-          stroke="var(--accent-gold)"
-          strokeWidth="3.5"
-          strokeDasharray="4,3"
-          strokeLinecap="round"
-        />
-      ))}
-      {layout.hDoors.map((w, i) => (
-        <line
-          key={`hd-${i}`}
-          x1={w.c * 20}
-          y1={(w.r + 1) * 20}
-          x2={(w.c + 1) * 20}
-          y2={(w.r + 1) * 20}
-          stroke="var(--accent-gold)"
-          strokeWidth="3.5"
-          strokeDasharray="4,3"
-          strokeLinecap="round"
-        />
-      ))}
+      {/* Solid Outer border */}
+      <rect
+        x="0"
+        y="0"
+        width="100"
+        height="100"
+        fill="none"
+        stroke="rgba(255,255,255,0.2)"
+        strokeWidth="1.5"
+      />
     </>
   );
 };
