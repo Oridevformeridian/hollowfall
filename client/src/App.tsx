@@ -218,7 +218,7 @@ export default function App() {
   if (gameState.phase === 'LOBBY') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6">
-        <div className="glass-panel w-full max-w-xl p-8 flex flex-col gap-6">
+        <div className="glass-panel w-full max-w-3xl p-8 flex flex-col gap-6">
           <div className="flex justify-between items-center border-b border-[var(--border-light)] pb-4">
             <div>
               <h2 className="text-2xl font-bold text-[var(--accent-cyan)] m-0">Lobby Room: {gameState.roomCode}</h2>
@@ -233,102 +233,115 @@ export default function App() {
             </div>
           )}
 
-          <div className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider">Connected Players ({playersList.length}/2)</h3>
-            <div className="flex flex-col gap-2">
-              {playersList.map(player => (
-                <div key={player.id} className="flex justify-between items-center bg-[rgba(255,255,255,0.03)] p-4 rounded-xl border border-gray-800">
-                  <div className="flex items-center gap-3">
-                    <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
-                    <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '26px', lineHeight: '1' }}>{player.emoji}</span>
-                      <span>{player.username} {player.id === socket?.id && '(You)'}</span>
-                    </span>
-                  </div>
-                  <span className={`text-xs px-3 py-1.5 rounded-full font-bold ${player.isReady ? 'bg-[rgba(0,230,118,0.15)] text-[var(--accent-green)]' : 'bg-gray-800 text-gray-400'}`}>
-                    {player.isReady ? 'READY' : 'NOT READY'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {(() => {
-            const takenEmojis = playersList
-              .filter(p => p.id !== socket?.id)
-              .map(p => p.emoji);
-            return (
-              <div className="flex flex-col gap-2 border-t border-[var(--border-light)] pt-4 mt-2">
-                <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider font-bold">Choose Your Hero</h3>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(5, 42px)',
-                    gap: '6px',
-                    justifyContent: 'center',
-                    marginTop: '8px'
-                  }}
-                >
-                  {HEROES.map(hero => {
-                    const isTaken = takenEmojis.includes(hero.emoji);
-                    const isSelected = self?.emoji === hero.emoji;
-                    return (
-                      <button
-                        type="button"
-                        key={hero.emoji}
-                        onClick={() => !isTaken && handleSelectHero(hero.emoji)}
-                        disabled={isTaken}
-                        style={{
-                          fontSize: '24px',
-                          width: '42px',
-                          height: '42px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: isSelected
-                            ? `2.5px solid ${hero.color}`
-                            : isTaken
-                            ? '1px dashed #334155'
-                            : '1px solid var(--border-light)',
-                          borderRadius: '8px',
-                          backgroundColor: isSelected
-                            ? `${hero.color}22`
-                            : 'rgba(0, 0, 0, 0.2)',
-                          cursor: isTaken ? 'not-allowed' : 'pointer',
-                          opacity: isTaken ? 0.25 : 1,
-                          transition: 'all 0.2s',
-                          boxShadow: isSelected ? `0 0 10px ${hero.color}` : 'none'
-                        }}
-                        className={isTaken ? '' : 'hover:scale-110'}
-                        title={isTaken ? `${hero.name} (Already Taken)` : hero.name}
-                      >
-                        {hero.emoji}
-                      </button>
-                    );
-                  })}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '32px',
+              alignItems: 'center',
+              width: '100%'
+            }}
+          >
+            {/* Column 1: Connected Players & Buttons */}
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-3">
+                <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider">Connected Players ({playersList.length}/2)</h3>
+                <div className="flex flex-col gap-2">
+                  {playersList.map(player => (
+                    <div key={player.id} className="flex justify-between items-center bg-[rgba(255,255,255,0.03)] p-4 rounded-xl border border-gray-800">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
+                        <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '26px', lineHeight: '1' }}>{player.emoji}</span>
+                          <span>{player.username} {player.id === socket?.id && '(You)'}</span>
+                        </span>
+                      </div>
+                      <span className={`text-xs px-3 py-1.5 rounded-full font-bold ${player.isReady ? 'bg-[rgba(0,230,118,0.15)] text-[var(--accent-green)]' : 'bg-gray-800 text-gray-400'}`}>
+                        {player.isReady ? 'READY' : 'NOT READY'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            );
-          })()}
 
-          <div className="flex gap-4 mt-4 border-t border-[var(--border-light)] pt-6">
-            <button
-              onClick={handleToggleReady}
-              disabled={!self?.emoji}
-              className={`flex-1 ${self?.isReady ? 'btn-secondary' : 'btn-primary'}`}
-            >
-              {self?.isReady ? 'Cancel Ready' : 'Ready Up'}
-            </button>
+              <div className="flex gap-4 mt-2 border-t border-[var(--border-light)] pt-6">
+                <button
+                  onClick={handleToggleReady}
+                  disabled={!self?.emoji}
+                  className={`flex-1 ${self?.isReady ? 'btn-secondary' : 'btn-primary'}`}
+                >
+                  {self?.isReady ? 'Cancel Ready' : 'Ready Up'}
+                </button>
 
-            {isHost && (
-              <button
-                onClick={handleStartGame}
-                disabled={playersList.length !== 2 || playersList.some(p => !p.isReady)}
-                className="btn-primary flex-1 bg-gradient-to-r from-[var(--accent-gold)] to-[#ffa600] text-black font-extrabold disabled:opacity-50"
-              >
-                Start Game Setup
-              </button>
-            )}
+                {isHost && (
+                  <button
+                    onClick={handleStartGame}
+                    disabled={playersList.length !== 2 || playersList.some(p => !p.isReady)}
+                    className="btn-primary flex-1 bg-gradient-to-r from-[var(--accent-gold)] to-[#ffa600] text-black font-extrabold disabled:opacity-50"
+                  >
+                    Start Game Setup
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Column 2: Choose Your Hero Picker */}
+            {(() => {
+              const takenEmojis = playersList
+                .filter(p => p.id !== socket?.id)
+                .map(p => p.emoji);
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                  <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider font-bold text-center">Choose Your Hero</h3>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(5, 42px)',
+                      gap: '6px',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {HEROES.map(hero => {
+                      const isTaken = takenEmojis.includes(hero.emoji);
+                      const isSelected = self?.emoji === hero.emoji;
+                      return (
+                        <button
+                          type="button"
+                          key={hero.emoji}
+                          onClick={() => !isTaken && handleSelectHero(hero.emoji)}
+                          disabled={isTaken}
+                          style={{
+                            fontSize: '24px',
+                            width: '42px',
+                            height: '42px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: isSelected
+                              ? `2.5px solid ${hero.color}`
+                              : isTaken
+                              ? '1px dashed #334155'
+                              : '1px solid var(--border-light)',
+                            borderRadius: '8px',
+                            backgroundColor: isSelected
+                              ? `${hero.color}22`
+                              : 'rgba(0, 0, 0, 0.2)',
+                            cursor: isTaken ? 'not-allowed' : 'pointer',
+                            opacity: isTaken ? 0.25 : 1,
+                            transition: 'all 0.2s',
+                            boxShadow: isSelected ? `0 0 10px ${hero.color}` : 'none'
+                          }}
+                          className={isTaken ? '' : 'hover:scale-110'}
+                          title={isTaken ? `${hero.name} (Already Taken)` : hero.name}
+                        >
+                          {hero.emoji}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
