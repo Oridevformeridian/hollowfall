@@ -316,7 +316,7 @@ export default function App() {
     }
   }
 
-  const cellWidth = gameState.phase === 'GAMEPLAY' ? 220 : 110;
+  const cellWidth = gameState.phase === 'GAMEPLAY' ? 320 : 110;
   const subCellSize = cellWidth / 5;
   const tokenSize = Math.floor(subCellSize * 0.8);
 
@@ -410,6 +410,49 @@ export default function App() {
 
       {/* Main Board Space */}
       <div className="main-content">
+        {/* Turn Indicator Overlay (Top Right) */}
+        {gameState.phase === 'GAMEPLAY' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '24px',
+              right: '24px',
+              zIndex: 40,
+              display: 'flex',
+              gap: '12px',
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid var(--border-light)',
+              padding: '8px 16px',
+              borderRadius: '12px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)'
+            }}
+          >
+            {gameState.turnOrder.map((pId) => {
+              const player = gameState.players[pId];
+              const isActive = pId === activePlayerId;
+              return (
+                <div
+                  key={pId}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    border: isActive ? `2px solid ${player.color}` : '2px solid transparent',
+                    boxShadow: isActive ? `0 0 10px ${player.color}44` : 'none',
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.03)' : 'transparent',
+                    transition: 'all 0.3s'
+                  }}
+                >
+                  <span style={{ fontSize: '22px', lineHeight: '1' }}>{player.emoji}</span>
+                  <span style={{ fontSize: '14px', fontWeight: 'bold', color: 'white' }}>{player.username}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {error && (
           <div style={{ position: 'absolute', top: '24px', left: '24px', right: '24px', zIndex: 50, backgroundColor: 'rgba(255,23,68,0.9)', border: '1px solid var(--accent-crimson)', color: 'white', padding: '12px', borderRadius: '8px', fontSize: '14px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
             {error}
