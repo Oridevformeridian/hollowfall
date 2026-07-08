@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
-import { FIXED_TILES, TileLayout } from './shared/constants.ts';
+import { FIXED_TILES, TileLayout, HEROES } from './shared/constants.ts';
 import { validateTilePlacement } from './shared/validation.ts';
 
 const renderTileSvgContent = (_layout: TileLayout, playerColor: string) => {
@@ -59,7 +59,6 @@ export default function App() {
   // Form states
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
-  const [selectedColor, setSelectedColor] = useState('#00E5FF');
   const [selectedEmoji, setSelectedEmoji] = useState('🧙');
 
   // Interactive placement states
@@ -111,9 +110,11 @@ export default function App() {
       setError('Username and Room Code are required.');
       return;
     }
+    const matchedHero = HEROES.find(h => h.emoji === selectedEmoji);
+    const playerColor = matchedHero ? matchedHero.color : '#00E5FF';
     sendEvent({
       event: 'JOIN_ROOM',
-      payload: { username, roomCode, color: selectedColor, emoji: selectedEmoji }
+      payload: { username, roomCode, color: playerColor, emoji: selectedEmoji }
     });
   };
 
@@ -186,21 +187,6 @@ export default function App() {
           </div>
 
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-gray-300">Select Avatar Color</label>
-            <div className="flex gap-3 justify-center">
-              {['#00E5FF', '#FFD600', '#FF1744', '#00E676', '#D500F9', '#FF6D00'].map(c => (
-                <button
-                  type="button"
-                  key={c}
-                  onClick={() => setSelectedColor(c)}
-                  style={{ backgroundColor: c, border: selectedColor === c ? '3px solid #ffffff' : 'none' }}
-                  className="w-8 h-8 rounded-full cursor-pointer transition-transform hover:scale-110"
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
             <label className="text-sm font-semibold text-gray-300">Select Your Hero</label>
             <div
               style={{
@@ -210,11 +196,11 @@ export default function App() {
                 justifyItems: 'center'
               }}
             >
-              {['🧙', '👻', '🧝', '🦁', '🧛', '🤖', '🦊', '🐦', '🐉', '💀'].map(emoji => (
+              {HEROES.map(hero => (
                 <button
                   type="button"
-                  key={emoji}
-                  onClick={() => setSelectedEmoji(emoji)}
+                  key={hero.emoji}
+                  onClick={() => setSelectedEmoji(hero.emoji)}
                   style={{
                     fontSize: '20px',
                     width: '40px',
@@ -222,15 +208,17 @@ export default function App() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: selectedEmoji === emoji ? '2px solid var(--accent-cyan)' : '1px solid var(--border-light)',
+                    border: selectedEmoji === hero.emoji ? `2.5px solid ${hero.color}` : '1px solid var(--border-light)',
                     borderRadius: '8px',
-                    backgroundColor: selectedEmoji === emoji ? 'rgba(0, 229, 255, 0.1)' : 'rgba(0, 0, 0, 0.2)',
+                    backgroundColor: selectedEmoji === hero.emoji ? `${hero.color}22` : 'rgba(0, 0, 0, 0.2)',
                     cursor: 'pointer',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    boxShadow: selectedEmoji === hero.emoji ? `0 0 10px ${hero.color}` : 'none'
                   }}
                   className="hover:scale-110"
+                  title={hero.name}
                 >
-                  {emoji}
+                  {hero.emoji}
                 </button>
               ))}
             </div>

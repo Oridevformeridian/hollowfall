@@ -110,3 +110,22 @@ export const FIXED_TILES: TileLayout[] = [
     ]
   }
 ];
+
+export interface Hero {
+  emoji: string;
+  color: string;
+  name: string;
+}
+
+export const HEROES: Hero[] = [
+  { emoji: '🧙', color: '#00E5FF', name: 'Mage' },
+  { emoji: '👻', color: '#E2E8F0', name: 'Spirit' },
+  { emoji: '🧝', color: '#00E676', name: 'Elf' },
+  { emoji: '🦁', color: '#FF6D00', name: 'Beast' },
+  { emoji: '🧛', color: '#FF1744', name: 'Vampire' },
+  { emoji: '🤖', color: '#90A4AE', name: 'Golem' },
+  { emoji: '🦊', color: '#FFD600', name: 'Fox' },
+  { emoji: '🐦', color: '#80D8FF', name: 'Owl' },
+  { emoji: '🐉', color: '#A7FFEB', name: 'Dragon' },
+  { emoji: '💀', color: '#D500F9', name: 'Reaper' }
+];
