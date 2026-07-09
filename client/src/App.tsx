@@ -173,16 +173,19 @@ const renderTileSvgContent = (
         );
       })}
 
-      {/* Solid Outer border */}
-      <rect
-        x="0"
-        y="0"
-        width="100"
-        height="100"
-        fill="none"
-        stroke="rgba(255,255,255,0.2)"
-        strokeWidth="1.5"
-      />
+      {/* Outer borders with exit gaps */}
+      {/* North */}
+      <line x1="0" y1="0" x2="40" y2="0" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="60" y1="0" x2="100" y2="0" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
+      {/* South */}
+      <line x1="0" y1="100" x2="40" y2="100" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="60" y1="100" x2="100" y2="100" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
+      {/* West */}
+      <line x1="0" y1="0" x2="0" y2="40" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="0" y1="60" x2="0" y2="100" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
+      {/* East */}
+      <line x1="100" y1="0" x2="100" y2="40" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1="100" y1="60" x2="100" y2="100" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
     </>
   );
 };
@@ -887,6 +890,42 @@ export default function App() {
                         )}
                       </g>
                     </svg>
+
+                    {/* Render bridge connector East if tile to the right exists */}
+                    {gameState.placedTiles[`${x + 1},${y}`] && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: `${cellWidth}px`,
+                          top: `${subCellSize * 2}px`,
+                          width: '16px',
+                          height: `${subCellSize}px`,
+                          backgroundColor: 'rgba(71, 85, 105, 0.15)',
+                          borderTop: '2.5px solid #475569',
+                          borderBottom: '2.5px solid #475569',
+                          zIndex: 5,
+                          pointerEvents: 'none'
+                        }}
+                      />
+                    )}
+
+                    {/* Render bridge connector South if tile below exists */}
+                    {gameState.placedTiles[`${x},${y - 1}`] && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: `${subCellSize * 2}px`,
+                          top: `${cellWidth}px`,
+                          width: `${subCellSize}px`,
+                          height: '16px',
+                          backgroundColor: 'rgba(71, 85, 105, 0.15)',
+                          borderLeft: '2.5px solid #475569',
+                          borderRight: '2.5px solid #475569',
+                          zIndex: 5,
+                          pointerEvents: 'none'
+                        }}
+                      />
+                    )}
                     {/* Interactive overlay cells for token movement */}
                     {gameState.phase === 'GAMEPLAY' && (
                       <div
