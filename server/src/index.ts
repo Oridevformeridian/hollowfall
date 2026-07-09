@@ -108,7 +108,7 @@ io.on('connection', (socket) => {
       switch (message.event) {
         case 'JOIN_ROOM': {
           const { username, roomCode, color, emoji } = message.payload;
-          const targetRoomCode = roomCode.toUpperCase().trim();
+          const targetRoomCode = roomCode.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
 
           if (!targetRoomCode) {
             sendError(socket, 'Room code is required.');
@@ -119,7 +119,7 @@ io.on('connection', (socket) => {
           if (!room) {
             // Create a new room
             room = {
-              roomCode: targetRoomCode,
+              roomCode: roomCode.trim(),
               phase: 'LOBBY',
               players: {},
               turnOrder: [],
