@@ -1078,35 +1078,59 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px', marginBottom: '8px' }}>
                   {/* Pick Up Treasure Button */}
                   {(() => {
-                    const sameCellTr = gameState.treasures && myTokenPos
-                      ? Object.values(gameState.treasures).find(
+                    const sameCellTreasures = gameState.treasures && myTokenPos
+                      ? Object.values(gameState.treasures).filter(
                           t => t.tileX === myTokenPos.tileX &&
                                t.tileY === myTokenPos.tileY &&
                                t.r === myTokenPos.r &&
                                t.c === myTokenPos.c &&
                                t.carrierId === null
                         )
-                      : null;
-                    if (sameCellTr && self && self.ap > 0) {
-                      return (
-                        <button
-                          onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: sameCellTr.id } })}
-                          className="btn-primary"
-                          style={{
-                            width: '100%',
-                            backgroundColor: 'var(--accent-gold)',
-                            color: 'black',
-                            fontWeight: 'bold',
-                            fontSize: '13px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px'
-                          }}
-                        >
-                          💎 Pick Up Mask (Ends Turn)
-                        </button>
-                      );
+                      : [];
+                    if (sameCellTreasures.length > 0 && self && self.ap > 0) {
+                      return sameCellTreasures.map(t => {
+                        const owner = gameState.players[t.ownerId];
+                        const label = owner
+                          ? `📥 Pick Up ${owner.username}'s Mask`
+                          : `📥 Pick Up Mask`;
+
+                        // Check if it's player's own mask at default position
+                        let isOwnDefault = false;
+                        if (t.ownerId === socket?.id) {
+                          const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === socket.id);
+                          if (ownerTile) {
+                            const isOwnerTile = t.tileX === ownerTile.position.x && t.tileY === ownerTile.position.y;
+                            const isCorner = (t.r === 0 || t.r === 4) && (t.c === 0 || t.c === 4);
+                            if (isOwnerTile && isCorner) {
+                              isOwnDefault = true;
+                            }
+                          }
+                        }
+
+                        return (
+                          <button
+                            key={`pickup-${t.id}`}
+                            disabled={isOwnDefault}
+                            onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: t.id } })}
+                            className={isOwnDefault ? "btn-secondary" : "btn-primary"}
+                            style={{
+                              width: '100%',
+                              backgroundColor: isOwnDefault ? 'rgba(255,255,255,0.02)' : 'var(--accent-gold)',
+                              color: isOwnDefault ? '#64748b' : 'black',
+                              fontWeight: 'bold',
+                              fontSize: '13px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              opacity: isOwnDefault ? 0.5 : 1,
+                              cursor: isOwnDefault ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {label} {isOwnDefault ? '(Home)' : '(Ends Turn)'}
+                          </button>
+                        );
+                      });
                     }
                     return null;
                   })()}

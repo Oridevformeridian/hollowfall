@@ -918,6 +918,19 @@ io.on('connection', (socket) => {
             return;
           }
 
+          // Check if player is trying to pick up their own mask from its default position
+          if (treasure.ownerId === playerId) {
+            const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
+            if (playerTile) {
+              const isOwnerTile = treasure.tileX === playerTile.position.x && treasure.tileY === playerTile.position.y;
+              const isCorner = (treasure.r === 0 || treasure.r === 4) && (treasure.c === 0 || treasure.c === 4);
+              if (isOwnerTile && isCorner) {
+                sendError(socket, 'You cannot pick up your own Mask while it is in its default starting position.');
+                return;
+              }
+            }
+          }
+
           treasure.carrierId = playerId;
 
           player.ap = 0;
