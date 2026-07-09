@@ -14,7 +14,8 @@ const renderTileSvgContent = (
   myTokenPos?: any,
   isActiveTurn?: boolean,
   selfAp?: number,
-  placedTiles?: any
+  placedTiles?: any,
+  wallsState?: Record<string, boolean>
 ) => {
   const rot = rotation || 0;
   const cells = [];
@@ -75,6 +76,54 @@ const renderTileSvgContent = (
           strokeLinecap="round"
         />
       ))}
+
+      {/* Render Dynamic Raised Stone Walls */}
+      {(() => {
+        const dynamicWalls = [];
+        if (tilePos && wallsState) {
+          for (let r = 0; r < 5; r++) {
+            for (let c = 0; c < 4; c++) {
+              const wallKey = `${tilePos.x},${tilePos.y}:${r},${c}:V`;
+              if (wallsState[wallKey]) {
+                dynamicWalls.push(
+                  <line
+                    key={`dyn-vwall-${r}-${c}`}
+                    x1={(c + 1) * 20}
+                    y1={r * 20}
+                    x2={(c + 1) * 20}
+                    y2={(r + 1) * 20}
+                    stroke="#FF6D00"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    style={{ filter: 'drop-shadow(0 0 3px #FF6D00)' }}
+                  />
+                );
+              }
+            }
+          }
+          for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 5; c++) {
+              const wallKey = `${tilePos.x},${tilePos.y}:${r},${c}:H`;
+              if (wallsState[wallKey]) {
+                dynamicWalls.push(
+                  <line
+                    key={`dyn-hwall-${r}-${c}`}
+                    x1={c * 20}
+                    y1={(r + 1) * 20}
+                    x2={(c + 1) * 20}
+                    y2={(r + 1) * 20}
+                    stroke="#FF6D00"
+                    strokeWidth="3.5"
+                    strokeLinecap="round"
+                    style={{ filter: 'drop-shadow(0 0 3px #FF6D00)' }}
+                  />
+                );
+              }
+            }
+          }
+        }
+        return dynamicWalls;
+      })()}
 
       {/* Render Doors */}
       {layout.vDoors.map((d, idx) => {
@@ -201,6 +250,7 @@ export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [targetingCardId, setTargetingCardId] = useState<string | null>(null);
 
   // Form states
   const [username, setUsername] = useState('');
@@ -320,6 +370,18 @@ export default function App() {
 
   const handleEndTurn = () => {
     sendEvent({ event: 'END_TURN' });
+  };
+
+  const handlePlayCard = (cardId: string, target?: any) => {
+    sendEvent({
+      event: 'PLAY_CARD',
+      payload: { cardId, target }
+    });
+    setTargetingCardId(null);
+  };
+
+  const handleResetGame = () => {
+    sendEvent({ event: 'RESET_GAME' });
   };
 
   // Helper selectors
@@ -737,9 +799,14 @@ export default function App() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '24px' }}>{player.emoji}</span>
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
-                              {player.username} {isMe && '(You)'}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+                                {player.username} {isMe && '(You)'}
+                              </span>
+                              {player.form === 'wolf' && (
+                                <span style={{ fontSize: '10px', color: 'var(--accent-cyan)' }} title="Wolf Form: Moves cost 0 AP!">🐺 Wolf</span>
+                              )}
+                            </div>
                             <span style={{ fontSize: '10px', color: '#64748b' }}>
                               {isActive ? 'Active Turn' : 'Waiting...'}
                             </span>
@@ -752,10 +819,27 @@ export default function App() {
                         )}
                       </div>
 
-                      {/* AP indicator */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', marginTop: '4px' }}>
-                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>Actions:</span>
-                        <span style={{ fontSize: '13px', letterSpacing: '2px' }}>{apIcons}</span>
+                      {/* Vitals indicators */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', marginTop: '4px' }}>
+                        {/* Health (Thread) */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>🧵 Thread:</span>
+                          <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>
+                            {player.thread} / {player.maxThread}
+                          </span>
+                        </div>
+                        {/* Score */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>🏆 Score:</span>
+                          <span style={{ fontSize: '11px', color: 'var(--accent-gold)', fontWeight: 'bold' }}>
+                            {player.points} / 2 pts
+                          </span>
+                        </div>
+                        {/* AP Actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>Actions:</span>
+                          <span style={{ fontSize: '13px', letterSpacing: '2px' }}>{apIcons}</span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -893,7 +977,8 @@ export default function App() {
                           myTokenPos,
                           isActiveTurn,
                           self?.ap,
-                          gameState.placedTiles
+                          gameState.placedTiles,
+                          gameState.wallsState
                         )}
                       </g>
                     </svg>
@@ -946,37 +1031,136 @@ export default function App() {
                           gridTemplateColumns: 'repeat(5, 1fr)',
                           gridTemplateRows: 'repeat(5, 1fr)',
                           zIndex: 20
-                        }}
-                      >
+                        }}>
                         {Array.from({ length: 25 }).map((_, idx) => {
                           const r = Math.floor(idx / 5);
                           const c = idx % 5;
                           const targetPos = { tileX: x, tileY: y, r, c };
-                          const isValidMove = myTokenPos && isActiveTurn && self && self.ap > 0 && validateTokenMove(
+
+                          // 1. Regular token movement highlight
+                          const isValidMove = !targetingCardId && myTokenPos && isActiveTurn && self && self.ap > 0 && validateTokenMove(
                             myTokenPos,
                             targetPos,
                             gameState.placedTiles,
-                            gameState.doorsState
+                            gameState.doorsState,
+                            gameState.wallsState
                           ).valid;
+
+                          // 2. Kindle the Storm targeting
+                          let isKindleTarget = false;
+                          if (targetingCardId === 'ash_kindle_storm' && isActiveTurn) {
+                            const occupiedPlayerId = Object.keys(gameState.tokenPositions).find(pId => {
+                              const pos = gameState.tokenPositions[pId];
+                              return pos.tileX === x && pos.tileY === y && pos.r === r && pos.c === c;
+                            });
+                            isKindleTarget = !!occupiedPlayerId && occupiedPlayerId !== socket?.id;
+                          }
+
+                          // 3. Miststep targeting
+                          let isMiststepTarget = false;
+                          if (targetingCardId === 'working_miststep' && isActiveTurn && myTokenPos) {
+                            const globalR_from = myTokenPos.tileY * 5 + myTokenPos.r;
+                            const globalC_from = myTokenPos.tileX * 5 + myTokenPos.c;
+                            const globalR_to = y * 5 + r;
+                            const globalC_to = x * 5 + c;
+                            const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
+                            isMiststepTarget = dist <= 3;
+                          }
+
+                          // 4. Raise Stone cell detection (player's current cell)
+                          const isRaiseStoneCell = targetingCardId === 'working_raise_stone' && isActiveTurn && myTokenPos && myTokenPos.tileX === x && myTokenPos.tileY === y && myTokenPos.r === r && myTokenPos.c === c;
 
                           return (
                             <div
-                              key={`move-overlay-${r}-${c}`}
+                              key={`cell-overlay-${r}-${c}`}
                               onClick={(e) => {
                                 if (isValidMove) {
                                   e.stopPropagation();
                                   handleMoveToken(targetPos);
+                                } else if (isKindleTarget) {
+                                  e.stopPropagation();
+                                  handlePlayCard('ash_kindle_storm', targetPos);
+                                } else if (isMiststepTarget) {
+                                  e.stopPropagation();
+                                  handlePlayCard('working_miststep', targetPos);
                                 }
                               }}
                               style={{
-                                cursor: isValidMove ? 'pointer' : 'default',
-                                border: isValidMove ? '1.5px dashed var(--accent-green)' : 'none',
-                                backgroundColor: isValidMove ? 'rgba(0, 230, 118, 0.1)' : 'transparent',
+                                position: 'relative',
+                                cursor: (isValidMove || isKindleTarget || isMiststepTarget) ? 'pointer' : 'default',
+                                border: isValidMove
+                                  ? '1.5px dashed var(--accent-green)'
+                                  : isKindleTarget
+                                  ? '2px solid var(--accent-crimson)'
+                                  : isMiststepTarget
+                                  ? '1.5px dashed var(--accent-cyan)'
+                                  : 'none',
+                                backgroundColor: isValidMove
+                                  ? 'rgba(0, 230, 118, 0.1)'
+                                  : isKindleTarget
+                                  ? 'rgba(255, 23, 68, 0.15)'
+                                  : isMiststepTarget
+                                  ? 'rgba(0, 229, 255, 0.1)'
+                                  : 'transparent',
                                 borderRadius: '4px',
                                 transition: 'all 0.15s ease'
                               }}
-                              title={isValidMove ? 'Move here' : ''}
-                            />
+                              title={
+                                isValidMove
+                                  ? 'Move here'
+                                  : isKindleTarget
+                                  ? 'Target with Kindle the Storm'
+                                  : isMiststepTarget
+                                  ? 'Teleport here'
+                                  : ''
+                              }
+                            >
+                              {/* Edge-zone selectors for Raise Stone */}
+                              {isRaiseStoneCell && (
+                                <>
+                                  {r > 0 && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePlayCard('working_raise_stone', { tileX: x, tileY: y, r: r - 1, c, direction: 'H' });
+                                      }}
+                                      style={{ position: 'absolute', top: 0, left: '6px', right: '6px', height: '6px', backgroundColor: '#FF6D00', cursor: 'pointer', borderRadius: '2px', boxShadow: '0 0 5px #FF6D00', zIndex: 10 }}
+                                      title="Raise North wall"
+                                    />
+                                  )}
+                                  {r < 4 && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePlayCard('working_raise_stone', { tileX: x, tileY: y, r, c, direction: 'H' });
+                                      }}
+                                      style={{ position: 'absolute', bottom: 0, left: '6px', right: '6px', height: '6px', backgroundColor: '#FF6D00', cursor: 'pointer', borderRadius: '2px', boxShadow: '0 0 5px #FF6D00', zIndex: 10 }}
+                                      title="Raise South wall"
+                                    />
+                                  )}
+                                  {c > 0 && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePlayCard('working_raise_stone', { tileX: x, tileY: y, r, c: c - 1, direction: 'V' });
+                                      }}
+                                      style={{ position: 'absolute', left: 0, top: '6px', bottom: '6px', width: '6px', backgroundColor: '#FF6D00', cursor: 'pointer', borderRadius: '2px', boxShadow: '0 0 5px #FF6D00', zIndex: 10 }}
+                                      title="Raise West wall"
+                                    />
+                                  )}
+                                  {c < 4 && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePlayCard('working_raise_stone', { tileX: x, tileY: y, r, c, direction: 'V' });
+                                      }}
+                                      style={{ position: 'absolute', right: 0, top: '6px', bottom: '6px', width: '6px', backgroundColor: '#FF6D00', cursor: 'pointer', borderRadius: '2px', boxShadow: '0 0 5px #FF6D00', zIndex: 10 }}
+                                      title="Raise East wall"
+                                    />
+                                  )}
+                                </>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
@@ -1030,6 +1214,206 @@ export default function App() {
           })}
         </div>
       </div>
+
+      {/* Card Hand / Inventory HUD */}
+      {gameState.phase === 'GAMEPLAY' && self && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '180px',
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(12px)',
+            borderTop: '2px solid var(--border-light)',
+            padding: '16px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            zIndex: 100,
+            boxShadow: '0 -10px 30px rgba(0,0,0,0.5)',
+            boxSizing: 'border-box'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                Your Hand ({self.hand.length}/7 Rites)
+              </span>
+              {targetingCardId && (
+                <span style={{ fontSize: '11px', color: 'var(--accent-crimson)', animation: 'pulse 1.5s infinite', fontWeight: 'bold' }}>
+                  🎯 SELECT A TARGET ON THE BOARD FOR {self.hand.find(c => c.id === targetingCardId)?.name.toUpperCase()}
+                </span>
+              )}
+            </div>
+            {targetingCardId && (
+              <button
+                onClick={() => setTargetingCardId(null)}
+                className="btn-secondary"
+                style={{ padding: '2px 8px', fontSize: '11px', color: 'var(--accent-crimson)', borderColor: 'var(--accent-crimson)' }}
+              >
+                Cancel Target
+              </button>
+            )}
+          </div>
+
+          {/* Horizontal Cards Scroll list */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '16px',
+              overflowX: 'auto',
+              paddingBottom: '8px',
+              flexGrow: 1
+            }}
+          >
+            {self.hand.map((card) => {
+              const isTargeting = targetingCardId === card.id;
+              const isBane = card.type === 'bane';
+              const isWard = card.type === 'ward';
+              const isWorking = card.type === 'working';
+              const isOffering = card.type === 'offering';
+
+              const typeColor = isBane
+                ? 'var(--accent-crimson)'
+                : isWard
+                ? 'var(--accent-gold)'
+                : isWorking
+                ? 'var(--accent-cyan)'
+                : isOffering
+                ? 'var(--accent-green)'
+                : '#94a3b8';
+
+              const canCast = isActiveTurn && self.ap > 0 && !isWard;
+
+              return (
+                <div
+                  key={card.id}
+                  style={{
+                    minWidth: '220px',
+                    maxWidth: '220px',
+                    backgroundColor: 'rgba(255,255,255,0.02)',
+                    border: isTargeting ? '2px solid var(--accent-cyan)' : `1px solid ${typeColor}66`,
+                    borderRadius: '10px',
+                    padding: '10px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: isTargeting ? '0 0 10px var(--accent-cyan)44' : 'none',
+                    opacity: (targetingCardId && !isTargeting) ? 0.4 : 1,
+                    transition: 'all 0.2s',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white' }}>{card.name}</span>
+                      <span
+                        style={{
+                          fontSize: '8px',
+                          fontWeight: 'bold',
+                          color: typeColor,
+                          border: `1px solid ${typeColor}`,
+                          padding: '1px 4px',
+                          borderRadius: '4px',
+                          textTransform: 'uppercase'
+                        }}
+                      >
+                        {card.type}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '10px', color: '#94a3b8', margin: '4px 0 0 0', lineHeight: '1.3' }}>
+                      {card.description}
+                    </p>
+                  </div>
+
+                  <div style={{ marginTop: '8px' }}>
+                    {isWard ? (
+                      <span style={{ fontSize: '9px', color: '#64748b', fontStyle: 'italic', display: 'block', textAlign: 'center' }}>
+                        Auto-triggers on defense
+                      </span>
+                    ) : (
+                      <button
+                        disabled={!canCast}
+                        onClick={() => {
+                          const noTargetNeeded = card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath';
+                          if (noTargetNeeded) {
+                            handlePlayCard(card.id);
+                          } else {
+                            setTargetingCardId(card.id);
+                          }
+                        }}
+                        className={canCast ? 'btn-primary' : 'btn-secondary'}
+                        style={{
+                          width: '100%',
+                          padding: '4px 0',
+                          fontSize: '11px',
+                          opacity: canCast ? 1 : 0.5,
+                          cursor: canCast ? 'pointer' : 'not-allowed'
+                        }}
+                      >
+                        {isTargeting ? 'Select Target...' : 'Cast Rite'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Game Over Modal */}
+      {gameState.phase === 'GAME_OVER' && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(3, 4, 5, 0.95)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div style={{ textAlign: 'center', padding: '40px', borderRadius: '24px', border: '2px solid var(--accent-gold)', backgroundColor: 'rgba(255,255,255,0.01)', boxShadow: '0 0 30px rgba(255, 214, 0, 0.15)', maxWidth: '480px', width: '90%' }}>
+            <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🏆</span>
+            <h2 style={{ color: 'var(--accent-gold)', fontSize: '28px', fontWeight: 'black', margin: '0 0 8px 0', letterSpacing: '2px' }}>MATCH COMPLETE</h2>
+            
+            {(() => {
+              const winner = Object.values(gameState.players).find(p => p.points >= 2);
+              if (winner) {
+                return (
+                  <div style={{ margin: '24px 0' }}>
+                    <span style={{ fontSize: '64px', display: 'block', margin: '8px 0' }}>{winner.emoji}</span>
+                    <h3 style={{ fontSize: '20px', color: 'white', margin: '0' }}>{winner.username} Wins!</h3>
+                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>Successfully severed the thread of their opponent twice.</p>
+                  </div>
+                );
+              }
+              return <p style={{ color: 'white', margin: '24px 0' }}>A legendary battle has ended!</p>;
+            })()}
+
+            {isHost ? (
+              <button
+                onClick={handleResetGame}
+                className="btn-primary"
+                style={{ width: '100%', marginTop: '16px', backgroundColor: 'var(--accent-gold)', color: 'black', fontWeight: 'bold' }}
+              >
+                Restart Game Lobby
+              </button>
+            ) : (
+              <p style={{ fontSize: '12px', color: '#64748b', margin: '16px 0 0 0' }}>Waiting for host to restart lobby...</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

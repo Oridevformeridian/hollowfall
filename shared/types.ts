@@ -10,6 +10,18 @@ export interface Player {
   isHost: boolean;
   assignedTileIndex: number | null; // 0..3 index of distributed fixed tiles
   ap: number;
+  thread: number;
+  maxThread: number;
+  hand: Card[];
+  points: number;
+  form: 'normal' | 'wolf';
+}
+
+export interface Card {
+  id: string;
+  name: string;
+  type: 'bane' | 'ward' | 'working' | 'talisman' | 'offering';
+  description: string;
 }
 
 export interface Coordinate {
@@ -39,6 +51,7 @@ export interface GameState {
   activePlayerIndex: number;
   placedTiles: Record<string, PlacedTile>; // Key format: "x,y"
   doorsState: Record<string, 'OPEN' | 'CLOSED'>; // Key format: "x,y:r,c:direction"
+  wallsState: Record<string, boolean>; // Key format: "x,y:r,c:direction"
   tokenPositions: Record<PlayerId, TokenPosition>;
 }
 
@@ -50,7 +63,9 @@ export type ClientMessage =
   | { event: 'INTERACT_DOOR'; payload: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' } }
   | { event: 'MOVE_TOKEN'; payload: TokenPosition }
   | { event: 'SELECT_HERO'; payload: { emoji: string } }
-  | { event: 'END_TURN' };
+  | { event: 'END_TURN' }
+  | { event: 'PLAY_CARD'; payload: { cardId: string; target?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' } } }
+  | { event: 'RESET_GAME' };
 
 export type ServerMessage =
   | { event: 'STATE_UPDATE'; payload: GameState }

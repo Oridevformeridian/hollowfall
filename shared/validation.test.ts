@@ -123,6 +123,16 @@ describe('validateTokenMove', () => {
     expect(res.valid).toBe(true);
   });
 
+  it('should block move if path crosses dynamically raised stone wall', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 3 };
+    
+    const wallsState = { '0,0:2,2:V': true };
+    const res = validateTokenMove(from, to, placedTiles, {}, wallsState);
+    expect(res.valid).toBe(false);
+    expect(res.error).toContain('Blocked by a raised stone wall');
+  });
+
   it('should enforce crossing tile borders only via exits', () => {
     // Correct East exit crossing (tile 0,0 East exit (2,4) to tile 1,0 West exit (2,0))
     const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };

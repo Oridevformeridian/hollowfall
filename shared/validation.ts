@@ -102,7 +102,8 @@ export function validateTokenMove(
   from: TokenPosition,
   to: TokenPosition,
   placedTiles: Record<string, PlacedTile>,
-  doorsState: Record<string, 'OPEN' | 'CLOSED'>
+  doorsState: Record<string, 'OPEN' | 'CLOSED'>,
+  wallsState?: Record<string, boolean>
 ): { valid: boolean; error?: string } {
   // Check tile coordinate validity
   const fromTile = placedTiles[`${from.tileX},${from.tileY}`];
@@ -149,6 +150,12 @@ export function validateTokenMove(
     const unrotation = ((360 - fromTile.rotation) % 360) as 0 | 90 | 180 | 270;
     const ur = rotateBorderCoordinate(br, bc, bdir, unrotation);
     const layout = FIXED_TILES[fromTile.tileId - 1];
+
+    // Check dynamic Raised Stone wall
+    const wallKey = `${from.tileX},${from.tileY}:${br},${bc}:${bdir}`;
+    if (wallsState && wallsState[wallKey]) {
+      return { valid: false, error: 'Blocked by a raised stone wall.' };
+    }
 
     // Check Wall obstruction
     if (ur.direction === 'H') {

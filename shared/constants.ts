@@ -1,3 +1,5 @@
+import { Card } from './types';
+
 export interface WallOrDoor {
   r: number;
   c: number;
@@ -128,4 +130,55 @@ export const HEROES: Hero[] = [
   { emoji: '🧚‍♀️', color: '#FFAB40', name: 'Woman Fairy' },
   { emoji: '🧞', color: '#D500F9', name: 'Genie' },
   { emoji: '🦄', color: '#E2E8F0', name: 'Unicorn' }
+];
+
+export const BASIC_CARDS: Card[] = [
+  {
+    id: 'ash_kindle_storm',
+    name: 'Kindle the Storm',
+    type: 'bane',
+    description: 'Deals 3 fire damage to target Walker in LOS.'
+  },
+  {
+    id: 'ash_turn_aside',
+    name: 'Turn Aside',
+    type: 'ward',
+    description: 'Reaction: Auto-counter and cancel an incoming attack spell.'
+  },
+  {
+    id: 'ash_spirit_skin',
+    name: 'Spirit-Skin',
+    type: 'ward',
+    description: 'Reaction: Auto-reduce incoming attack damage by 2.'
+  },
+  {
+    id: 'working_miststep',
+    name: 'Miststep',
+    type: 'working',
+    description: 'Teleport to any cell up to 3 distance in LOS.'
+  },
+  {
+    id: 'working_raise_stone',
+    name: 'Raise Stone',
+    type: 'working',
+    description: 'Create a permanent stone wall on an adjacent border.'
+  },
+  {
+    id: 'talisman_bear_charm',
+    name: 'Bear-Charm',
+    type: 'talisman',
+    description: 'Carry: +2 Max Thread (Health) and heal 2 Thread.'
+  },
+  {
+    id: 'working_don_wolf',
+    name: 'Don the Wolf',
+    type: 'working',
+    description: 'Form: Transform into a Wolf. Moves cost 0 AP (speed boost!).'
+  },
+  {
+    id: 'offering_deep_breath',
+    name: 'Deep Breath',
+    type: 'offering',
+    description: 'Offering: Instantly gain +2 Action Points (AP).'
+  }
 ];

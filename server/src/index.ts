@@ -2,9 +2,9 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
+import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, Card } from '../../shared/types';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract } from '../../shared/validation';
-import { HEROES } from '../../shared/constants';
+import { HEROES, BASIC_CARDS } from '../../shared/constants';
 
 const app = express();
 app.use(cors());
@@ -26,10 +26,24 @@ const getRandomColor = () => {
   return colors[Math.floor(random() * colors.length)];
 };
 
+function dealRandomHand(): Card[] {
+  const hand: Card[] = [];
+  for (let i = 0; i < 5; i++) {
+    const randomCard = BASIC_CARDS[Math.floor(Math.random() * BASIC_CARDS.length)];
+    hand.push(randomCard);
+  }
+  return hand;
+}
+
 function passTurn(room: GameState) {
   const currentPid = room.turnOrder[room.activePlayerIndex];
-  if (room.players[currentPid]) {
-    room.players[currentPid].ap = 0;
+  const endingPlayer = room.players[currentPid];
+  if (endingPlayer) {
+    endingPlayer.ap = 0;
+    endingPlayer.form = 'normal';
+    while (endingPlayer.hand.length < 5) {
+      endingPlayer.hand.push(BASIC_CARDS[Math.floor(Math.random() * BASIC_CARDS.length)]);
+    }
   }
   room.activePlayerIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
   const nextPid = room.turnOrder[room.activePlayerIndex];
@@ -72,6 +86,7 @@ io.on('connection', (socket) => {
               activePlayerIndex: 0,
               placedTiles: {},
               doorsState: {},
+              wallsState: {},
               tokenPositions: {}
             };
             rooms.set(targetRoomCode, room);
@@ -124,7 +139,12 @@ io.on('connection', (socket) => {
             isReady: false,
             isHost,
             assignedTileIndex: null,
-            ap: 0
+            ap: 0,
+            thread: 15,
+            maxThread: 15,
+            hand: [],
+            points: 0,
+            form: 'normal'
           };
 
           room.players[playerId] = player;
@@ -269,7 +289,13 @@ io.on('connection', (socket) => {
             // Player 1 spawn at their tile's center (2, 2)
             // Player 2 spawn at their tile's center (2, 2)
             for (const pId of room.turnOrder) {
-              room.players[pId].ap = 0;
+              const p = room.players[pId];
+              p.ap = 0;
+              p.thread = 15;
+              p.maxThread = 15;
+              p.hand = dealRandomHand();
+              p.points = 0;
+              p.form = 'normal';
               // Find a tile placed by this player
               const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === pId);
               if (playerTile) {
@@ -307,7 +333,10 @@ io.on('connection', (socket) => {
           }
 
           const player = room.players[playerId];
-          if (!player || player.ap < 1) {
+          if (!player) return;
+
+          const isWolf = player.form === 'wolf';
+          if (!isWolf && player.ap < 1) {
             sendError(socket, 'No Action Points (AP) remaining.');
             return;
           }
@@ -319,7 +348,7 @@ io.on('connection', (socket) => {
             return;
           }
 
-          const validation = validateTokenMove(currentPos, targetPos, room.placedTiles, room.doorsState);
+          const validation = validateTokenMove(currentPos, targetPos, room.placedTiles, room.doorsState, room.wallsState);
           if (!validation.valid) {
             sendError(socket, validation.error || 'Invalid movement.');
             return;
@@ -327,7 +356,10 @@ io.on('connection', (socket) => {
 
           // Move the token
           room.tokenPositions[playerId] = targetPos;
-          player.ap--;
+          
+          if (!isWolf) {
+            player.ap--;
+          }
 
           // Auto-pass if 0 AP
           if (player.ap === 0) {
@@ -396,6 +428,208 @@ io.on('connection', (socket) => {
           }
 
           passTurn(room);
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'PLAY_CARD': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'GAMEPLAY') return;
+
+          const activePlayerId = room.turnOrder[room.activePlayerIndex];
+          if (playerId !== activePlayerId) {
+            sendError(socket, 'It is not your turn.');
+            return;
+          }
+
+          const player = room.players[playerId];
+          if (!player) return;
+
+          const { cardId, target } = message.payload;
+          const cardIndex = player.hand.findIndex(c => c.id === cardId);
+          if (cardIndex === -1) {
+            sendError(socket, 'Card is not in your hand.');
+            return;
+          }
+
+          const card = player.hand[cardIndex];
+          const isOffering = card.type === 'offering';
+
+          // Cast costs 1 AP unless it is an offering card
+          if (!isOffering && player.ap < 1) {
+            sendError(socket, 'No Action Points (AP) remaining to play this card.');
+            return;
+          }
+
+          // Resolve card benefits
+          if (card.id === 'ash_kindle_storm') {
+            if (!target) {
+              sendError(socket, 'Kindle the Storm requires a target cell.');
+              return;
+            }
+            const targetPlayerId = Object.keys(room.tokenPositions).find(pId => {
+              const pos = room.tokenPositions[pId];
+              return pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
+            });
+            if (!targetPlayerId) {
+              sendError(socket, 'No player found at targeted cell.');
+              return;
+            }
+            if (targetPlayerId === playerId) {
+              sendError(socket, 'You cannot target yourself.');
+              return;
+            }
+            const targetPlayer = room.players[targetPlayerId];
+
+            // Auto Ward response checking
+            const turnAsideIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_turn_aside');
+            const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
+
+            if (turnAsideIndex !== -1) {
+              targetPlayer.hand.splice(turnAsideIndex, 1);
+              console.log(`${targetPlayer.username} used Turn Aside to counter Kindle the Storm.`);
+            } else if (spiritSkinIndex !== -1) {
+              targetPlayer.hand.splice(spiritSkinIndex, 1);
+              targetPlayer.thread = Math.max(0, targetPlayer.thread - 1); // 3 damage reduced by 2
+              console.log(`${targetPlayer.username} used Spirit-Skin to reduce Kindle the Storm damage to 1.`);
+            } else {
+              targetPlayer.thread = Math.max(0, targetPlayer.thread - 3);
+            }
+
+            // Victory check / Death respawn
+            if (targetPlayer.thread <= 0) {
+              player.points += 1;
+              targetPlayer.thread = 15;
+              const targetTile = Object.values(room.placedTiles).find(t => t.placedBy === targetPlayerId);
+              if (targetTile) {
+                room.tokenPositions[targetPlayerId] = {
+                  tileX: targetTile.position.x,
+                  tileY: targetTile.position.y,
+                  r: 2,
+                  c: 2
+                };
+              }
+              if (player.points >= 2) {
+                room.phase = 'GAME_OVER';
+              }
+            }
+
+          } else if (card.id === 'working_miststep') {
+            if (!target) {
+              sendError(socket, 'Miststep requires a target cell.');
+              return;
+            }
+            const targetTile = room.placedTiles[`${target.tileX},${target.tileY}`];
+            if (!targetTile) {
+              sendError(socket, 'Target cell must be on a placed tile.');
+              return;
+            }
+            // Check distance <= 3 Manhattan
+            const from = room.tokenPositions[playerId];
+            if (!from) return;
+            const globalR_from = from.tileY * 5 + from.r;
+            const globalC_from = from.tileX * 5 + from.c;
+            const globalR_to = target.tileY * 5 + target.r;
+            const globalC_to = target.tileX * 5 + target.c;
+            const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
+            if (dist > 3) {
+              sendError(socket, 'Target is too far (max distance 3 cells).');
+              return;
+            }
+            room.tokenPositions[playerId] = {
+              tileX: target.tileX,
+              tileY: target.tileY,
+              r: target.r,
+              c: target.c
+            };
+
+          } else if (card.id === 'working_raise_stone') {
+            if (!target || target.direction === undefined) {
+              sendError(socket, 'Raise Stone requires a target border.');
+              return;
+            }
+            // Verify adjacent
+            const from = room.tokenPositions[playerId];
+            if (!from) return;
+            if (from.tileX !== target.tileX || from.tileY !== target.tileY) {
+              sendError(socket, 'You must target a border on your current tile.');
+              return;
+            }
+            if (target.direction === 'H') {
+              if (from.c !== target.c || (from.r !== target.r && from.r !== target.r + 1)) {
+                sendError(socket, 'You must be adjacent to the target border.');
+                return;
+              }
+            } else {
+              if (from.r !== target.r || (from.c !== target.c && from.c !== target.c + 1)) {
+                sendError(socket, 'You must be adjacent to the target border.');
+                return;
+              }
+            }
+            const wallKey = `${target.tileX},${target.tileY}:${target.r},${target.c}:${target.direction}`;
+            room.wallsState[wallKey] = true;
+
+          } else if (card.id === 'talisman_bear_charm') {
+            player.maxThread += 2;
+            player.thread = Math.min(player.maxThread, player.thread + 2);
+
+          } else if (card.id === 'working_don_wolf') {
+            player.form = 'wolf';
+
+          } else if (card.id === 'offering_deep_breath') {
+            player.ap += 2;
+
+          } else {
+            sendError(socket, 'Unknown card played.');
+            return;
+          }
+
+          // Discard card from hand
+          player.hand.splice(cardIndex, 1);
+
+          // Deduct AP if not an offering
+          if (!isOffering) {
+            player.ap--;
+          }
+
+          // Auto-pass if AP hits 0
+          if (player.ap === 0) {
+            passTurn(room);
+          }
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'RESET_GAME': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'GAME_OVER') return;
+
+          const player = room.players[playerId];
+          if (!player || !player.isHost) {
+            sendError(socket, 'Only the host can reset the game.');
+            return;
+          }
+
+          room.phase = 'LOBBY';
+          room.placedTiles = {};
+          room.doorsState = {};
+          room.wallsState = {};
+          room.tokenPositions = {};
+          room.turnOrder = [];
+          for (const pId of Object.keys(room.players)) {
+            const p = room.players[pId];
+            p.isReady = false;
+            p.assignedTileIndex = null;
+            p.ap = 0;
+            p.thread = 15;
+            p.maxThread = 15;
+            p.hand = [];
+            p.points = 0;
+            p.form = 'normal';
+          }
+
           broadcastState(currentRoomCode, room);
           break;
         }
