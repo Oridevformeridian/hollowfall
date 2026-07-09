@@ -1034,16 +1034,18 @@ export default function App() {
                           
                           const dr = Math.abs(toPos.r - myTokenPos.r);
                           const dc = Math.abs(toPos.c - myTokenPos.c);
-                          const dtX = Math.abs(toPos.tileX - myTokenPos.tileX);
-                          const dtY = Math.abs(toPos.tileY - myTokenPos.tileY);
+                          const dx = toPos.tileX - myTokenPos.tileX;
+                          const dy = toPos.tileY - myTokenPos.tileY;
+                          const dtX = Math.abs(dx);
+                          const dtY = Math.abs(dy);
 
                           const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
                           const isAdjacent = (dtX <= 1 && dtY <= 1) && (
                             (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
-                            (dtX === 1 && dtY === 0 && myTokenPos.r === 2 && myTokenPos.c === 4 && toPos.r === 2 && toPos.c === 0) ||
-                            (dtX === -1 && dtY === 0 && myTokenPos.r === 2 && myTokenPos.c === 0 && toPos.r === 2 && toPos.c === 4) ||
-                            (dtX === 0 && dtY === 1 && myTokenPos.r === 0 && myTokenPos.c === 2 && toPos.r === 4 && toPos.c === 2) ||
-                            (dtX === 0 && dtY === -1 && myTokenPos.r === 4 && myTokenPos.c === 2 && toPos.r === 0 && toPos.c === 2)
+                            (dx === 1 && dy === 0 && myTokenPos.r === 2 && myTokenPos.c === 4 && toPos.r === 2 && toPos.c === 0) ||
+                            (dx === -1 && dy === 0 && myTokenPos.r === 2 && myTokenPos.c === 0 && toPos.r === 2 && toPos.c === 4) ||
+                            (dx === 0 && dy === 1 && myTokenPos.r === 0 && myTokenPos.c === 2 && toPos.r === 4 && toPos.c === 2) ||
+                            (dx === 0 && dy === -1 && myTokenPos.r === 4 && myTokenPos.c === 2 && toPos.r === 0 && toPos.c === 2)
                           );
 
                           if (!isSameCell && !isAdjacent) return false;
@@ -1277,7 +1279,7 @@ export default function App() {
                           const targetPos = { tileX: x, tileY: y, r, c };
 
                           // Check if this cell contains a lashable player
-                           const lashablePlayer = !targetingCardId && gameState && myTokenPos && self && self.ap > 0 && !self.hasAttackedThisTurn && !self.isFirstTurnOfMatch
+                           const lashablePlayer = !targetingCardId && gameState && myTokenPos && self && isActiveTurn && self.ap > 0 && !self.hasAttackedThisTurn && !self.isFirstTurnOfMatch
                              ? Object.values(gameState.players).find(p => {
                                  if (p.id === socket?.id || p.thread <= 0) return false;
                                  const toPos = gameState.tokenPositions[p.id];
@@ -1286,16 +1288,18 @@ export default function App() {
 
                                  const dr = Math.abs(toPos.r - myTokenPos.r);
                                  const dc = Math.abs(toPos.c - myTokenPos.c);
-                                 const dtX = Math.abs(toPos.tileX - myTokenPos.tileX);
-                                 const dtY = Math.abs(toPos.tileY - myTokenPos.tileY);
+                                 const dx = toPos.tileX - myTokenPos.tileX;
+                                 const dy = toPos.tileY - myTokenPos.tileY;
+                                 const dtX = Math.abs(dx);
+                                 const dtY = Math.abs(dy);
 
                                  const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
                                  const isAdjacent = (dtX <= 1 && dtY <= 1) && (
                                    (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
-                                   (dtX === 1 && dtY === 0 && myTokenPos.r === 2 && myTokenPos.c === 4 && toPos.r === 2 && toPos.c === 0) ||
-                                   (dtX === -1 && dtY === 0 && myTokenPos.r === 2 && myTokenPos.c === 0 && toPos.r === 2 && toPos.c === 4) ||
-                                   (dtX === 0 && dtY === 1 && myTokenPos.r === 0 && myTokenPos.c === 2 && toPos.r === 4 && toPos.c === 2) ||
-                                   (dtX === 0 && dtY === -1 && myTokenPos.r === 4 && myTokenPos.c === 2 && toPos.r === 0 && toPos.c === 2)
+                                   (dx === 1 && dy === 0 && myTokenPos.r === 2 && myTokenPos.c === 4 && toPos.r === 2 && toPos.c === 0) ||
+                                   (dx === -1 && dy === 0 && myTokenPos.r === 2 && myTokenPos.c === 0 && toPos.r === 2 && toPos.c === 4) ||
+                                   (dx === 0 && dy === 1 && myTokenPos.r === 0 && myTokenPos.c === 2 && toPos.r === 4 && toPos.c === 2) ||
+                                   (dx === 0 && dy === -1 && myTokenPos.r === 4 && myTokenPos.c === 2 && toPos.r === 0 && toPos.c === 2)
                                  );
 
                                  if (!isSameCell && !isAdjacent) return false;

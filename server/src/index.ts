@@ -602,13 +602,14 @@ io.on('connection', (socket) => {
  
             if (turnAsideIndex !== -1) {
               targetPlayer.hand.splice(turnAsideIndex, 1);
-              console.log(`${targetPlayer.username} used Turn Aside to counter Kindle the Storm.`);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Turn Aside to counter Kindle the Storm!`);
             } else if (spiritSkinIndex !== -1) {
               targetPlayer.hand.splice(spiritSkinIndex, 1);
               targetPlayer.thread = Math.max(0, targetPlayer.thread - 1); // 3 damage reduced by 2
-              console.log(`${targetPlayer.username} used Spirit-Skin to reduce Kindle the Storm damage to 1.`);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Spirit-Skin to reduce Kindle the Storm damage by 2 (took 1 damage).`);
             } else {
               targetPlayer.thread = Math.max(0, targetPlayer.thread - 3);
+              broadcastSystemMessage(currentRoomCode, `${player.username} cast Kindle the Storm on ${targetPlayer.username} for 3 damage!`);
             }
  
             // Victory check / Death respawn
@@ -619,7 +620,7 @@ io.on('connection', (socket) => {
               if (player.hand.length > 7) {
                 player.hand.splice(7);
               }
-
+ 
               // Drop target's carried treasure
               if (room.treasures) {
                 for (const treasureId of Object.keys(room.treasures)) {
@@ -636,7 +637,7 @@ io.on('connection', (socket) => {
                   }
                 }
               }
-
+ 
               targetPlayer.thread = 15;
               const targetTile = Object.values(room.placedTiles).find(t => t.placedBy === targetPlayerId);
               if (targetTile) {
@@ -647,10 +648,11 @@ io.on('connection', (socket) => {
                   c: 2
                 };
               }
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} was defeated by ${player.username} and respawned!`);
             }
             recalculatePoints(room);
             if (player.points >= 2) {
-                room.phase = 'GAME_OVER';
+              room.phase = 'GAME_OVER';
             }
 
           } else if (card.id === 'working_miststep') {
@@ -787,16 +789,18 @@ io.on('connection', (socket) => {
 
           const dr = Math.abs(to.r - from.r);
           const dc = Math.abs(to.c - from.c);
-          const dtX = Math.abs(to.tileX - from.tileX);
-          const dtY = Math.abs(to.tileY - from.tileY);
+          const dx = to.tileX - from.tileX;
+          const dy = to.tileY - from.tileY;
+          const dtX = Math.abs(dx);
+          const dtY = Math.abs(dy);
 
           const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
           const isAdjacent = (dtX <= 1 && dtY <= 1) && (
             (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
-            (dtX === 1 && dtY === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) ||
-            (dtX === -1 && dtY === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) ||
-            (dtX === 0 && dtY === 1 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) ||
-            (dtX === 0 && dtY === -1 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2)
+            (dx === 1 && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) ||
+            (dx === -1 && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) ||
+            (dx === 0 && dy === 1 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) ||
+            (dx === 0 && dy === -1 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2)
           );
 
           if (!isSameCell && !isAdjacent) {
@@ -815,10 +819,10 @@ io.on('connection', (socket) => {
           const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
           if (spiritSkinIndex !== -1) {
             targetPlayer.hand.splice(spiritSkinIndex, 1);
-            console.log(`${targetPlayer.username} used Spirit-Skin to block Lash damage.`);
+            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Spirit-Skin to block the Lash damage!`);
           } else {
             targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
-            console.log(`${player.username} lashed ${targetPlayer.username} for 1 physical damage.`);
+            broadcastSystemMessage(currentRoomCode, `${player.username} lashed ${targetPlayer.username} for 1 damage!`);
           }
 
           if (targetPlayer.thread <= 0) {
@@ -852,6 +856,7 @@ io.on('connection', (socket) => {
                 c: 2
               };
             }
+            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} was defeated by ${player.username} and respawned!`);
           }
 
           recalculatePoints(room);
@@ -1058,6 +1063,14 @@ const sendError = (socket: any, message: string) => {
     payload: { message }
   };
   socket.emit('message', JSON.stringify(msg));
+};
+
+const broadcastSystemMessage = (roomCode: string, message: string) => {
+  const msg: ServerMessage = {
+    event: 'ERROR',
+    payload: { message }
+  };
+  io.to(roomCode).emit('message', JSON.stringify(msg));
 };
 
 const PORT = process.env.PORT || 3001;
