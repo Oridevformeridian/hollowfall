@@ -680,7 +680,6 @@ export default function App() {
       </div>
     );
   }
-
   // Active board placement or finalized gameplay preview
   const activeTileIndex = self?.assignedTileIndex;
   const activeTileLayout = activeTileIndex !== null && activeTileIndex !== undefined ? FIXED_TILES[activeTileIndex] : null;
