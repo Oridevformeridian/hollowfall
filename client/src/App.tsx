@@ -306,9 +306,9 @@ const ITEMS = ['cup', 'spoon', 'fork', 'pen', 'book', 'key', 'bag', 'shoe', 'hat
 const COLORS = ['red', 'blue', 'green', 'pink', 'gray', 'teal', 'gold', 'yellow', 'black', 'white', 'orange', 'brown', 'purple'];
 
 function generateLobbyName(): string {
-  const w1 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-  const w2 = ITEMS[Math.floor(Math.random() * ITEMS.length)];
-  const w3 = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const w1 = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const w2 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+  const w3 = ITEMS[Math.floor(Math.random() * ITEMS.length)];
   return `${w1}-${w2}-${w3}`;
 }
 
