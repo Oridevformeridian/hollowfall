@@ -1257,8 +1257,36 @@ export default function App() {
                           const c = idx % 5;
                           const targetPos = { tileX: x, tileY: y, r, c };
 
+                          // Check if this cell contains a lashable player
+                           const lashablePlayer = !targetingCardId && gameState && myTokenPos && self && self.ap > 0 && !self.hasAttackedThisTurn && !self.isFirstTurnOfMatch
+                             ? Object.values(gameState.players).find(p => {
+                                 if (p.id === socket?.id || p.thread <= 0) return false;
+                                 const toPos = gameState.tokenPositions[p.id];
+                                 if (!toPos) return false;
+                                 if (toPos.tileX !== x || toPos.tileY !== y || toPos.r !== r || toPos.c !== c) return false;
+
+                                 const dr = Math.abs(toPos.r - myTokenPos.r);
+                                 const dc = Math.abs(toPos.c - myTokenPos.c);
+                                 const dtX = Math.abs(toPos.tileX - myTokenPos.tileX);
+                                 const dtY = Math.abs(toPos.tileY - myTokenPos.tileY);
+
+                                 const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
+                                 const isAdjacent = (dtX <= 1 && dtY <= 1) && (
+                                   (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
+                                   (dtX === 1 && dtY === 0 && myTokenPos.r === 2 && myTokenPos.c === 4 && toPos.r === 2 && toPos.c === 0) ||
+                                   (dtX === -1 && dtY === 0 && myTokenPos.r === 2 && myTokenPos.c === 0 && toPos.r === 2 && toPos.c === 4) ||
+                                   (dtX === 0 && dtY === 1 && myTokenPos.r === 0 && myTokenPos.c === 2 && toPos.r === 4 && toPos.c === 2) ||
+                                   (dtX === 0 && dtY === -1 && myTokenPos.r === 4 && myTokenPos.c === 2 && toPos.r === 0 && toPos.c === 2)
+                                 );
+
+                                 if (!isSameCell && !isAdjacent) return false;
+                                 
+                                 return hasLineOfSight(myTokenPos, toPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
+                               })
+                             : null;
+
                           // 1. Regular token movement highlight
-                          const isValidMove = !targetingCardId && myTokenPos && isActiveTurn && self && self.ap > 0 && validateTokenMove(
+                          const isValidMove = !targetingCardId && !lashablePlayer && myTokenPos && isActiveTurn && self && self.ap > 0 && validateTokenMove(
                             myTokenPos,
                             targetPos,
                             gameState.placedTiles,
@@ -1294,7 +1322,10 @@ export default function App() {
                             <div
                               key={`cell-overlay-${r}-${c}`}
                               onClick={(e) => {
-                                if (isValidMove) {
+                                if (lashablePlayer) {
+                                  e.stopPropagation();
+                                  sendEvent({ event: 'LASH_ATTACK', payload: { targetPlayerId: lashablePlayer.id } });
+                                } else if (isValidMove) {
                                   e.stopPropagation();
                                   handleMoveToken(targetPos);
                                 } else if (isKindleTarget) {
@@ -1307,16 +1338,20 @@ export default function App() {
                               }}
                               style={{
                                 position: 'relative',
-                                cursor: (isValidMove || isKindleTarget || isMiststepTarget) ? 'pointer' : 'default',
-                                pointerEvents: (isValidMove || isKindleTarget || isMiststepTarget || isRaiseStoneCell) ? 'auto' : 'none',
-                                border: isValidMove
+                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget) ? 'pointer' : 'default',
+                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isRaiseStoneCell) ? 'auto' : 'none',
+                                border: lashablePlayer
+                                  ? '2px solid var(--accent-crimson)'
+                                  : isValidMove
                                   ? '1.5px dashed var(--accent-green)'
                                   : isKindleTarget
                                   ? '2px solid var(--accent-crimson)'
                                   : isMiststepTarget
                                   ? '1.5px dashed var(--accent-cyan)'
                                   : 'none',
-                                backgroundColor: isValidMove
+                                backgroundColor: lashablePlayer
+                                  ? 'rgba(239, 68, 68, 0.15)'
+                                  : isValidMove
                                   ? 'rgba(0, 230, 118, 0.1)'
                                   : isKindleTarget
                                   ? 'rgba(255, 23, 68, 0.15)'
