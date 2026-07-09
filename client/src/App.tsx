@@ -1105,7 +1105,14 @@ export default function App() {
       </div>
 
       {/* Main Board Space */}
-      <div className="main-content" style={{ overflow: 'hidden' }}>
+      <div
+        className="main-content"
+        style={{
+          overflow: 'auto',
+          paddingBottom: gameState.phase === 'GAMEPLAY' ? '220px' : '24px',
+          boxSizing: 'border-box'
+        }}
+      >
         {/* Turn Indicator Overlay (Top Right) */}
         {gameState.turnOrder.length > 0 && (
           <div
