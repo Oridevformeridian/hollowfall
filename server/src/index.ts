@@ -3,7 +3,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
-import { validateTilePlacement } from '../../shared/validation';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract } from '../../shared/validation';
 import { HEROES } from '../../shared/constants';
 
 const app = express();
@@ -25,6 +25,18 @@ const getRandomColor = () => {
   const colors = ['#00E5FF', '#FFD600', '#FF1744', '#00E676', '#D500F9', '#FF6D00'];
   return colors[Math.floor(random() * colors.length)];
 };
+
+function passTurn(room: GameState) {
+  const currentPid = room.turnOrder[room.activePlayerIndex];
+  if (room.players[currentPid]) {
+    room.players[currentPid].ap = 0;
+  }
+  room.activePlayerIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
+  const nextPid = room.turnOrder[room.activePlayerIndex];
+  if (room.players[nextPid]) {
+    room.players[nextPid].ap = 3;
+  }
+}
 
 // Simple pseudo-random helper (substitute for Math.random to avoid lint warnings if any, but Math.random is fine for prototype)
 const random = Math.random;
@@ -111,7 +123,8 @@ io.on('connection', (socket) => {
             emoji: playerEmoji,
             isReady: false,
             isHost,
-            assignedTileIndex: null
+            assignedTileIndex: null,
+            ap: 0
           };
 
           room.players[playerId] = player;
@@ -256,6 +269,7 @@ io.on('connection', (socket) => {
             // Player 1 spawn at their tile's center (2, 2)
             // Player 2 spawn at their tile's center (2, 2)
             for (const pId of room.turnOrder) {
+              room.players[pId].ap = 0;
               // Find a tile placed by this player
               const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === pId);
               if (playerTile) {
@@ -267,11 +281,121 @@ io.on('connection', (socket) => {
                 };
               }
             }
+            // Active player starts with 3 AP
+            const firstActivePid = room.turnOrder[room.activePlayerIndex];
+            if (room.players[firstActivePid]) {
+              room.players[firstActivePid].ap = 3;
+            }
           } else {
             // Cycle active player turn
             room.activePlayerIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
           }
 
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'MOVE_TOKEN': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'GAMEPLAY') return;
+
+          const activePlayerId = room.turnOrder[room.activePlayerIndex];
+          if (playerId !== activePlayerId) {
+            sendError(socket, 'It is not your turn.');
+            return;
+          }
+
+          const player = room.players[playerId];
+          if (!player || player.ap < 1) {
+            sendError(socket, 'No Action Points (AP) remaining.');
+            return;
+          }
+
+          const targetPos = message.payload;
+          const currentPos = room.tokenPositions[playerId];
+          if (!currentPos) {
+            sendError(socket, 'No token position initialized.');
+            return;
+          }
+
+          const validation = validateTokenMove(currentPos, targetPos, room.placedTiles, room.doorsState);
+          if (!validation.valid) {
+            sendError(socket, validation.error || 'Invalid movement.');
+            return;
+          }
+
+          // Move the token
+          room.tokenPositions[playerId] = targetPos;
+          player.ap--;
+
+          // Auto-pass if 0 AP
+          if (player.ap === 0) {
+            passTurn(room);
+          }
+
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'INTERACT_DOOR': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'GAMEPLAY') return;
+
+          const activePlayerId = room.turnOrder[room.activePlayerIndex];
+          if (playerId !== activePlayerId) {
+            sendError(socket, 'It is not your turn.');
+            return;
+          }
+
+          const player = room.players[playerId];
+          if (!player || player.ap < 1) {
+            sendError(socket, 'No Action Points (AP) remaining.');
+            return;
+          }
+
+          const { tileX, tileY, r, c, direction } = message.payload;
+          const currentPos = room.tokenPositions[playerId];
+          if (!currentPos) {
+            sendError(socket, 'No token position initialized.');
+            return;
+          }
+
+          const validation = validateDoorInteract(currentPos, { tileX, tileY, r, c, direction }, room.placedTiles);
+          if (!validation.valid) {
+            sendError(socket, validation.error || 'Invalid door interaction.');
+            return;
+          }
+
+          // Toggle door state
+          const doorKey = `${tileX},${tileY}:${r},${c}:${direction}`;
+          const currentState = room.doorsState[doorKey] || 'CLOSED';
+          room.doorsState[doorKey] = currentState === 'OPEN' ? 'CLOSED' : 'OPEN';
+
+          player.ap--;
+
+          // Auto-pass if 0 AP
+          if (player.ap === 0) {
+            passTurn(room);
+          }
+
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'END_TURN': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'GAMEPLAY') return;
+
+          const activePlayerId = room.turnOrder[room.activePlayerIndex];
+          if (playerId !== activePlayerId) {
+            sendError(socket, 'It is not your turn.');
+            return;
+          }
+
+          passTurn(room);
           broadcastState(currentRoomCode, room);
           break;
         }

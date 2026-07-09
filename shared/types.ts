@@ -9,6 +9,7 @@ export interface Player {
   isReady: boolean;
   isHost: boolean;
   assignedTileIndex: number | null; // 0..3 index of distributed fixed tiles
+  ap: number;
 }
 
 export interface Coordinate {
@@ -48,7 +49,8 @@ export type ClientMessage =
   | { event: 'PLACE_TILE'; payload: { x: number; y: number; rotation: 0 | 90 | 180 | 270 } }
   | { event: 'INTERACT_DOOR'; payload: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' } }
   | { event: 'MOVE_TOKEN'; payload: TokenPosition }
-  | { event: 'SELECT_HERO'; payload: { emoji: string } };
+  | { event: 'SELECT_HERO'; payload: { emoji: string } }
+  | { event: 'END_TURN' };
 
 export type ServerMessage =
   | { event: 'STATE_UPDATE'; payload: GameState }

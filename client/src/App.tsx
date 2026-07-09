@@ -2,9 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES } from './shared/constants.ts';
-import { validateTilePlacement } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate } from './shared/validation.ts';
 
-const renderTileSvgContent = (_layout: TileLayout, playerColor: string) => {
+const renderTileSvgContent = (
+  layout: TileLayout,
+  playerColor: string,
+  tilePos?: { x: number; y: number },
+  doorsState?: Record<string, 'OPEN' | 'CLOSED'>,
+  rotation?: 0 | 90 | 180 | 270,
+  onInteractDoor?: (tileX: number, tileY: number, r: number, c: number, direction: 'H' | 'V') => void,
+  myTokenPos?: any,
+  isActiveTurn?: boolean,
+  selfAp?: number,
+  placedTiles?: any
+) => {
+  const rot = rotation || 0;
   const cells = [];
   for (let r = 0; r < 5; r++) {
     for (let c = 0; c < 5; c++) {
@@ -36,6 +48,130 @@ const renderTileSvgContent = (_layout: TileLayout, playerColor: string) => {
         strokeWidth="1"
         style={{ filter: `drop-shadow(0 0 5px ${playerColor})` }}
       />
+
+      {/* Render Walls */}
+      {layout.vWalls.map((w, idx) => (
+        <line
+          key={`vwall-${idx}`}
+          x1={(w.c + 1) * 20}
+          y1={w.r * 20}
+          x2={(w.c + 1) * 20}
+          y2={(w.r + 1) * 20}
+          stroke="#475569" // slate wall color
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      ))}
+
+      {layout.hWalls.map((w, idx) => (
+        <line
+          key={`hwall-${idx}`}
+          x1={w.c * 20}
+          y1={(w.r + 1) * 20}
+          x2={(w.c + 1) * 20}
+          y2={(w.r + 1) * 20}
+          stroke="#475569" // slate wall color
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      ))}
+
+      {/* Render Doors */}
+      {layout.vDoors.map((d, idx) => {
+        let isOpen = false;
+        let canClick = false;
+        let placedR = d.r;
+        let placedC = d.c;
+        let placedDir: 'H' | 'V' = 'V';
+
+        if (tilePos && doorsState && rotation !== undefined) {
+          const placed = rotateBorderCoordinate(d.r, d.c, 'V', rot);
+          placedR = placed.r;
+          placedC = placed.c;
+          placedDir = placed.direction;
+          const doorKey = `${tilePos.x},${tilePos.y}:${placedR},${placedC}:${placedDir}`;
+          isOpen = doorsState[doorKey] === 'OPEN';
+
+          if (myTokenPos && isActiveTurn && selfAp && selfAp > 0 && placedTiles) {
+            canClick = validateDoorInteract(myTokenPos, { tileX: tilePos.x, tileY: tilePos.y, r: placedR, c: placedC, direction: placedDir }, placedTiles).valid;
+          }
+        }
+
+        return (
+          <g key={`vdoor-g-${idx}`} transform={`rotate(${-rot} ${(d.c + 1) * 20} ${d.r * 20 + 10})`}>
+            <text
+              x={(d.c + 1) * 20}
+              y={d.r * 20 + 10}
+              fontSize="7"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              style={{
+                cursor: canClick && onInteractDoor ? 'pointer' : 'default',
+                userSelect: 'none',
+                filter: canClick ? 'drop-shadow(0 0 3px #00E676)' : 'none',
+                opacity: isOpen ? 0.4 : 1,
+                transition: 'all 0.2s'
+              }}
+              onClick={(e) => {
+                if (canClick && onInteractDoor && tilePos) {
+                  e.stopPropagation();
+                  onInteractDoor(tilePos.x, tilePos.y, placedR, placedC, placedDir);
+                }
+              }}
+            >
+              {isOpen ? '🔓' : '🚪'}
+            </text>
+          </g>
+        );
+      })}
+
+      {layout.hDoors.map((d, idx) => {
+        let isOpen = false;
+        let canClick = false;
+        let placedR = d.r;
+        let placedC = d.c;
+        let placedDir: 'H' | 'V' = 'H';
+
+        if (tilePos && doorsState && rotation !== undefined) {
+          const placed = rotateBorderCoordinate(d.r, d.c, 'H', rot);
+          placedR = placed.r;
+          placedC = placed.c;
+          placedDir = placed.direction;
+          const doorKey = `${tilePos.x},${tilePos.y}:${placedR},${placedC}:${placedDir}`;
+          isOpen = doorsState[doorKey] === 'OPEN';
+
+          if (myTokenPos && isActiveTurn && selfAp && selfAp > 0 && placedTiles) {
+            canClick = validateDoorInteract(myTokenPos, { tileX: tilePos.x, tileY: tilePos.y, r: placedR, c: placedC, direction: placedDir }, placedTiles).valid;
+          }
+        }
+
+        return (
+          <g key={`hdoor-g-${idx}`} transform={`rotate(${-rot} ${d.c * 20 + 10} ${(d.r + 1) * 20})`}>
+            <text
+              x={d.c * 20 + 10}
+              y={(d.r + 1) * 20}
+              fontSize="7"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              style={{
+                cursor: canClick && onInteractDoor ? 'pointer' : 'default',
+                userSelect: 'none',
+                filter: canClick ? 'drop-shadow(0 0 3px #00E676)' : 'none',
+                opacity: isOpen ? 0.4 : 1,
+                transition: 'all 0.2s'
+              }}
+              onClick={(e) => {
+                if (canClick && onInteractDoor && tilePos) {
+                  e.stopPropagation();
+                  onInteractDoor(tilePos.x, tilePos.y, placedR, placedC, placedDir);
+                }
+              }}
+            >
+              {isOpen ? '🔓' : '🚪'}
+            </text>
+          </g>
+        );
+      })}
 
       {/* Solid Outer border */}
       <rect
@@ -158,12 +294,31 @@ export default function App() {
     setRotation(0);
   };
 
+  const handleMoveToken = (pos: any) => {
+    sendEvent({
+      event: 'MOVE_TOKEN',
+      payload: pos
+    });
+  };
+
+  const handleInteractDoor = (tileX: number, tileY: number, r: number, c: number, direction: 'H' | 'V') => {
+    sendEvent({
+      event: 'INTERACT_DOOR',
+      payload: { tileX, tileY, r, c, direction }
+    });
+  };
+
+  const handleEndTurn = () => {
+    sendEvent({ event: 'END_TURN' });
+  };
+
   // Helper selectors
   const self = socket?.id && gameState ? gameState.players[socket.id] : null;
   const isHost = self?.isHost || false;
   const playersList = gameState ? Object.values(gameState.players) : [];
   const activePlayerId = gameState?.turnOrder[gameState.activePlayerIndex];
-  const isActiveTurn = socket && activePlayerId === socket.id;
+  const isActiveTurn = !!(socket && activePlayerId === socket.id);
+  const myTokenPos = socket?.id && gameState ? gameState.tokenPositions[socket.id] : null;
 
   // Render Join / Lobby
   if (!gameState) {
@@ -535,9 +690,87 @@ export default function App() {
           )}
 
           {gameState.phase === 'GAMEPLAY' && (
-            <div style={{ backgroundColor: 'rgba(0,230,118,0.05)', borderColor: 'var(--accent-green)', borderWidth: '1px', borderStyle: 'solid', padding: '16px', borderRadius: '12px', textAlign: 'center' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--accent-green)', margin: '0 0 4px 0' }}>MAZE READY</h3>
-              <p style={{ fontSize: '12px', color: '#cbd5e1', margin: '0' }}>All 4 board sectors successfully placed and aligned.</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+              <div style={{ backgroundColor: 'rgba(0,230,118,0.05)', borderColor: 'var(--accent-green)', borderWidth: '1px', borderStyle: 'solid', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
+                <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent-green)', margin: '0 0 2px 0' }}>MAZE READY</h3>
+                <p style={{ fontSize: '11px', color: '#cbd5e1', margin: '0' }}>All 4 sectors aligned.</p>
+              </div>
+
+              {/* Character HUD List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <h3 className="text-xs font-bold text-gray-400 m-0 uppercase tracking-widest">Player Status</h3>
+                {gameState.turnOrder.map((pId) => {
+                  const player = gameState.players[pId];
+                  const isActive = pId === activePlayerId;
+                  const isMe = pId === socket?.id;
+                  
+                  // Render Action Points as Emoji Lightning bolts
+                  const apCount = player.ap || 0;
+                  const apIcons = '⚡'.repeat(apCount) + '⚪'.repeat(Math.max(0, 3 - apCount));
+
+                  return (
+                    <div
+                      key={pId}
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                        border: isActive ? `2px solid ${player.color}` : '1px solid #1a1f26',
+                        borderRadius: '12px',
+                        padding: '12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '8px',
+                        boxShadow: isActive ? `0 0 12px ${player.color}33` : 'none',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '24px' }}>{player.emoji}</span>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+                              {player.username} {isMe && '(You)'}
+                            </span>
+                            <span style={{ fontSize: '10px', color: '#64748b' }}>
+                              {isActive ? 'Active Turn' : 'Waiting...'}
+                            </span>
+                          </div>
+                        </div>
+                        {isActive && (
+                          <span style={{ fontSize: '12px', color: player.color, fontWeight: 'bold' }}>
+                            ACTIVE
+                          </span>
+                        )}
+                      </div>
+
+                      {/* AP indicator */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', marginTop: '4px' }}>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>Actions:</span>
+                        <span style={{ fontSize: '13px', letterSpacing: '2px' }}>{apIcons}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* End Turn Button (only for active player) */}
+              {isActiveTurn && (
+                <button
+                  onClick={handleEndTurn}
+                  className="btn-primary"
+                  style={{
+                    width: '100%',
+                    marginTop: '8px',
+                    backgroundColor: 'var(--accent-cyan)',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  End Turn ➔
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -640,9 +873,68 @@ export default function App() {
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
                     <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100">
                       <g transform={`rotate(${tile.rotation} 50 50)`}>
-                        {renderTileSvgContent(FIXED_TILES[tile.tileId - 1], gameState.players[tile.placedBy]?.color || '#00E5FF')}
+                        {renderTileSvgContent(
+                          FIXED_TILES[tile.tileId - 1],
+                          gameState.players[tile.placedBy]?.color || '#00E5FF',
+                          { x, y },
+                          gameState.doorsState,
+                          tile.rotation,
+                          handleInteractDoor,
+                          myTokenPos,
+                          isActiveTurn,
+                          self?.ap,
+                          gameState.placedTiles
+                        )}
                       </g>
                     </svg>
+                    {/* Interactive overlay cells for token movement */}
+                    {gameState.phase === 'GAMEPLAY' && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(5, 1fr)',
+                          gridTemplateRows: 'repeat(5, 1fr)',
+                          zIndex: 20
+                        }}
+                      >
+                        {Array.from({ length: 25 }).map((_, idx) => {
+                          const r = Math.floor(idx / 5);
+                          const c = idx % 5;
+                          const targetPos = { tileX: x, tileY: y, r, c };
+                          const isValidMove = myTokenPos && isActiveTurn && self && self.ap > 0 && validateTokenMove(
+                            myTokenPos,
+                            targetPos,
+                            gameState.placedTiles,
+                            gameState.doorsState
+                          ).valid;
+
+                          return (
+                            <div
+                              key={`move-overlay-${r}-${c}`}
+                              onClick={(e) => {
+                                if (isValidMove) {
+                                  e.stopPropagation();
+                                  handleMoveToken(targetPos);
+                                }
+                              }}
+                              style={{
+                                cursor: isValidMove ? 'pointer' : 'default',
+                                border: isValidMove ? '1.5px dashed var(--accent-green)' : 'none',
+                                backgroundColor: isValidMove ? 'rgba(0, 230, 118, 0.1)' : 'transparent',
+                                borderRadius: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                              title={isValidMove ? 'Move here' : ''}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
                     {/* Render spawn Token (in gameplay phase) */}
                     {Object.entries(gameState.tokenPositions).map(([pId, pos]) => {
                       if (pos.tileX === x && pos.tileY === y) {
@@ -661,7 +953,9 @@ export default function App() {
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              filter: `drop-shadow(0 0 6px ${player?.color})`
+                              filter: `drop-shadow(0 0 6px ${player?.color})`,
+                              zIndex: 30,
+                              pointerEvents: 'none'
                             }}
                             className="floating-emoji"
                           >

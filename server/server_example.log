@@ -1,0 +1,13 @@
+Server listening on port 3001
+Socket connected: k8gCnWh3Go6DqBrkAAAC
+Received message: JOIN_ROOM from k8gCnWh3Go6DqBrkAAAC
+Player Spotus joined room AAAAA
+Socket connected: 30EqnGqvGAqOrnL7AAAF
+Received message: JOIN_ROOM from 30EqnGqvGAqOrnL7AAAF
+Player Homie joined room AAAAA
+Received message: TOGGLE_READY from k8gCnWh3Go6DqBrkAAAC
+Received message: TOGGLE_READY from 30EqnGqvGAqOrnL7AAAF
+Received message: START_GAME from k8gCnWh3Go6DqBrkAAAC
+Socket disconnected: 30EqnGqvGAqOrnL7AAAF
+Socket disconnected: k8gCnWh3Go6DqBrkAAAC
+Room AAAAA deleted because it is empty.

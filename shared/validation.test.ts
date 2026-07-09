@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate } from './validation';
-import { PlacedTile } from './types';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract } from './validation';
+import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
   it('should enforce first tile is placed at (0, 0)', () => {
@@ -74,5 +74,89 @@ describe('rotateBorderCoordinate', () => {
     expect(res.direction).toBe('H');
     expect(res.r).toBe(2);
     expect(res.c).toBe(3);
+  });
+});
+
+describe('validateTokenMove', () => {
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+    '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+  };
+
+  it('should allow simple cell-to-cell move on unblocked pathway', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 3 }; // Move right from center (clear pathway)
+    const res = validateTokenMove(from, to, placedTiles, {});
+    expect(res.valid).toBe(true);
+  });
+
+  it('should block move if path crosses solid wall', () => {
+    // Tile 1 has V-wall at r:2, c:1 (separating c:1 and c:2 on row 2)
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 1 };
+    
+    // With tile rotation 0, it should block because V-wall at (2,1) exists
+    const res = validateTokenMove(from, to, placedTiles, {});
+    // Wait, let's verify if V-wall is at (2,1).
+    // Yes: in Tile 1 layout, vWalls includes { r: 2, c: 1 } which blocks moving between c:1 and c:2 on row 2!
+    // So this should be blocked.
+    expect(res.valid).toBe(false);
+    expect(res.error).toContain('Blocked by a wall');
+  });
+
+  it('should block move if path crosses closed door', () => {
+    // Tile 1 has H-door at r:3, c:3 (separating row 3 and 4 at col 3)
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 3 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 4, c: 3 };
+    
+    const res = validateTokenMove(from, to, placedTiles, {});
+    expect(res.valid).toBe(false);
+    expect(res.error).toContain('Blocked by a closed door');
+  });
+
+  it('should allow move if path crosses open door', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 3 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 4, c: 3 };
+    
+    const doorsState = { '0,0:3,3:H': 'OPEN' as const };
+    const res = validateTokenMove(from, to, placedTiles, doorsState);
+    expect(res.valid).toBe(true);
+  });
+
+  it('should enforce crossing tile borders only via exits', () => {
+    // Correct East exit crossing (tile 0,0 East exit (2,4) to tile 1,0 West exit (2,0))
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
+    const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 0 };
+    const res = validateTokenMove(from, to, placedTiles, {});
+    expect(res.valid).toBe(true);
+
+    // Invalid border crossing (row 1, col 4 to row 1, col 0)
+    const from2: TokenPosition = { tileX: 0, tileY: 0, r: 1, c: 4 };
+    const to2: TokenPosition = { tileX: 1, tileY: 0, r: 1, c: 0 };
+    const res2 = validateTokenMove(from2, to2, placedTiles, {});
+    expect(res2.valid).toBe(false);
+    expect(res2.error).toContain('only allowed through aligned exits');
+  });
+});
+
+describe('validateDoorInteract', () => {
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' }
+  };
+
+  it('should allow interaction if adjacent to a valid door', () => {
+    // Tile 1 has H-door at r:3, c:3 (separates cell (3,3) and (4,3))
+    const token: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 3 };
+    const door = { tileX: 0, tileY: 0, r: 3, c: 3, direction: 'H' as const };
+    const res = validateDoorInteract(token, door, placedTiles);
+    expect(res.valid).toBe(true);
+  });
+
+  it('should block interaction if player is too far', () => {
+    const token: TokenPosition = { tileX: 0, tileY: 0, r: 1, c: 1 };
+    const door = { tileX: 0, tileY: 0, r: 3, c: 3, direction: 'H' as const };
+    const res = validateDoorInteract(token, door, placedTiles);
+    expect(res.valid).toBe(false);
+    expect(res.error).toContain('You must be in an adjacent cell');
   });
 });
