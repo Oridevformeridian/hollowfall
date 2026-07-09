@@ -301,6 +301,17 @@ function playVictoryChime() {
   }
 }
 
+const FIRST_WORDS = ['spirit', 'hidden', 'hollow', 'sacred', 'silent', 'ancient', 'mystic', 'wild', 'dormant', 'primal'];
+const SECOND_WORDS = ['duel', 'hearth', 'lair', 'stone', 'gate', 'threshold', 'thread', 'mask', 'realm', 'path'];
+const THIRD_WORDS = ['rite', 'seer', 'walker', 'glow', 'glen', 'bound', 'keep', 'run', 'fall', 'peak'];
+
+function generateLobbyName(): string {
+  const w1 = FIRST_WORDS[Math.floor(Math.random() * FIRST_WORDS.length)];
+  const w2 = SECOND_WORDS[Math.floor(Math.random() * SECOND_WORDS.length)];
+  const w3 = THIRD_WORDS[Math.floor(Math.random() * THIRD_WORDS.length)];
+  return `${w1}-${w2}-${w3}`;
+}
+
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -392,6 +403,19 @@ export default function App() {
     sendEvent({
       event: 'JOIN_ROOM',
       payload: { username, roomCode, color: '', emoji: '' }
+    });
+  };
+
+  const handleCreate = () => {
+    if (!username) {
+      setError('Please enter your name first.');
+      return;
+    }
+    const newRoomCode = generateLobbyName();
+    setRoomCode(newRoomCode);
+    sendEvent({
+      event: 'JOIN_ROOM',
+      payload: { username, roomCode: newRoomCode, color: '', emoji: '' }
     });
   };
 
@@ -547,8 +571,7 @@ export default function App() {
           boxSizing: 'border-box'
         }}
       >
-        <form
-          onSubmit={handleJoin}
+        <div
           className="glass-panel pulse-glow"
           style={{
             width: '100%',
@@ -581,13 +604,15 @@ export default function App() {
                 borderRadius: '8px',
                 fontSize: '14px',
                 textAlign: 'center',
-                width: '100%'
+                width: '100%',
+                boxSizing: 'border-box'
               }}
             >
               {error}
             </div>
           )}
 
+          {/* Name Input - Always Required */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center' }}>
             <label className="text-sm font-semibold text-gray-300">Your Name</label>
             <input
@@ -601,34 +626,63 @@ export default function App() {
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center' }}>
-            <label className="text-sm font-semibold text-gray-300">Room Code</label>
-            <input
-              type="text"
-              value={roomCode}
-              onChange={e => setRoomCode(e.target.value)}
-              placeholder="e.g. THRESH"
-              className="input-field text-center"
-              style={{ width: '100%', textAlign: 'center' }}
-              maxLength={6}
-            />
+          <div style={{ width: '100%', borderTop: '1px solid var(--border-light)', margin: '8px 0' }} />
+
+          {/* Option A: Create a Match */}
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <h3 style={{ fontSize: '14px', color: 'var(--accent-gold)', margin: 0, fontWeight: 'bold' }}>Option A: Host New Game</h3>
+            <p style={{ fontSize: '11px', color: '#64748b', margin: 0 }}>Generates a random, easy-to-read name you can share over Discord.</p>
+            <button
+              type="button"
+              onClick={handleCreate}
+              className="btn-primary"
+              style={{
+                width: '100%',
+                backgroundColor: 'var(--accent-gold)',
+                color: 'black',
+                fontWeight: 'bold',
+                marginTop: '4px'
+              }}
+            >
+              ✨ Create Match
+            </button>
           </div>
 
-          <button
-            type="submit"
-            className="btn-primary"
-            style={{
-              width: '100%',
-              marginTop: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center'
-            }}
+          <div style={{ width: '100%', borderTop: '1px solid var(--border-light)', margin: '8px 0' }} />
+
+          {/* Option B: Join Existing Match */}
+          <form
+            onSubmit={handleJoin}
+            style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}
           >
-            Connect to Lobby
-          </button>
-        </form>
+            <h3 style={{ fontSize: '14px', color: 'var(--accent-cyan)', margin: 0, fontWeight: 'bold' }}>Option B: Join Existing Game</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={roomCode}
+                onChange={e => setRoomCode(e.target.value)}
+                placeholder="e.g. mystic-lair-seer"
+                className="input-field text-center"
+                style={{ width: '100%', textAlign: 'center' }}
+                maxLength={30}
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn-secondary"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                fontWeight: 'bold'
+              }}
+            >
+              ➔ Join Match
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
@@ -1159,6 +1213,23 @@ export default function App() {
                   End Turn ➔
                 </button>
               )}
+
+              {/* Reset / Exit Match Button */}
+              <button
+                onClick={handleResetGame}
+                className="btn-secondary"
+                style={{
+                  width: '100%',
+                  marginTop: '16px',
+                  borderColor: 'rgba(239, 68, 68, 0.4)',
+                  color: '#ef4444',
+                  fontWeight: 'bold',
+                  fontSize: '12px',
+                  padding: '6px 0',
+                }}
+              >
+                🏳️ Abort & Exit to Lobby
+              </button>
             </div>
           )}
         </div>
