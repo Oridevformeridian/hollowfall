@@ -768,10 +768,22 @@ export default function App() {
   const placedList = Object.values(gameState.placedTiles);
   const xs = placedList.map(t => t.position.x);
   const ys = placedList.map(t => t.position.y);
-  const minX = Math.min(-1, ...xs) - 1;
-  const maxX = Math.max(1, ...xs) + 1;
-  const minY = Math.min(-1, ...ys) - 1;
-  const maxY = Math.max(1, ...ys) + 1;
+  let minX: number;
+  let maxX: number;
+  let minY: number;
+  let maxY: number;
+
+  if (gameState.phase === 'PLACEMENT') {
+    minX = xs.length > 0 ? Math.min(-1, ...xs) - 1 : -2;
+    maxX = xs.length > 0 ? Math.max(1, ...xs) + 1 : 2;
+    minY = ys.length > 0 ? Math.min(-1, ...ys) - 1 : -2;
+    maxY = ys.length > 0 ? Math.max(1, ...ys) + 1 : 2;
+  } else {
+    minX = xs.length > 0 ? Math.min(...xs) : 0;
+    maxX = xs.length > 0 ? Math.max(...xs) : 0;
+    minY = ys.length > 0 ? Math.min(...ys) : 0;
+    maxY = ys.length > 0 ? Math.max(...ys) : 0;
+  }
 
   const macroGrid: { x: number; y: number }[] = [];
   for (let y = maxY; y >= minY; y--) {
