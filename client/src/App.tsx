@@ -301,14 +301,14 @@ function playVictoryChime() {
   }
 }
 
-const FIRST_WORDS = ['spirit', 'hidden', 'hollow', 'sacred', 'silent', 'ancient', 'mystic', 'wild', 'dormant', 'primal'];
-const SECOND_WORDS = ['duel', 'hearth', 'lair', 'stone', 'gate', 'threshold', 'thread', 'mask', 'realm', 'path'];
-const THIRD_WORDS = ['rite', 'seer', 'walker', 'glow', 'glen', 'bound', 'keep', 'run', 'fall', 'peak'];
+const ANIMALS = ['frog', 'duck', 'crab', 'bear', 'lion', 'wolf', 'deer', 'goat', 'owl', 'fish', 'fox', 'bird', 'cat', 'dog', 'pig'];
+const ITEMS = ['cup', 'spoon', 'fork', 'pen', 'book', 'key', 'bag', 'shoe', 'hat', 'box', 'bowl', 'lamp', 'door', 'desk', 'clock'];
+const COLORS = ['red', 'blue', 'green', 'pink', 'gray', 'teal', 'gold', 'yellow', 'black', 'white', 'orange', 'brown', 'purple'];
 
 function generateLobbyName(): string {
-  const w1 = FIRST_WORDS[Math.floor(Math.random() * FIRST_WORDS.length)];
-  const w2 = SECOND_WORDS[Math.floor(Math.random() * SECOND_WORDS.length)];
-  const w3 = THIRD_WORDS[Math.floor(Math.random() * THIRD_WORDS.length)];
+  const w1 = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
+  const w2 = ITEMS[Math.floor(Math.random() * ITEMS.length)];
+  const w3 = COLORS[Math.floor(Math.random() * COLORS.length)];
   return `${w1}-${w2}-${w3}`;
 }
 
