@@ -253,11 +253,73 @@ const renderTileSvgContent = (
   );
 };
 
+function playVictoryChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    
+    const now = ctx.currentTime;
+    
+    // Celebratory major chord arpeggio: C4, E4, G4, C5
+    const freqs = [261.63, 329.63, 392.00, 523.25];
+    
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.15);
+      
+      // Envelope
+      gain.gain.setValueAtTime(0, now + idx * 0.15);
+      gain.gain.linearRampToValueAtTime(0.15, now + idx * 0.15 + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.15 + 1.2);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start(now + idx * 0.15);
+      osc.stop(now + idx * 0.15 + 1.3);
+    });
+
+    // Add a shimmering high C6 note at the end
+    const shimmer = ctx.createOscillator();
+    const shimmerGain = ctx.createGain();
+    shimmer.type = 'sine';
+    shimmer.frequency.setValueAtTime(1046.50, now + 0.6);
+    shimmerGain.gain.setValueAtTime(0, now + 0.6);
+    shimmerGain.gain.linearRampToValueAtTime(0.05, now + 0.6 + 0.05);
+    shimmerGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6 + 1.5);
+    shimmer.connect(shimmerGain);
+    shimmerGain.connect(ctx.destination);
+    shimmer.start(now + 0.6);
+    shimmer.stop(now + 0.6 + 1.6);
+
+  } catch (e) {
+    console.error('AudioContext failed:', e);
+  }
+}
+
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetingCardId, setTargetingCardId] = useState<string | null>(null);
+  const [playedGameOverSound, setPlayedGameOverSound] = useState(false);
+
+  useEffect(() => {
+    if (gameState?.phase === 'GAME_OVER') {
+      if (!playedGameOverSound) {
+        playVictoryChime();
+        setPlayedGameOverSound(true);
+      }
+    } else {
+      if (playedGameOverSound) {
+        setPlayedGameOverSound(false);
+      }
+    }
+  }, [gameState?.phase, playedGameOverSound]);
 
   // Form states
   const [username, setUsername] = useState('');
@@ -1700,18 +1762,59 @@ export default function App() {
             zIndex: 1000
           }}
         >
-          <div style={{ textAlign: 'center', padding: '40px', borderRadius: '24px', border: '2px solid var(--accent-gold)', backgroundColor: 'rgba(255,255,255,0.01)', boxShadow: '0 0 30px rgba(255, 214, 0, 0.15)', maxWidth: '480px', width: '90%' }}>
-            <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🏆</span>
-            <h2 style={{ color: 'var(--accent-gold)', fontSize: '28px', fontWeight: 'black', margin: '0 0 8px 0', letterSpacing: '2px' }}>MATCH COMPLETE</h2>
+          {/* Confetti particles */}
+          {Array.from({ length: 40 }).map((_, i) => {
+            const left = Math.random() * 100;
+            const delay = Math.random() * 4;
+            const size = Math.random() * 8 + 6;
+            const colors = ['#ffd700', '#ffb700', '#ffdf00', '#ffe853', '#d4af37'];
+            const bg = colors[Math.floor(Math.random() * colors.length)];
+            return (
+              <div
+                key={`confetti-${i}`}
+                className="confetti-particle"
+                style={{
+                  left: `${left}%`,
+                  width: `${size}px`,
+                  height: `${size}px`,
+                  backgroundColor: bg,
+                  boxShadow: `0 0 8px ${bg}aa`,
+                  animationDelay: `${delay}s`,
+                }}
+              />
+            );
+          })}
+
+          <div
+            className="victory-panel"
+            style={{
+              textAlign: 'center',
+              padding: '40px',
+              borderRadius: '24px',
+              border: '2px solid var(--accent-gold)',
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              backdropFilter: 'blur(16px)',
+              boxShadow: '0 0 40px rgba(255, 214, 0, 0.25)',
+              maxWidth: '480px',
+              width: '90%',
+              position: 'relative',
+              boxSizing: 'border-box'
+            }}
+          >
+            {/* Victory radial glow behind winner */}
+            <div className="victory-glow" />
+
+            <span style={{ fontSize: '56px', display: 'block', marginBottom: '16px', filter: 'drop-shadow(0 0 12px var(--accent-gold))' }}>🏆</span>
+            <h2 style={{ color: 'var(--accent-gold)', fontSize: '32px', fontWeight: '900', margin: '0 0 8px 0', letterSpacing: '3px', textTransform: 'uppercase', textShadow: '0 0 10px rgba(255,214,0,0.3)' }}>MATCH COMPLETE</h2>
             
             {(() => {
               const winner = Object.values(gameState.players).find(p => p.points >= 2);
               if (winner) {
                 return (
                   <div style={{ margin: '24px 0' }}>
-                    <span style={{ fontSize: '64px', display: 'block', margin: '8px 0' }}>{winner.emoji}</span>
-                    <h3 style={{ fontSize: '20px', color: 'white', margin: '0' }}>{winner.username} Wins!</h3>
-                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>Successfully severed the thread of their opponent twice.</p>
+                    <span style={{ fontSize: '64px', display: 'block', margin: '8px 0', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.4))' }}>{winner.emoji}</span>
+                    <h3 style={{ fontSize: '24px', color: 'white', margin: '0', fontWeight: 'bold' }}>{winner.username} Wins!</h3>
+                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>Successfully reached 2 victory points!</p>
                   </div>
                 );
               }
