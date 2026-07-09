@@ -156,6 +156,7 @@ const renderTileSvgContent = (
               dominantBaseline="middle"
               style={{
                 cursor: canClick && onInteractDoor ? 'pointer' : 'default',
+                pointerEvents: 'auto',
                 userSelect: 'none',
                 filter: canClick ? 'drop-shadow(0 0 3px #00E676)' : 'none',
                 opacity: isOpen ? 0.4 : 1,
@@ -204,6 +205,7 @@ const renderTileSvgContent = (
               dominantBaseline="middle"
               style={{
                 cursor: canClick && onInteractDoor ? 'pointer' : 'default',
+                pointerEvents: 'auto',
                 userSelect: 'none',
                 filter: canClick ? 'drop-shadow(0 0 3px #00E676)' : 'none',
                 opacity: isOpen ? 0.4 : 1,
@@ -1035,7 +1037,7 @@ export default function App() {
                 {tile ? (
                   // Placed Tile
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-                    <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100">
+                    <svg style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 25, pointerEvents: 'none' }} viewBox="0 0 100 100">
                       <g transform={`rotate(${tile.rotation} 50 50)`}>
                         {renderTileSvgContent(
                           FIXED_TILES[tile.tileId - 1],
