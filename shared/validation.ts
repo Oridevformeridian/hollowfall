@@ -96,6 +96,200 @@ export function validateTilePlacement(
 }
 
 /**
+ * Checks if a border between cells on a tile is blocked by a wall, closed door, or dynamic Raised Stone.
+ */
+export function isBorderBlocked(
+  tileX: number,
+  tileY: number,
+  r: number,
+  c: number,
+  direction: 'H' | 'V',
+  placedTiles: Record<string, PlacedTile>,
+  doorsState: Record<string, 'OPEN' | 'CLOSED'>,
+  wallsState?: Record<string, boolean>
+): { blocked: boolean; reason?: string } {
+  const tile = placedTiles[`${tileX},${tileY}`];
+  if (!tile) return { blocked: true, reason: 'No tile found.' };
+
+  // Check dynamic Raised Stone wall
+  const wallKey = `${tileX},${tileY}:${r},${c}:${direction}`;
+  if (wallsState && wallsState[wallKey]) {
+    return { blocked: true, reason: 'Blocked by a raised stone wall.' };
+  }
+
+  // Unrotate boundary coordinate to check native layout
+  const unrotation = ((360 - tile.rotation) % 360) as 0 | 90 | 180 | 270;
+  const ur = rotateBorderCoordinate(r, c, direction, unrotation);
+  const layout = FIXED_TILES[tile.tileId - 1];
+
+  if (ur.direction === 'H') {
+    if (layout.hWalls.some(w => w.r === ur.r && w.c === ur.c)) {
+      return { blocked: true, reason: 'Blocked by a wall.' };
+    }
+    if (layout.hDoors.some(d => d.r === ur.r && d.c === ur.c)) {
+      const doorKey = `${tileX},${tileY}:${r},${c}:H`;
+      if (doorsState[doorKey] !== 'OPEN') {
+        return { blocked: true, reason: 'Blocked by a closed door.' };
+      }
+    }
+  } else {
+    if (layout.vWalls.some(w => w.r === ur.r && w.c === ur.c)) {
+      return { blocked: true, reason: 'Blocked by a wall.' };
+    }
+    if (layout.vDoors.some(d => d.r === ur.r && d.c === ur.c)) {
+      const doorKey = `${tileX},${tileY}:${r},${c}:V`;
+      if (doorsState[doorKey] !== 'OPEN') {
+        return { blocked: true, reason: 'Blocked by a closed door.' };
+      }
+    }
+  }
+
+  return { blocked: false };
+}
+
+/**
+ * Checks whether there is an unobstructed line of sight (LOS) between two micro-grid coordinates.
+ */
+export function hasLineOfSight(
+  from: TokenPosition,
+  to: TokenPosition,
+  placedTiles: Record<string, PlacedTile>,
+  doorsState: Record<string, 'OPEN' | 'CLOSED'>,
+  wallsState?: Record<string, boolean>
+): boolean {
+  const ws = wallsState || {};
+
+  // If same cell, LOS is clear
+  if (from.tileX === to.tileX && from.tileY === to.tileY && from.r === to.r && from.c === to.c) {
+    return true;
+  }
+
+  // If different tiles:
+  if (from.tileX !== to.tileX || from.tileY !== to.tileY) {
+    // Only orthogonal transitions through aligned exits are clear.
+    const dx = to.tileX - from.tileX;
+    const dy = to.tileY - from.tileY;
+    if (Math.abs(dx) + Math.abs(dy) !== 1) {
+      return false; // Diagonal across tiles is blocked
+    }
+    // East crossing
+    if (dx === 1 && dy === 0) {
+      return from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0;
+    }
+    // West crossing
+    if (dx === -1 && dy === 0) {
+      return from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4;
+    }
+    // North crossing
+    if (dx === 0 && dy === 1) {
+      return from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
+    }
+    // South crossing
+    if (dx === 0 && dy === -1) {
+      return from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
+    }
+    return false;
+  }
+
+  // Same tile:
+  const dr = to.r - from.r;
+  const dc = to.c - from.c;
+  const absDr = Math.abs(dr);
+  const absDc = Math.abs(dc);
+
+  if (absDr <= 1 && absDc <= 1) {
+    // Orthogonally or diagonally adjacent on same tile
+    if (absDr + absDc === 1) {
+      // Orthogonal
+      let br = 0;
+      let bc = 0;
+      let bdir: 'H' | 'V' = 'H';
+      if (dr === 1) {
+        br = from.r;
+        bc = from.c;
+        bdir = 'H';
+      } else if (dr === -1) {
+        br = to.r;
+        bc = from.c;
+        bdir = 'H';
+      } else if (dc === 1) {
+        br = from.r;
+        bc = from.c;
+        bdir = 'V';
+      } else if (dc === -1) {
+        br = from.r;
+        bc = to.c;
+        bdir = 'V';
+      }
+      return !isBorderBlocked(from.tileX, from.tileY, br, bc, bdir, placedTiles, doorsState, ws).blocked;
+    } else {
+      // Diagonal
+      const minR = Math.min(from.r, to.r);
+      const minC = Math.min(from.c, to.c);
+      
+      const v1 = isBorderBlocked(from.tileX, from.tileY, from.r, minC, 'V', placedTiles, doorsState, ws).blocked;
+      const v2 = isBorderBlocked(from.tileX, from.tileY, to.r, minC, 'V', placedTiles, doorsState, ws).blocked;
+      const h1 = isBorderBlocked(from.tileX, from.tileY, minR, from.c, 'H', placedTiles, doorsState, ws).blocked;
+      const h2 = isBorderBlocked(from.tileX, from.tileY, minR, to.c, 'H', placedTiles, doorsState, ws).blocked;
+      
+      return !(v1 || v2 || h1 || h2);
+    }
+  }
+
+  // Linear raycast check for straight orthogonal/diagonal paths
+  if (from.r === to.r) {
+    const r = from.r;
+    const startC = Math.min(from.c, to.c);
+    const endC = Math.max(from.c, to.c);
+    for (let c = startC; c < endC; c++) {
+      if (isBorderBlocked(from.tileX, from.tileY, r, c, 'V', placedTiles, doorsState, ws).blocked) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (from.c === to.c) {
+    const c = from.c;
+    const startR = Math.min(from.r, to.r);
+    const endR = Math.max(from.r, to.r);
+    for (let r = startR; r < endR; r++) {
+      if (isBorderBlocked(from.tileX, from.tileY, r, c, 'H', placedTiles, doorsState, ws).blocked) {
+        return false;
+      }
+    }
+    return true;
+  }
+  if (absDr === absDc) {
+    const stepR = dr > 0 ? 1 : -1;
+    const stepC = dc > 0 ? 1 : -1;
+    let currR = from.r;
+    let currC = from.c;
+    while (currR !== to.r && currC !== to.c) {
+      const nextR = currR + stepR;
+      const nextC = currC + stepC;
+      
+      const minR = Math.min(currR, nextR);
+      const minC = Math.min(currC, nextC);
+      
+      const v1 = isBorderBlocked(from.tileX, from.tileY, currR, minC, 'V', placedTiles, doorsState, ws).blocked;
+      const v2 = isBorderBlocked(from.tileX, from.tileY, nextR, minC, 'V', placedTiles, doorsState, ws).blocked;
+      const h1 = isBorderBlocked(from.tileX, from.tileY, minR, currC, 'H', placedTiles, doorsState, ws).blocked;
+      const h2 = isBorderBlocked(from.tileX, from.tileY, minR, nextC, 'H', placedTiles, doorsState, ws).blocked;
+      
+      if (v1 || v2 || h1 || h2) {
+        return false;
+      }
+      
+      currR = nextR;
+      currC = nextC;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Validates player token movement step.
  */
 export function validateTokenMove(
@@ -146,40 +340,9 @@ export function validateTokenMove(
       bdir = 'V';
     }
 
-    // Unrotate boundary coordinate to check native layout
-    const unrotation = ((360 - fromTile.rotation) % 360) as 0 | 90 | 180 | 270;
-    const ur = rotateBorderCoordinate(br, bc, bdir, unrotation);
-    const layout = FIXED_TILES[fromTile.tileId - 1];
-
-    // Check dynamic Raised Stone wall
-    const wallKey = `${from.tileX},${from.tileY}:${br},${bc}:${bdir}`;
-    if (wallsState && wallsState[wallKey]) {
-      return { valid: false, error: 'Blocked by a raised stone wall.' };
-    }
-
-    // Check Wall obstruction
-    if (ur.direction === 'H') {
-      if (layout.hWalls.some(w => w.r === ur.r && w.c === ur.c)) {
-        return { valid: false, error: 'Blocked by a wall.' };
-      }
-      // Check Door obstruction
-      if (layout.hDoors.some(d => d.r === ur.r && d.c === ur.c)) {
-        const doorKey = `${from.tileX},${from.tileY}:${br},${bc}:H`;
-        if (doorsState[doorKey] !== 'OPEN') {
-          return { valid: false, error: 'Blocked by a closed door.' };
-        }
-      }
-    } else {
-      if (layout.vWalls.some(w => w.r === ur.r && w.c === ur.c)) {
-        return { valid: false, error: 'Blocked by a wall.' };
-      }
-      // Check Door obstruction
-      if (layout.vDoors.some(d => d.r === ur.r && d.c === ur.c)) {
-        const doorKey = `${from.tileX},${from.tileY}:${br},${bc}:V`;
-        if (doorsState[doorKey] !== 'OPEN') {
-          return { valid: false, error: 'Blocked by a closed door.' };
-        }
-      }
+    const check = isBorderBlocked(from.tileX, from.tileY, br, bc, bdir, placedTiles, doorsState, wallsState);
+    if (check.blocked) {
+      return { valid: false, error: check.reason || 'Blocked by a wall or door.' };
     }
 
     return { valid: true };

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES } from './shared/constants.ts';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight } from './shared/validation.ts';
 
 const renderTileSvgContent = (
   layout: TileLayout,
@@ -237,13 +237,17 @@ const renderTileSvgContent = (
       {/* East */}
       <line x1="100" y1="0" x2="100" y2="40" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
       <line x1="100" y1="60" x2="100" y2="100" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Treasure Spawns at corners (0,0) and (4,4) */}
-      <g transform={`rotate(${-rot} 10 10)`}>
-        <text x="10" y="11" fontSize="7" textAnchor="middle" dominantBaseline="middle" style={{ userSelect: 'none' }}>💎</text>
-      </g>
-      <g transform={`rotate(${-rot} 90 90)`}>
-        <text x="90" y="91" fontSize="7" textAnchor="middle" dominantBaseline="middle" style={{ userSelect: 'none' }}>💎</text>
-      </g>
+      {/* Treasure Spawns at corners (0,0) and (4,4) - only for unplaced preview */}
+      {!tilePos && (
+        <>
+          <g transform={`rotate(${-rot} 10 10)`}>
+            <text x="10" y="11" fontSize="7" textAnchor="middle" dominantBaseline="middle" style={{ userSelect: 'none' }}>💎</text>
+          </g>
+          <g transform={`rotate(${-rot} 90 90)`}>
+            <text x="90" y="91" fontSize="7" textAnchor="middle" dominantBaseline="middle" style={{ userSelect: 'none' }}>💎</text>
+          </g>
+        </>
+      )}
     </>
   );
 };
@@ -907,6 +911,28 @@ export default function App() {
                             {player.points} / 2 pts
                           </span>
                         </div>
+                        {/* Attack status */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>⚔️ Attack:</span>
+                          <span style={{ fontSize: '11px', color: player.hasAttackedThisTurn ? '#ef4444' : player.isFirstTurnOfMatch ? '#64748b' : 'var(--accent-green)', fontWeight: 'bold' }}>
+                            {player.hasAttackedThisTurn ? 'Used' : player.isFirstTurnOfMatch ? 'Forbidden' : 'Ready'}
+                          </span>
+                        </div>
+                        {/* Carrying status */}
+                        {(() => {
+                          const carried = gameState.treasures ? Object.values(gameState.treasures).find(t => t.carrierId === pId) : null;
+                          if (carried) {
+                            return (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>💎 Carrying:</span>
+                                <span style={{ fontSize: '11px', color: 'var(--accent-cyan)', fontWeight: 'bold' }}>
+                                  {carried.ownerId === pId ? 'Own Mask' : "Rival's Mask"}
+                                </span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                         {/* AP Actions */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
                           <span style={{ fontSize: '11px', color: '#94a3b8' }}>Actions:</span>
@@ -917,6 +943,125 @@ export default function App() {
                   );
                 })}
               </div>
+
+              {/* Active Player Actions */}
+              {isActiveTurn && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px', marginBottom: '8px' }}>
+                  {/* Pick Up Treasure Button */}
+                  {(() => {
+                    const sameCellTr = gameState.treasures && myTokenPos
+                      ? Object.values(gameState.treasures).find(
+                          t => t.tileX === myTokenPos.tileX &&
+                               t.tileY === myTokenPos.tileY &&
+                               t.r === myTokenPos.r &&
+                               t.c === myTokenPos.c &&
+                               t.carrierId === null
+                        )
+                      : null;
+                    if (sameCellTr && self && self.ap > 0) {
+                      return (
+                        <button
+                          onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: sameCellTr.id } })}
+                          className="btn-primary"
+                          style={{
+                            width: '100%',
+                            backgroundColor: 'var(--accent-gold)',
+                            color: 'black',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          💎 Pick Up Mask (Ends Turn)
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Drop Treasure Button */}
+                  {(() => {
+                    const carriedTr = gameState.treasures
+                      ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
+                      : null;
+                    if (carriedTr) {
+                      return (
+                        <button
+                          onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: carriedTr.id } })}
+                          className="btn-secondary"
+                          style={{
+                            width: '100%',
+                            borderColor: 'var(--accent-gold)',
+                            color: 'var(--accent-gold)',
+                            fontWeight: 'bold',
+                            fontSize: '13px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          📤 Drop Mask (Free Action)
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Lash Adjacent Walker Buttons */}
+                  {(() => {
+                    const lashable = gameState && myTokenPos && self && self.ap > 0 && !self.hasAttackedThisTurn && !self.isFirstTurnOfMatch
+                      ? Object.values(gameState.players).filter(p => {
+                          if (p.id === socket?.id || p.thread <= 0) return false;
+                          const toPos = gameState.tokenPositions[p.id];
+                          if (!toPos) return false;
+                          
+                          const dr = Math.abs(toPos.r - myTokenPos.r);
+                          const dc = Math.abs(toPos.c - myTokenPos.c);
+                          const dtX = Math.abs(toPos.tileX - myTokenPos.tileX);
+                          const dtY = Math.abs(toPos.tileY - myTokenPos.tileY);
+
+                          const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
+                          const isAdjacent = (dtX <= 1 && dtY <= 1) && (
+                            (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
+                            (dtX === 1 && dtY === 0 && myTokenPos.r === 2 && myTokenPos.c === 4 && toPos.r === 2 && toPos.c === 0) ||
+                            (dtX === -1 && dtY === 0 && myTokenPos.r === 2 && myTokenPos.c === 0 && toPos.r === 2 && toPos.c === 4) ||
+                            (dtX === 0 && dtY === 1 && myTokenPos.r === 0 && myTokenPos.c === 2 && toPos.r === 4 && toPos.c === 2) ||
+                            (dtX === 0 && dtY === -1 && myTokenPos.r === 4 && myTokenPos.c === 2 && toPos.r === 0 && toPos.c === 2)
+                          );
+
+                          if (!isSameCell && !isAdjacent) return false;
+                          
+                          return hasLineOfSight(myTokenPos, toPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
+                        })
+                      : [];
+
+                    return lashable.map(p => (
+                      <button
+                        key={`lash-${p.id}`}
+                        onClick={() => sendEvent({ event: 'LASH_ATTACK', payload: { targetPlayerId: p.id } })}
+                        className="btn-primary"
+                        style={{
+                          width: '100%',
+                          backgroundColor: 'var(--accent-crimson)',
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: '13px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        ⚔️ Lash {p.username} (-1 AP, 1 Dmg)
+                      </button>
+                    ));
+                  })()}
+                </div>
+              )}
 
               {/* End Turn Button (only for active player) */}
               {isActiveTurn && (
@@ -1239,10 +1384,40 @@ export default function App() {
                         })}
                       </div>
                     )}
+                    {/* Render dynamic uncarried treasures */}
+                    {gameState.treasures && Object.values(gameState.treasures).map((tr) => {
+                      if (tr.tileX === x && tr.tileY === y && tr.carrierId === null) {
+                        return (
+                          <div
+                            key={tr.id}
+                            style={{
+                              position: 'absolute',
+                              left: `${tr.c * subCellSize}px`,
+                              top: `${tr.r * subCellSize}px`,
+                              width: `${subCellSize}px`,
+                              height: `${subCellSize}px`,
+                              fontSize: `${tokenSize}px`,
+                              lineHeight: `${subCellSize}px`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              zIndex: 15,
+                              pointerEvents: 'none',
+                              userSelect: 'none'
+                            }}
+                          >
+                            💎
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+
                     {/* Render spawn Token (in gameplay phase) */}
                     {Object.entries(gameState.tokenPositions).map(([pId, pos]) => {
                       if (pos.tileX === x && pos.tileY === y) {
                         const player = gameState.players[pId];
+                        const isCarrying = gameState.treasures && Object.values(gameState.treasures).some(t => t.carrierId === pId);
                         return (
                           <div
                             key={pId}
@@ -1264,6 +1439,11 @@ export default function App() {
                             className="floating-emoji"
                           >
                             {player?.emoji}
+                            {isCarrying && (
+                              <span style={{ fontSize: '10px', position: 'absolute', bottom: '-4px', right: '-4px', filter: 'drop-shadow(0 0 2px #00E5FF)' }}>
+                                💎
+                              </span>
+                            )}
                           </div>
                         );
                       }

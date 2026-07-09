@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -168,5 +168,49 @@ describe('validateDoorInteract', () => {
     const res = validateDoorInteract(token, door, placedTiles);
     expect(res.valid).toBe(false);
     expect(res.error).toContain('You must be in an adjacent cell');
+  });
+});
+
+describe('hasLineOfSight', () => {
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+    '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+  };
+
+  it('should allow line of sight to self', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    expect(hasLineOfSight(from, from, placedTiles, {})).toBe(true);
+  });
+
+  it('should check line of sight horizontally (unblocked)', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 4, c: 1 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 4, c: 4 }; // Horizontal line on row 4 is clear of walls
+    expect(hasLineOfSight(from, to, placedTiles, {})).toBe(true);
+  });
+
+  it('should check line of sight horizontally (blocked by wall)', () => {
+    // Tile 1 has V-wall at r:2, c:1 (separating c:1 and c:2 on row 2)
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    expect(hasLineOfSight(from, to, placedTiles, {})).toBe(false);
+  });
+
+  it('should check line of sight diagonally (unblocked)', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 0, c: 3 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 1, c: 4 }; // diagonal is clear of walls
+    expect(hasLineOfSight(from, to, placedTiles, {})).toBe(true);
+  });
+
+  it('should check line of sight diagonally (blocked by wall)', () => {
+    // Tile 1 has H-wall at r:1, c:4 (separating row 1 and row 2 at col 4)
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 3 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 1, c: 4 };
+    expect(hasLineOfSight(from, to, placedTiles, {})).toBe(false);
+  });
+
+  it('should block line of sight across non-adjacent tiles', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 2, tileY: 0, r: 2, c: 2 }; // Tile (2,0) doesn't exist/not adjacent
+    expect(hasLineOfSight(from, to, placedTiles, {})).toBe(false);
   });
 });

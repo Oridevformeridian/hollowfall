@@ -3,7 +3,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, Card } from '../../shared/types';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract } from '../../shared/validation';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight } from '../../shared/validation';
 import { HEROES, BASIC_CARDS } from '../../shared/constants';
 
 const app = express();
@@ -41,14 +41,54 @@ function passTurn(room: GameState) {
   if (endingPlayer) {
     endingPlayer.ap = 0;
     endingPlayer.form = 'normal';
+    endingPlayer.isFirstTurnOfMatch = false;
     while (endingPlayer.hand.length < 5) {
       endingPlayer.hand.push(BASIC_CARDS[Math.floor(Math.random() * BASIC_CARDS.length)]);
+    }
+    if (endingPlayer.hand.length > 7) {
+      endingPlayer.hand.splice(7);
     }
   }
   room.activePlayerIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
   const nextPid = room.turnOrder[room.activePlayerIndex];
   if (room.players[nextPid]) {
     room.players[nextPid].ap = 3;
+    room.players[nextPid].hasAttackedThisTurn = false;
+  }
+}
+
+function recalculatePoints(room: GameState) {
+  for (const pId of Object.keys(room.players)) {
+    const p = room.players[pId];
+    p.points = p.severPoints || 0;
+  }
+
+  if (room.treasures) {
+    for (const treasureId of Object.keys(room.treasures)) {
+      const treasure = room.treasures[treasureId];
+      if (treasure.carrierId === null) {
+        const tileKey = `${treasure.tileX},${treasure.tileY}`;
+        const tile = room.placedTiles[tileKey];
+        if (tile) {
+          if (treasure.r === 2 && treasure.c === 2) {
+            const hearthOwnerId = tile.placedBy;
+            if (treasure.ownerId !== hearthOwnerId) {
+              const hearthOwner = room.players[hearthOwnerId];
+              if (hearthOwner) {
+                hearthOwner.points += 1;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for (const pId of Object.keys(room.players)) {
+    const p = room.players[pId];
+    if (p.points >= 2) {
+      room.phase = 'GAME_OVER';
+    }
   }
 }
 
@@ -87,7 +127,8 @@ io.on('connection', (socket) => {
               placedTiles: {},
               doorsState: {},
               wallsState: {},
-              tokenPositions: {}
+              tokenPositions: {},
+              treasures: {}
             };
             rooms.set(targetRoomCode, room);
           }
@@ -144,6 +185,9 @@ io.on('connection', (socket) => {
             maxThread: 15,
             hand: [],
             points: 0,
+            severPoints: 0,
+            hasAttackedThisTurn: false,
+            isFirstTurnOfMatch: true,
             form: 'normal'
           };
 
@@ -288,6 +332,42 @@ io.on('connection', (socket) => {
             // Set initial token positions to player Lairs
             // Player 1 spawn at their tile's center (2, 2)
             // Player 2 spawn at their tile's center (2, 2)
+            room.treasures = {};
+            
+            // Spawn treasures at the corners of all placed tiles, rotated appropriately
+            for (const tileKey of Object.keys(room.placedTiles)) {
+              const tile = room.placedTiles[tileKey];
+              const [tileX, tileY] = tileKey.split(',').map(Number);
+              const corners = [
+                { r: 0, c: 0 },
+                { r: 4, c: 4 }
+              ];
+              corners.forEach((corner, idx) => {
+                let nr = corner.r;
+                let nc = corner.c;
+                if (tile.rotation === 90) {
+                  nr = corner.c;
+                  nc = 4 - corner.r;
+                } else if (tile.rotation === 180) {
+                  nr = 4 - corner.r;
+                  nc = 4 - corner.c;
+                } else if (tile.rotation === 270) {
+                  nr = 4 - corner.c;
+                  nc = corner.r;
+                }
+                const treasureId = `treasure_${tileKey}_${idx}`;
+                room.treasures[treasureId] = {
+                  id: treasureId,
+                  tileX,
+                  tileY,
+                  r: nr,
+                  c: nc,
+                  ownerId: tile.placedBy,
+                  carrierId: null
+                };
+              });
+            }
+
             for (const pId of room.turnOrder) {
               const p = room.players[pId];
               p.ap = 0;
@@ -295,6 +375,9 @@ io.on('connection', (socket) => {
               p.maxThread = 15;
               p.hand = dealRandomHand();
               p.points = 0;
+              p.severPoints = 0;
+              p.hasAttackedThisTurn = false;
+              p.isFirstTurnOfMatch = true;
               p.form = 'normal';
               // Find a tile placed by this player
               const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === pId);
@@ -312,6 +395,7 @@ io.on('connection', (socket) => {
             if (room.players[firstActivePid]) {
               room.players[firstActivePid].ap = 3;
             }
+            recalculatePoints(room);
           } else {
             // Cycle active player turn
             room.activePlayerIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
@@ -357,6 +441,19 @@ io.on('connection', (socket) => {
           // Move the token
           room.tokenPositions[playerId] = targetPos;
           
+          // Update any carried treasure position
+          if (room.treasures) {
+            for (const treasureId of Object.keys(room.treasures)) {
+              const treasure = room.treasures[treasureId];
+              if (treasure.carrierId === playerId) {
+                treasure.tileX = targetPos.tileX;
+                treasure.tileY = targetPos.tileY;
+                treasure.r = targetPos.r;
+                treasure.c = targetPos.c;
+              }
+            }
+          }
+
           if (!isWolf) {
             player.ap--;
           }
@@ -464,8 +561,22 @@ io.on('connection', (socket) => {
 
           // Resolve card benefits
           if (card.id === 'ash_kindle_storm') {
+            if (player.hasAttackedThisTurn) {
+              sendError(socket, 'You have already attacked this turn.');
+              return;
+            }
+            if (player.isFirstTurnOfMatch) {
+              sendError(socket, 'Attacks are forbidden on your first turn.');
+              return;
+            }
             if (!target) {
               sendError(socket, 'Kindle the Storm requires a target cell.');
+              return;
+            }
+            const fromPos = room.tokenPositions[playerId];
+            if (!fromPos) return;
+            if (!hasLineOfSight(fromPos, target, room.placedTiles, room.doorsState, room.wallsState)) {
+              sendError(socket, 'Target cell is not in your Line of Sight (LOS).');
               return;
             }
             const targetPlayerId = Object.keys(room.tokenPositions).find(pId => {
@@ -481,11 +592,14 @@ io.on('connection', (socket) => {
               return;
             }
             const targetPlayer = room.players[targetPlayerId];
+ 
+            // Mark attack used
+            player.hasAttackedThisTurn = true;
 
             // Auto Ward response checking
             const turnAsideIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_turn_aside');
             const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
-
+ 
             if (turnAsideIndex !== -1) {
               targetPlayer.hand.splice(turnAsideIndex, 1);
               console.log(`${targetPlayer.username} used Turn Aside to counter Kindle the Storm.`);
@@ -496,10 +610,33 @@ io.on('connection', (socket) => {
             } else {
               targetPlayer.thread = Math.max(0, targetPlayer.thread - 3);
             }
-
+ 
             // Victory check / Death respawn
             if (targetPlayer.thread <= 0) {
-              player.points += 1;
+              player.severPoints = (player.severPoints || 0) + 1;
+              player.hand.push(...targetPlayer.hand);
+              targetPlayer.hand = [];
+              if (player.hand.length > 7) {
+                player.hand.splice(7);
+              }
+
+              // Drop target's carried treasure
+              if (room.treasures) {
+                for (const treasureId of Object.keys(room.treasures)) {
+                  const tr = room.treasures[treasureId];
+                  if (tr.carrierId === targetPlayerId) {
+                    tr.carrierId = null;
+                    const deathPos = room.tokenPositions[targetPlayerId];
+                    if (deathPos) {
+                      tr.tileX = deathPos.tileX;
+                      tr.tileY = deathPos.tileY;
+                      tr.r = deathPos.r;
+                      tr.c = deathPos.c;
+                    }
+                  }
+                }
+              }
+
               targetPlayer.thread = 15;
               const targetTile = Object.values(room.placedTiles).find(t => t.placedBy === targetPlayerId);
               if (targetTile) {
@@ -510,9 +647,10 @@ io.on('connection', (socket) => {
                   c: 2
                 };
               }
-              if (player.points >= 2) {
+            }
+            recalculatePoints(room);
+            if (player.points >= 2) {
                 room.phase = 'GAME_OVER';
-              }
             }
 
           } else if (card.id === 'working_miststep') {
@@ -601,6 +739,222 @@ io.on('connection', (socket) => {
           break;
         }
 
+        case 'LASH_ATTACK': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'GAMEPLAY') return;
+
+          const activePlayerId = room.turnOrder[room.activePlayerIndex];
+          if (playerId !== activePlayerId) {
+            sendError(socket, 'It is not your turn.');
+            return;
+          }
+
+          const player = room.players[playerId];
+          if (!player || player.ap < 1) {
+            sendError(socket, 'No Action Points (AP) remaining.');
+            return;
+          }
+
+          if (player.hasAttackedThisTurn) {
+            sendError(socket, 'You have already attacked this turn.');
+            return;
+          }
+
+          if (player.isFirstTurnOfMatch) {
+            sendError(socket, 'Attacks are forbidden on your first turn.');
+            return;
+          }
+
+          const { targetPlayerId } = message.payload;
+          if (targetPlayerId === playerId) {
+            sendError(socket, 'You cannot target yourself.');
+            return;
+          }
+
+          const targetPlayer = room.players[targetPlayerId];
+          if (!targetPlayer) {
+            sendError(socket, 'Target player not found.');
+            return;
+          }
+
+          const from = room.tokenPositions[playerId];
+          const to = room.tokenPositions[targetPlayerId];
+          if (!from || !to) {
+            sendError(socket, 'Positions not initialized.');
+            return;
+          }
+
+          const dr = Math.abs(to.r - from.r);
+          const dc = Math.abs(to.c - from.c);
+          const dtX = Math.abs(to.tileX - from.tileX);
+          const dtY = Math.abs(to.tileY - from.tileY);
+
+          const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
+          const isAdjacent = (dtX <= 1 && dtY <= 1) && (
+            (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
+            (dtX === 1 && dtY === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) ||
+            (dtX === -1 && dtY === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) ||
+            (dtX === 0 && dtY === 1 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) ||
+            (dtX === 0 && dtY === -1 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2)
+          );
+
+          if (!isSameCell && !isAdjacent) {
+            sendError(socket, 'Target is out of range.');
+            return;
+          }
+
+          if (!hasLineOfSight(from, to, room.placedTiles, room.doorsState, room.wallsState)) {
+            sendError(socket, 'Target is blocked by a wall or door.');
+            return;
+          }
+
+          player.hasAttackedThisTurn = true;
+          player.ap--;
+
+          const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
+          if (spiritSkinIndex !== -1) {
+            targetPlayer.hand.splice(spiritSkinIndex, 1);
+            console.log(`${targetPlayer.username} used Spirit-Skin to block Lash damage.`);
+          } else {
+            targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
+            console.log(`${player.username} lashed ${targetPlayer.username} for 1 physical damage.`);
+          }
+
+          if (targetPlayer.thread <= 0) {
+            player.severPoints = (player.severPoints || 0) + 1;
+            player.hand.push(...targetPlayer.hand);
+            targetPlayer.hand = [];
+            if (player.hand.length > 7) {
+              player.hand.splice(7);
+            }
+
+            if (room.treasures) {
+              for (const treasureId of Object.keys(room.treasures)) {
+                const treasure = room.treasures[treasureId];
+                if (treasure.carrierId === targetPlayerId) {
+                  treasure.carrierId = null;
+                  treasure.tileX = to.tileX;
+                  treasure.tileY = to.tileY;
+                  treasure.r = to.r;
+                  treasure.c = to.c;
+                }
+              }
+            }
+
+            targetPlayer.thread = 15;
+            const targetTile = Object.values(room.placedTiles).find(t => t.placedBy === targetPlayerId);
+            if (targetTile) {
+              room.tokenPositions[targetPlayerId] = {
+                tileX: targetTile.position.x,
+                tileY: targetTile.position.y,
+                r: 2,
+                c: 2
+              };
+            }
+          }
+
+          recalculatePoints(room);
+
+          if (player.ap === 0) {
+            passTurn(room);
+          }
+
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'PICKUP_TREASURE': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'GAMEPLAY') return;
+
+          const activePlayerId = room.turnOrder[room.activePlayerIndex];
+          if (playerId !== activePlayerId) {
+            sendError(socket, 'It is not your turn.');
+            return;
+          }
+
+          const player = room.players[playerId];
+          if (!player || player.ap < 1) {
+            sendError(socket, 'No Action Points (AP) remaining.');
+            return;
+          }
+
+          const { treasureId } = message.payload;
+          const treasure = room.treasures && room.treasures[treasureId];
+          if (!treasure) {
+            sendError(socket, 'Treasure not found.');
+            return;
+          }
+
+          if (treasure.carrierId !== null) {
+            sendError(socket, 'Treasure is already being carried.');
+            return;
+          }
+
+          const pos = room.tokenPositions[playerId];
+          if (!pos || pos.tileX !== treasure.tileX || pos.tileY !== treasure.tileY || pos.r !== treasure.r || pos.c !== treasure.c) {
+            sendError(socket, 'You must be standing in the same cell to pick up the treasure.');
+            return;
+          }
+
+          const alreadyCarrying = Object.values(room.treasures).some(t => t.carrierId === playerId);
+          if (alreadyCarrying) {
+            sendError(socket, 'You can only carry one treasure at a time.');
+            return;
+          }
+
+          treasure.carrierId = playerId;
+
+          player.ap = 0;
+          passTurn(room);
+
+          recalculatePoints(room);
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'DROP_TREASURE': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'GAMEPLAY') return;
+
+          const activePlayerId = room.turnOrder[room.activePlayerIndex];
+          if (playerId !== activePlayerId) {
+            sendError(socket, 'It is not your turn.');
+            return;
+          }
+
+          const player = room.players[playerId];
+          if (!player) return;
+
+          const { treasureId } = message.payload;
+          const treasure = room.treasures && room.treasures[treasureId];
+          if (!treasure) {
+            sendError(socket, 'Treasure not found.');
+            return;
+          }
+
+          if (treasure.carrierId !== playerId) {
+            sendError(socket, 'You are not carrying this treasure.');
+            return;
+          }
+
+          const pos = room.tokenPositions[playerId];
+          if (!pos) return;
+
+          treasure.carrierId = null;
+          treasure.tileX = pos.tileX;
+          treasure.tileY = pos.tileY;
+          treasure.r = pos.r;
+          treasure.c = pos.c;
+
+          recalculatePoints(room);
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
         case 'RESET_GAME': {
           if (!currentRoomCode) return;
           const room = rooms.get(currentRoomCode);
@@ -617,6 +971,7 @@ io.on('connection', (socket) => {
           room.doorsState = {};
           room.wallsState = {};
           room.tokenPositions = {};
+          room.treasures = {};
           room.turnOrder = [];
           for (const pId of Object.keys(room.players)) {
             const p = room.players[pId];
@@ -627,6 +982,9 @@ io.on('connection', (socket) => {
             p.maxThread = 15;
             p.hand = [];
             p.points = 0;
+            p.severPoints = 0;
+            p.hasAttackedThisTurn = false;
+            p.isFirstTurnOfMatch = true;
             p.form = 'normal';
           }
 
@@ -667,6 +1025,7 @@ io.on('connection', (socket) => {
             room.phase = 'LOBBY';
             room.placedTiles = {};
             room.tokenPositions = {};
+            room.treasures = {};
             room.turnOrder = [];
             for (const p of remainingPlayers) {
               p.isReady = false;

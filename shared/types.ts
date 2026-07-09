@@ -14,7 +14,20 @@ export interface Player {
   maxThread: number;
   hand: Card[];
   points: number;
+  severPoints: number;
+  hasAttackedThisTurn: boolean;
+  isFirstTurnOfMatch: boolean;
   form: 'normal' | 'wolf';
+}
+
+export interface Treasure {
+  id: string;
+  tileX: number;
+  tileY: number;
+  r: number;
+  c: number;
+  ownerId: string;
+  carrierId: string | null;
 }
 
 export interface Card {
@@ -53,6 +66,7 @@ export interface GameState {
   doorsState: Record<string, 'OPEN' | 'CLOSED'>; // Key format: "x,y:r,c:direction"
   wallsState: Record<string, boolean>; // Key format: "x,y:r,c:direction"
   tokenPositions: Record<PlayerId, TokenPosition>;
+  treasures: Record<string, Treasure>;
 }
 
 export type ClientMessage =
@@ -65,7 +79,10 @@ export type ClientMessage =
   | { event: 'SELECT_HERO'; payload: { emoji: string } }
   | { event: 'END_TURN' }
   | { event: 'PLAY_CARD'; payload: { cardId: string; target?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' } } }
-  | { event: 'RESET_GAME' };
+  | { event: 'RESET_GAME' }
+  | { event: 'LASH_ATTACK'; payload: { targetPlayerId: string } }
+  | { event: 'PICKUP_TREASURE'; payload: { treasureId: string } }
+  | { event: 'DROP_TREASURE'; payload: { treasureId: string } };
 
 export type ServerMessage =
   | { event: 'STATE_UPDATE'; payload: GameState }
