@@ -186,6 +186,13 @@ const renderTileSvgContent = (
       {/* East */}
       <line x1="100" y1="0" x2="100" y2="40" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
       <line x1="100" y1="60" x2="100" y2="100" stroke="#475569" strokeWidth="2.5" strokeLinecap="round" />
+      {/* Treasure Spawns at corners (0,0) and (4,4) */}
+      <g transform={`rotate(${-rot} 10 10)`}>
+        <text x="10" y="11" fontSize="7" textAnchor="middle" dominantBaseline="middle" style={{ userSelect: 'none' }}>💎</text>
+      </g>
+      <g transform={`rotate(${-rot} 90 90)`}>
+        <text x="90" y="91" fontSize="7" textAnchor="middle" dominantBaseline="middle" style={{ userSelect: 'none' }}>💎</text>
+      </g>
     </>
   );
 };
