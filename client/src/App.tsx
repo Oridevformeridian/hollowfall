@@ -44,7 +44,7 @@ const renderTileSvgContent = (
 
       {/* Starting Star in Center */}
       <polygon
-        points="50,36 54,46 64,46 56,52 60,62 50,56 40,62 44,52 36,46 46,46"
+        points="50,40.2 52.8,47.2 59.8,47.2 54.2,51.4 57,58.4 50,54.2 43,58.4 45.8,51.4 40.2,47.2 47.2,47.2"
         fill={playerColor}
         stroke={playerColor}
         strokeWidth="1"
@@ -1398,7 +1398,7 @@ export default function App() {
                               top: `${tr.r * subCellSize}px`,
                               width: `${subCellSize}px`,
                               height: `${subCellSize}px`,
-                              fontSize: `${tokenSize}px`,
+                              fontSize: `${Math.floor(tokenSize * 0.5)}px`,
                               lineHeight: `${subCellSize}px`,
                               display: 'flex',
                               alignItems: 'center',
