@@ -392,6 +392,77 @@ export default function App() {
   const isActiveTurn = !!(socket && activePlayerId === socket.id);
   const myTokenPos = socket?.id && gameState ? gameState.tokenPositions[socket.id] : null;
 
+  // Keyboard arrow movement controls
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!gameState || gameState.phase !== 'GAMEPLAY' || !isActiveTurn || !myTokenPos) return;
+
+      // Ignore input elements to allow normal typing
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD'].includes(e.code)) {
+        e.preventDefault();
+      }
+
+      let dr = 0;
+      let dc = 0;
+
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+        dr = -1;
+      } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+        dr = 1;
+      } else if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        dc = -1;
+      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        dc = 1;
+      } else {
+        return;
+      }
+
+      let targetR = myTokenPos.r + dr;
+      let targetC = myTokenPos.c + dc;
+      let targetTileX = myTokenPos.tileX;
+      let targetTileY = myTokenPos.tileY;
+
+      if (targetR < 0) {
+        targetTileY += 1;
+        targetR = 4;
+      } else if (targetR > 4) {
+        targetTileY -= 1;
+        targetR = 0;
+      }
+
+      if (targetC < 0) {
+        targetTileX -= 1;
+        targetC = 4;
+      } else if (targetC > 4) {
+        targetTileX += 1;
+        targetC = 0;
+      }
+
+      const targetPos = { tileX: targetTileX, tileY: targetTileY, r: targetR, c: targetC };
+
+      const validation = validateTokenMove(
+        myTokenPos,
+        targetPos,
+        gameState.placedTiles,
+        gameState.doorsState,
+        gameState.wallsState
+      );
+
+      if (validation.valid) {
+        handleMoveToken(targetPos);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [gameState, isActiveTurn, myTokenPos]);
+
   // Render Join / Lobby
   if (!gameState) {
     return (
@@ -1029,7 +1100,8 @@ export default function App() {
                           display: 'grid',
                           gridTemplateColumns: 'repeat(5, 1fr)',
                           gridTemplateRows: 'repeat(5, 1fr)',
-                          zIndex: 20
+                          zIndex: 20,
+                          pointerEvents: 'none'
                         }}>
                         {Array.from({ length: 25 }).map((_, idx) => {
                           const r = Math.floor(idx / 5);
@@ -1087,6 +1159,7 @@ export default function App() {
                               style={{
                                 position: 'relative',
                                 cursor: (isValidMove || isKindleTarget || isMiststepTarget) ? 'pointer' : 'default',
+                                pointerEvents: (isValidMove || isKindleTarget || isMiststepTarget || isRaiseStoneCell) ? 'auto' : 'none',
                                 border: isValidMove
                                   ? '1.5px dashed var(--accent-green)'
                                   : isKindleTarget
