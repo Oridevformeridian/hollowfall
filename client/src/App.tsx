@@ -1228,7 +1228,7 @@ export default function App() {
                   padding: '6px 0',
                 }}
               >
-                🏳️ Abort & Exit to Lobby
+                🚪 Quit to Lobby
               </button>
             </div>
           )}
@@ -1892,17 +1892,43 @@ export default function App() {
               return <p style={{ color: 'white', margin: '24px 0' }}>A legendary battle has ended!</p>;
             })()}
 
-            {isHost ? (
-              <button
-                onClick={handleResetGame}
-                className="btn-primary"
-                style={{ width: '100%', marginTop: '16px', backgroundColor: 'var(--accent-gold)', color: 'black', fontWeight: 'bold' }}
-              >
-                Restart Game Lobby
-              </button>
-            ) : (
-              <p style={{ fontSize: '12px', color: '#64748b', margin: '16px 0 0 0' }}>Waiting for host to restart lobby...</p>
-            )}
+            {/* Match Statistics Table */}
+            <div style={{ margin: '24px 0', border: '1px solid var(--border-light)', borderRadius: '12px', padding: '16px', backgroundColor: 'rgba(255,255,255,0.02)', textAlign: 'left' }}>
+              <h4 style={{ color: 'var(--accent-cyan)', fontSize: '14px', margin: '0 0 12px 0', letterSpacing: '1px', textTransform: 'uppercase', fontWeight: 'bold' }}>Match Summary</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', gap: '8px', fontSize: '12px', color: '#94a3b8', borderBottom: '1px solid var(--border-light)', paddingBottom: '6px', marginBottom: '6px', fontWeight: 'bold' }}>
+                <span>Player</span>
+                <span style={{ textAlign: 'center' }}>Kills</span>
+                <span style={{ textAlign: 'center' }}>Points</span>
+              </div>
+              {Object.values(gameState.players).map(p => (
+                <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', gap: '8px', fontSize: '13px', color: 'white', padding: '4px 0' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>{p.emoji}</span>
+                    <span style={{ fontWeight: p.points >= 2 ? 'bold' : 'normal', color: p.points >= 2 ? 'var(--accent-gold)' : 'white' }}>{p.username}</span>
+                  </span>
+                  <span style={{ textAlign: 'center' }}>{p.severPoints || 0}</span>
+                  <span style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--accent-gold)' }}>{p.points} / 2</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleResetGame}
+              className="btn-primary"
+              style={{
+                width: '100%',
+                marginTop: '16px',
+                backgroundColor: 'var(--accent-gold)',
+                color: 'black',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
+            >
+              🚪 Quit to Lobby
+            </button>
           </div>
         </div>
       )}
