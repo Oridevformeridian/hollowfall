@@ -147,6 +147,18 @@ describe('validateTokenMove', () => {
     expect(res2.valid).toBe(false);
     expect(res2.error).toContain('only allowed through aligned exits');
   });
+
+  it('should block move if target cell is occupied by another token', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 3 };
+    const tokens = {
+      'player1': { tileX: 0, tileY: 0, r: 2, c: 2 },
+      'player2': { tileX: 0, tileY: 0, r: 2, c: 3 }
+    };
+    const res = validateTokenMove(from, to, placedTiles, {}, {}, tokens);
+    expect(res.valid).toBe(false);
+    expect(res.error).toContain('already occupied by another player');
+  });
 });
 
 describe('validateDoorInteract', () => {

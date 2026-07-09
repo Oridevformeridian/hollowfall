@@ -1314,7 +1314,8 @@ export default function App() {
                             targetPos,
                             gameState.placedTiles,
                             gameState.doorsState,
-                            gameState.wallsState
+                            gameState.wallsState,
+                            gameState.tokenPositions
                           ).valid;
 
                           // 2. Kindle the Storm targeting
@@ -1335,7 +1336,10 @@ export default function App() {
                             const globalR_to = y * 5 + r;
                             const globalC_to = x * 5 + c;
                             const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
-                            isMiststepTarget = dist <= 3;
+                            const isOccupied = Object.values(gameState.tokenPositions).some(pos => {
+                              return pos.tileX === x && pos.tileY === y && pos.r === r && pos.c === c;
+                            });
+                            isMiststepTarget = dist <= 3 && !isOccupied;
                           }
 
                           // 4. Raise Stone cell detection (player's current cell)

@@ -297,7 +297,8 @@ export function validateTokenMove(
   to: TokenPosition,
   placedTiles: Record<string, PlacedTile>,
   doorsState: Record<string, 'OPEN' | 'CLOSED'>,
-  wallsState?: Record<string, boolean>
+  wallsState?: Record<string, boolean>,
+  tokenPositions?: Record<string, TokenPosition>
 ): { valid: boolean; error?: string } {
   // Check tile coordinate validity
   const fromTile = placedTiles[`${from.tileX},${from.tileY}`];
@@ -305,6 +306,16 @@ export function validateTokenMove(
 
   if (!fromTile || !toTile) {
     return { valid: false, error: 'Movement must be on placed tiles.' };
+  }
+
+  // Check occupancy
+  if (tokenPositions) {
+    const isOccupied = Object.values(tokenPositions).some(pos => {
+      return pos.tileX === to.tileX && pos.tileY === to.tileY && pos.r === to.r && pos.c === to.c;
+    });
+    if (isOccupied) {
+      return { valid: false, error: 'Target cell is already occupied by another player.' };
+    }
   }
 
   // 1. Same-Tile Movement validation

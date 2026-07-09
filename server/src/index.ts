@@ -432,7 +432,7 @@ io.on('connection', (socket) => {
             return;
           }
 
-          const validation = validateTokenMove(currentPos, targetPos, room.placedTiles, room.doorsState, room.wallsState);
+          const validation = validateTokenMove(currentPos, targetPos, room.placedTiles, room.doorsState, room.wallsState, room.tokenPositions);
           if (!validation.valid) {
             sendError(socket, validation.error || 'Invalid movement.');
             return;
@@ -663,6 +663,14 @@ io.on('connection', (socket) => {
             const targetTile = room.placedTiles[`${target.tileX},${target.tileY}`];
             if (!targetTile) {
               sendError(socket, 'Target cell must be on a placed tile.');
+              return;
+            }
+            // Check occupancy
+            const isOccupied = Object.values(room.tokenPositions).some(pos => {
+              return pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
+            });
+            if (isOccupied) {
+              sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
             // Check distance <= 3 Manhattan
