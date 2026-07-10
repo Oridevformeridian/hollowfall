@@ -31,3 +31,10 @@ Thumbs.db
 # Shared build outputs
 shared/**/*.js
 shared/**/*.d.ts
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+

@@ -25,8 +25,8 @@ resource "google_artifact_registry_repository" "repo" {
 resource "google_cloud_run_v2_service" "app" {
   name                = var.app_name
   location            = var.region
-  deletion_protection = false
   ingress             = "INGRESS_TRAFFIC_ALL"
+
 
   template {
     # Socket.io connection stability is improved by session affinity
@@ -43,13 +43,9 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "NODE_ENV"
         value = "production"
       }
-
-      env {
-        name  = "PORT"
-        value = "8080"
-      }
     }
   }
+
 
   traffic {
     type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
