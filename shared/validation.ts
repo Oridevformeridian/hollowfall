@@ -580,7 +580,7 @@ export function validateTokenMove(
     }
   }
 
-  const isNorthCrossing = (dx === 0 && dy === 1) || isNorthWrap;
+  const isNorthCrossing = (dx === 0 && dy === -1) || isNorthWrap;
   if (isNorthCrossing) {
     if (from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) {
       const checkFrom = isBorderBlocked(from.tileX, from.tileY, 0, 2, 'H', placedTiles, doorsState, wallsState);
@@ -591,7 +591,7 @@ export function validateTokenMove(
     }
   }
 
-  const isSouthCrossing = (dx === 0 && dy === -1) || isSouthWrap;
+  const isSouthCrossing = (dx === 0 && dy === 1) || isSouthWrap;
   if (isSouthCrossing) {
     if (from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2) {
       const checkFrom = isBorderBlocked(from.tileX, from.tileY, 4, 2, 'H', placedTiles, doorsState, wallsState);

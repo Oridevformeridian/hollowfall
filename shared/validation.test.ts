@@ -148,6 +148,24 @@ describe('validateTokenMove', () => {
     expect(res2.error).toContain('only allowed through aligned exits');
   });
 
+  it('should allow normal vertical crossing between adjacent tiles', () => {
+    const twoTilesVert: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '0,1': { tileId: 2, position: { x: 0, y: 1 }, rotation: 0, placedBy: 'p2' }
+    };
+    // Going South from tile 0,0 South exit to tile 0,1 North exit
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 4, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 1, r: 0, c: 2 };
+    const res = validateTokenMove(from, to, twoTilesVert, {});
+    expect(res.valid).toBe(true);
+
+    // Going North from tile 0,1 North exit to tile 0,0 South exit
+    const from2: TokenPosition = { tileX: 0, tileY: 1, r: 0, c: 2 };
+    const to2: TokenPosition = { tileX: 0, tileY: 0, r: 4, c: 2 };
+    const res2 = validateTokenMove(from2, to2, twoTilesVert, {});
+    expect(res2.valid).toBe(true);
+  });
+
   it('should block move if target cell is occupied by another token', () => {
     const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
     const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 3 };
