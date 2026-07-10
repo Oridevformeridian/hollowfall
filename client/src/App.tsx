@@ -816,7 +816,7 @@ export default function App() {
                 )}
               </button>
             </div>
-            <p className="text-gray-400 text-xs m-0">Waiting for 2 players to start...</p>
+            <p className="text-gray-400 text-xs m-0">Waiting for players to ready up...</p>
             {isHost && <span className="text-xs bg-[var(--accent-gold)] text-black px-2.5 py-1 rounded font-bold mt-1">LOBBY HOST</span>}
           </div>
 
@@ -850,7 +850,7 @@ export default function App() {
             {/* Column 1: Connected Players */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider" style={{ textAlign: 'center' }}>
-                Connected Players ({playersList.length}/2)
+                Connected Players ({playersList.length}/6)
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {playersList.map(player => (
@@ -959,7 +959,7 @@ export default function App() {
             {isHost && (
               <button
                 onClick={handleStartGame}
-                disabled={playersList.length !== 2 || playersList.some(p => !p.isReady)}
+                disabled={playersList.length < 2 || playersList.some(p => !p.isReady)}
                 className="btn-primary flex-1 bg-gradient-to-r from-[var(--accent-gold)] to-[#ffa600] text-black font-extrabold disabled:opacity-50"
                 style={{ minWidth: '170px' }}
               >

@@ -142,8 +142,8 @@ io.on('connection', (socket) => {
 
           const existingPlayers = Object.values(room.players);
 
-          // Room is full constraint (max 2 players for prototype)
-          if (existingPlayers.length >= 2 && !room.players[playerId]) {
+          // Room is full constraint (max 6 players)
+          if (existingPlayers.length >= 6 && !room.players[playerId]) {
             sendError(socket, 'Room is full.');
             return;
           }
@@ -237,8 +237,8 @@ io.on('connection', (socket) => {
           }
 
           const playersList = Object.values(room.players);
-          if (playersList.length !== 2) {
-            sendError(socket, 'Exactly 2 players are required to start the game.');
+          if (playersList.length < 2) {
+            sendError(socket, 'At least 2 players are required to start the game.');
             return;
           }
 
@@ -261,7 +261,7 @@ io.on('connection', (socket) => {
           const tileIndices = [0, 1, 2, 3].sort(() => random() - 0.5);
           for (let i = 0; i < room.turnOrder.length; i++) {
             const pId = room.turnOrder[i];
-            room.players[pId].assignedTileIndex = tileIndices[i];
+            room.players[pId].assignedTileIndex = tileIndices[i % 4];
           }
 
           broadcastState(currentRoomCode, room);
