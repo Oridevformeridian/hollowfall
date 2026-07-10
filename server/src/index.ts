@@ -19,7 +19,6 @@ const io = new Server(server, {
 
 // In-memory store for game rooms
 const rooms = new Map<string, GameState>();
-const disconnectTimers = new Map<string, NodeJS.Timeout>();
 
 function concedePlayer(roomCode: string, pId: string) {
   const room = rooms.get(roomCode);
@@ -225,12 +224,6 @@ io.on('connection', (socket) => {
             playerId = existingReconnectingPlayer.id; // Map this connection's playerId to the existing player ID
             existingReconnectingPlayer.isDisconnected = false;
             
-            // Clear reconnection/concession timer if active
-            const timerKey = `${targetRoomCode}:${playerId}`;
-            if (disconnectTimers.has(timerKey)) {
-              clearTimeout(disconnectTimers.get(timerKey));
-              disconnectTimers.delete(timerKey);
-            }
 
             currentRoomCode = targetRoomCode;
             socket.join(targetRoomCode);
@@ -1250,39 +1243,19 @@ io.on('connection', (socket) => {
         const player = room.players[playerId];
 
         if (room.phase === 'PLACEMENT' || room.phase === 'GAMEPLAY') {
-          // Game is active: mark player as disconnected and start grace period
+          // Game is active: mark player as disconnected. Wait indefinitely for reconnection or concession.
           if (player) {
             player.isDisconnected = true;
-            broadcastSystemMessage(currentRoomCode, `${player.username} disconnected. Waiting 60 seconds for reconnection...`);
+            broadcastSystemMessage(currentRoomCode, `${player.username} disconnected.`);
             
             // Check if all players in the room are now disconnected
             const allDisconnected = Object.values(room.players).every(p => p.isDisconnected || p.hasConceded);
             if (allDisconnected) {
               rooms.delete(currentRoomCode);
               roomMetadata.delete(currentRoomCode);
-              // Clear any timers for this room
-              for (const key of disconnectTimers.keys()) {
-                if (key.startsWith(`${currentRoomCode}:`)) {
-                  clearTimeout(disconnectTimers.get(key));
-                  disconnectTimers.delete(key);
-                }
-              }
               console.log(`Room ${currentRoomCode} deleted because all players disconnected.`);
               return;
             }
-
-            // Start concession countdown
-            const timerKey = `${currentRoomCode}:${playerId}`;
-            // Clear existing timer if any (shouldn't be one, but safe)
-            if (disconnectTimers.has(timerKey)) {
-              clearTimeout(disconnectTimers.get(timerKey));
-            }
-            const timer = setTimeout(() => {
-              console.log(`Grace period expired for player ${player.username} in room ${currentRoomCode}`);
-              disconnectTimers.delete(timerKey);
-              concedePlayer(currentRoomCode!, playerId);
-            }, 60000);
-            disconnectTimers.set(timerKey, timer);
 
             // Reassign host if the disconnected player was the host
             if (player.isHost) {
