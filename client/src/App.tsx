@@ -847,8 +847,8 @@ export default function App() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
-                      <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '26px', lineHeight: '1' }}>{player.emoji}</span>
+                      <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '48px', lineHeight: '1' }}>{player.emoji}</span>
                         <span>{player.username} {player.id === socket?.id && '(You)'}</span>
                       </span>
                     </div>
@@ -871,8 +871,8 @@ export default function App() {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(5, 42px)',
-                      gap: '6px',
+                      gridTemplateColumns: 'repeat(5, 80px)',
+                      gap: '12px',
                       justifyContent: 'center'
                     }}
                   >
@@ -886,27 +886,27 @@ export default function App() {
                           onClick={() => !isTaken && handleSelectHero(hero.emoji)}
                           disabled={isTaken}
                           style={{
-                            fontSize: '24px',
-                            width: '42px',
-                            height: '42px',
+                            fontSize: '48px',
+                            width: '80px',
+                            height: '80px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             border: isSelected
-                              ? `2.5px solid ${hero.color}`
+                              ? `4px solid ${hero.color}`
                               : isTaken
-                              ? '1px dashed #334155'
-                              : '1px solid var(--border-light)',
-                            borderRadius: '8px',
+                              ? '2px dashed #334155'
+                              : '2px solid var(--border-light)',
+                            borderRadius: '16px',
                             backgroundColor: isSelected
                               ? `${hero.color}22`
                               : 'rgba(0, 0, 0, 0.2)',
                             cursor: isTaken ? 'not-allowed' : 'pointer',
                             opacity: isTaken ? 0.25 : 1,
                             transition: 'all 0.2s',
-                            boxShadow: isSelected ? `0 0 10px ${hero.color}` : 'none'
+                            boxShadow: isSelected ? `0 0 15px ${hero.color}` : 'none'
                           }}
-                          className={isTaken ? '' : 'hover:scale-110'}
+                          className={isTaken ? '' : 'hover:scale-105'}
                           title={isTaken ? `${hero.name} (Already Taken)` : hero.name}
                         >
                           {hero.emoji}
