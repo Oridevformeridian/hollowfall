@@ -1965,54 +1965,51 @@ export default function App() {
             bottom: 0,
             left: 0,
             right: 0,
-            height: '75px',
+            height: '210px',
             backgroundColor: 'rgba(15, 23, 42, 0.95)',
             backdropFilter: 'blur(12px)',
             borderTop: '2px solid var(--border-light)',
-            padding: '4px 24px',
+            padding: '12px 24px',
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             zIndex: 100,
             boxShadow: '0 -10px 30px rgba(0,0,0,0.5)',
-            boxSizing: 'border-box',
-            overflow: 'visible'
+            boxSizing: 'border-box'
           }}
         >
           {/* Left Summary label */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', zIndex: 125 }}>
-            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 125, minWidth: '100px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
               Your Hand
             </span>
-            <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
               ({self.hand.length}/7 Rites)
             </span>
             {targetingCardId && (
-              <span style={{ fontSize: '10px', color: 'var(--accent-crimson)', animation: 'pulse 1.5s infinite', fontWeight: 'bold', marginTop: '2px' }}>
+              <span style={{ fontSize: '10px', color: 'var(--accent-crimson)', animation: 'pulse 1.5s infinite', fontWeight: 'bold', marginTop: '4px' }}>
                 🎯 Target Needed
               </span>
             )}
           </div>
 
-          {/* Cards List (Fanned out from bottom center) */}
+          {/* Cards List (Centered horizontally, fully formed) */}
           <div
             style={{
-              position: 'absolute',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              bottom: '-10px',
               display: 'flex',
-              gap: '12px',
-              overflow: 'visible',
+              gap: '16px',
+              overflowX: 'auto',
               pointerEvents: 'auto',
-              paddingBottom: '20px'
+              flexGrow: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '0 24px'
             }}
           >
             {self.hand.map((card) => {
               const isSelected = selectedCardId === card.id;
               const isHovered = hoveredCardId === card.id;
-              const raised = isSelected || isHovered;
 
               const isBane = card.type === 'bane';
               const isWard = card.type === 'ward';
@@ -2058,123 +2055,112 @@ export default function App() {
                   }}
                   style={{
                     width: '110px',
-                    height: raised ? '195px' : '55px',
-                    position: 'relative',
-                    cursor: canCast ? 'pointer' : 'not-allowed',
+                    height: '165px',
+                    minWidth: '110px',
+                    maxWidth: '110px',
+                    minHeight: '165px',
+                    maxHeight: '165px',
+                    flexShrink: 0,
+                    backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                    border: isSelected 
+                      ? '2px solid var(--accent-cyan)' 
+                      : isHovered 
+                      ? `2px solid ${typeColor}` 
+                      : `1px solid ${typeColor}66`,
+                    borderRadius: '12px',
+                    boxShadow: isSelected 
+                      ? `0 0 20px var(--accent-cyan)` 
+                      : isHovered 
+                      ? `0 0 12px ${typeColor}` 
+                      : `0 0 6px ${typeColor}22`,
+                    padding: '10px',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'flex-start',
-                    overflow: 'visible',
-                    transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                    zIndex: raised ? 120 : 105,
-                    flexShrink: 0
+                    justifyContent: 'space-between',
+                    cursor: canCast ? 'pointer' : 'not-allowed',
+                    transition: 'all 0.15s ease-out',
+                    boxSizing: 'border-box',
+                    position: 'relative',
+                    opacity: (targetingCardId && !isSelected) ? 0.5 : 1
                   }}
                 >
-                  <div
-                    style={{
-                      width: '110px',
-                      height: '165px',
-                      minWidth: '110px',
-                      maxWidth: '110px',
-                      minHeight: '165px',
-                      maxHeight: '165px',
-                      flexShrink: 0,
-                      backgroundColor: 'rgba(15, 23, 42, 0.98)',
-                      border: isSelected ? '2px solid var(--accent-cyan)' : `1px solid ${typeColor}`,
-                      borderRadius: '12px',
-                      boxShadow: isSelected 
-                        ? `0 0 20px var(--accent-cyan)` 
-                        : isHovered 
-                        ? `0 0 12px ${typeColor}` 
-                        : `0 0 6px ${typeColor}22`,
-                      padding: '10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                      boxSizing: 'border-box',
-                      position: 'relative',
-                      opacity: (targetingCardId && !isSelected) ? 0.5 : 1
-                    }}
-                  >
-                    {/* Circular AP Cost Indicator */}
-                    {!isOffering && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '-6px',
-                        left: '-6px',
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--accent-cyan)',
-                        color: 'black',
-                        fontSize: '9px',
-                        fontWeight: 'bold',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: '0 0 4px var(--accent-cyan)',
-                        zIndex: 10
-                      }}>
-                        1
-                      </div>
-                    )}
-
-                    {/* Corner Accent */}
+                  {/* Circular AP Cost Indicator */}
+                  {!isOffering && (
                     <div style={{
                       position: 'absolute',
                       top: '-6px',
-                      right: '-6px',
-                      width: '20px',
-                      height: '20px',
-                      background: typeColor,
-                      transform: 'rotate(45deg)',
-                      opacity: 0.15,
-                      pointerEvents: 'none'
-                    }} />
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
-                        {card.type}
-                      </span>
-                      <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {card.name}
-                      </span>
-                    </div>
-
-                    {/* Description - visible only when raised */}
-                    <div style={{
+                      left: '-6px',
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--accent-cyan)',
+                      color: 'black',
                       fontSize: '9px',
-                      color: '#94a3b8',
-                      lineHeight: '1.25',
-                      opacity: 1,
-                      flexGrow: 1,
+                      fontWeight: 'bold',
                       display: 'flex',
                       alignItems: 'center',
-                      marginTop: '4px'
+                      justifyContent: 'center',
+                      boxShadow: '0 0 4px var(--accent-cyan)',
+                      zIndex: 10
                     }}>
-                      {card.description}
+                      1
                     </div>
+                  )}
 
-                    {/* CTA Label - visible only when raised */}
-                    <div style={{
-                      fontSize: '8px',
-                      fontWeight: 'bold',
-                      color: isSelected ? 'var(--accent-cyan)' : '#64748b',
-                      textAlign: 'center',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px',
-                      opacity: 1,
-                      marginTop: '2px'
-                    }}>
-                      {isWard
-                        ? '🛡️ Defense'
-                        : isSelected 
-                        ? (card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath'
-                          ? '➔ Click to Cast' 
-                          : '🎯 Target board') 
-                        : '⚡ Cast Rite'}
-                    </div>
+                  {/* Corner Accent */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    right: '-6px',
+                    width: '20px',
+                    height: '20px',
+                    background: typeColor,
+                    transform: 'rotate(45deg)',
+                    opacity: 0.15,
+                    pointerEvents: 'none'
+                  }} />
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                      {card.type}
+                    </span>
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {card.name}
+                    </span>
+                  </div>
+
+                  {/* Description */}
+                  <div style={{
+                    fontSize: '9px',
+                    color: '#94a3b8',
+                    lineHeight: '1.25',
+                    opacity: 1,
+                    flexGrow: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginTop: '4px'
+                  }}>
+                    {card.description}
+                  </div>
+
+                  {/* CTA Label */}
+                  <div style={{
+                    fontSize: '8px',
+                    fontWeight: 'bold',
+                    color: isSelected ? 'var(--accent-cyan)' : '#64748b',
+                    textAlign: 'center',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    opacity: 1,
+                    marginTop: '2px'
+                  }}>
+                    {isWard
+                      ? '🛡️ Defense'
+                      : isSelected 
+                      ? (card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath'
+                        ? '➔ Click to Cast' 
+                        : '🎯 Target board') 
+                      : '⚡ Cast Rite'}
                   </div>
                 </div>
               );
@@ -2182,7 +2168,7 @@ export default function App() {
           </div>
 
           {/* Right helper buttons / controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', zIndex: 125 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', zIndex: 125, minWidth: '100px', justifyContent: 'flex-end' }}>
             {targetingCardId && (
               <button
                 onClick={() => {
