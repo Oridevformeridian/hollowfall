@@ -2215,14 +2215,14 @@ export default function App() {
 
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                    <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
                       {card.type}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
-                      <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
                         {card.name}
                       </span>
-                      <span style={{ fontSize: '11px', flexShrink: 0 }}>
+                      <span style={{ fontSize: '13px', flexShrink: 0 }}>
                         {getCardTypeEmoji(card.id)}
                       </span>
                     </div>
@@ -2230,9 +2230,9 @@ export default function App() {
 
                   {/* Description */}
                   <div style={{
-                    fontSize: '9px',
+                    fontSize: '11px',
                     color: '#94a3b8',
-                    lineHeight: '1.25',
+                    lineHeight: '1.3',
                     opacity: 1,
                     flexGrow: 1,
                     display: 'flex',
