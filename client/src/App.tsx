@@ -593,7 +593,9 @@ export default function App() {
   const self = socket?.id && gameState ? gameState.players[socket.id] : null;
   const isHost = self?.isHost || false;
   const playersList = gameState ? Object.values(gameState.players) : [];
-  const activePlayerId = gameState?.turnOrder[gameState.activePlayerIndex];
+  const activePlayerId = gameState?.turnOrder && gameState.activePlayerIndex !== undefined
+    ? gameState.turnOrder[gameState.activePlayerIndex]
+    : null;
   const isActiveTurn = !!(socket && activePlayerId === socket.id);
   const myTokenPos = socket?.id && gameState ? gameState.tokenPositions[socket.id] : null;
 
