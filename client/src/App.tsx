@@ -2017,13 +2017,13 @@ export default function App() {
               const isOffering = card.type === 'offering';
 
               const typeColor = isBane
-                ? 'var(--accent-crimson)'
+                ? '#ff1744'
                 : isWard
-                ? 'var(--accent-gold)'
+                ? '#ffd600'
                 : isWorking
-                ? 'var(--accent-cyan)'
-                : isOffering
-                ? 'var(--accent-green)'
+                ? '#00e5ff'
+                : (isOffering || card.type === 'talisman')
+                ? '#00e676'
                 : '#94a3b8';
 
               const canCast = isActiveTurn && self.ap > 0 && !isWard;
