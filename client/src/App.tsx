@@ -1651,7 +1651,9 @@ export default function App() {
                             const isOccupied = Object.values(gameState.tokenPositions).some(pos => {
                               return pos.tileX === x && pos.tileY === y && pos.r === r && pos.c === c;
                             });
-                            isMiststepTarget = dist <= 3 && !isOccupied;
+                            const targetPos = { tileX: x, tileY: y, r, c };
+                            const hasLos = hasLineOfSight(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
+                            isMiststepTarget = dist <= 3 && !isOccupied && hasLos;
                           }
 
                           // 3.5. Don the Wolf targeting

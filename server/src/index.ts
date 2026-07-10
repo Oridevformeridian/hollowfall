@@ -701,6 +701,10 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target is too far (max distance 3 cells).');
               return;
             }
+            if (!hasLineOfSight(from, target, room.placedTiles, room.doorsState, room.wallsState)) {
+              sendError(socket, 'Target cell is not in your Line of Sight (LOS).');
+              return;
+            }
             room.tokenPositions[playerId] = {
               tileX: target.tileX,
               tileY: target.tileY,
