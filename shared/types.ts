@@ -67,6 +67,7 @@ export interface GameState {
   wallsState: Record<string, boolean>; // Key format: "x,y:r,c:direction"
   tokenPositions: Record<PlayerId, TokenPosition>;
   treasures: Record<string, Treasure>;
+  gameLogs?: string[];
 }
 
 export type ClientMessage =

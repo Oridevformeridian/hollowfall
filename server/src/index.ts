@@ -52,8 +52,14 @@ function passTurn(room: GameState) {
   room.activePlayerIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
   const nextPid = room.turnOrder[room.activePlayerIndex];
   if (room.players[nextPid]) {
-    room.players[nextPid].ap = 3;
-    room.players[nextPid].hasAttackedThisTurn = false;
+    const nextPlayer = room.players[nextPid];
+    nextPlayer.ap = 3;
+    nextPlayer.hasAttackedThisTurn = false;
+    
+    // Log turn transition
+    if (!room.gameLogs) room.gameLogs = [];
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    room.gameLogs.push(`[${timestamp}] ➔ ${nextPlayer.username}'s turn began.`);
   }
 }
 
@@ -128,7 +134,8 @@ io.on('connection', (socket) => {
               doorsState: {},
               wallsState: {},
               tokenPositions: {},
-              treasures: {}
+              treasures: {},
+              gameLogs: []
             };
             rooms.set(targetRoomCode, room);
           }
@@ -196,6 +203,7 @@ io.on('connection', (socket) => {
           socket.join(targetRoomCode);
 
           console.log(`Player ${player.username} joined room ${targetRoomCode}`);
+          broadcastSystemMessage(targetRoomCode, `${player.username} joined the lobby.`);
           broadcastState(targetRoomCode, room);
           break;
         }
@@ -241,6 +249,7 @@ io.on('connection', (socket) => {
 
           // Transition to DRAFT & distribution
           room.phase = 'PLACEMENT';
+          broadcastSystemMessage(currentRoomCode, `Match started! Placement phase has begun.`);
           
           // Randomize turn order
           const playerIds = Object.keys(room.players);
@@ -323,6 +332,7 @@ io.on('connection', (socket) => {
 
           // Player has placed their starting tile
           activePlayer.assignedTileIndex = null;
+          broadcastSystemMessage(currentRoomCode, `${activePlayer.username} placed Sector ${placedTile.tileId} at (${x}, ${y}).`);
 
           // Check if all tiles are placed (number of placed tiles equals player count)
           const newPlacedCount = Object.keys(room.placedTiles).length;
@@ -500,7 +510,9 @@ io.on('connection', (socket) => {
           // Toggle door state
           const doorKey = `${tileX},${tileY}:${r},${c}:${direction}`;
           const currentState = room.doorsState[doorKey] || 'CLOSED';
-          room.doorsState[doorKey] = currentState === 'OPEN' ? 'CLOSED' : 'OPEN';
+          const nextState = currentState === 'OPEN' ? 'CLOSED' : 'OPEN';
+          room.doorsState[doorKey] = nextState;
+          broadcastSystemMessage(currentRoomCode, `${player.username} ${nextState.toLowerCase()}ed a door at Sector (${tileX}, ${tileY}) cell [${r}, ${c}].`);
 
           player.ap--;
 
@@ -932,6 +944,10 @@ io.on('connection', (socket) => {
           }
 
           treasure.carrierId = playerId;
+          
+          const treasureOwner = room.players[treasure.ownerId];
+          const ownerLabel = treasureOwner ? `${treasureOwner.username}'s Mask` : `a Mask`;
+          broadcastSystemMessage(currentRoomCode, `${player.username} picked up ${ownerLabel}.`);
 
           player.ap = 0;
           passTurn(room);
@@ -975,6 +991,10 @@ io.on('connection', (socket) => {
           treasure.tileY = pos.tileY;
           treasure.r = pos.r;
           treasure.c = pos.c;
+
+          const treasureOwner = room.players[treasure.ownerId];
+          const ownerLabel = treasureOwner ? `${treasureOwner.username}'s Mask` : `a Mask`;
+          broadcastSystemMessage(currentRoomCode, `${player.username} dropped ${ownerLabel}.`);
 
           recalculatePoints(room);
           broadcastState(currentRoomCode, room);
@@ -1087,11 +1107,17 @@ const sendError = (socket: any, message: string) => {
 };
 
 const broadcastSystemMessage = (roomCode: string, message: string) => {
-  const msg: ServerMessage = {
-    event: 'ERROR',
-    payload: { message }
-  };
-  io.to(roomCode).emit('message', JSON.stringify(msg));
+  const room = rooms.get(roomCode);
+  if (room) {
+    if (!room.gameLogs) {
+      room.gameLogs = [];
+    }
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    room.gameLogs.push(`[${timestamp}] ${message}`);
+    if (room.gameLogs.length > 20) {
+      room.gameLogs.shift();
+    }
+  }
 };
 
 const PORT = process.env.PORT || 3001;

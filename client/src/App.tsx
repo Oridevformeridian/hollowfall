@@ -1256,6 +1256,46 @@ export default function App() {
               </button>
             </div>
           )}
+
+          {/* Ritual Log / Game Feed */}
+          {gameState && gameState.gameLogs && gameState.gameLogs.length > 0 && (
+            <div
+              style={{
+                marginTop: '24px',
+                borderTop: '1px solid var(--border-light)',
+                paddingTop: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                textAlign: 'left'
+              }}
+            >
+              <h3 className="text-xs font-bold text-gray-400 m-0 uppercase tracking-widest">Ritual Feed</h3>
+              <div
+                style={{
+                  maxHeight: '160px',
+                  overflowY: 'auto',
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  border: '1px solid rgba(255,255,255,0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                  color: '#94a3b8',
+                  lineHeight: '1.4'
+                }}
+              >
+                {gameState.gameLogs.map((log, idx) => (
+                  <div key={`log-${idx}`} style={{ wordBreak: 'break-all' }}>
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: '24px', borderTop: '1px solid var(--border-light)', paddingTop: '16px', textAlign: 'center' }}>
