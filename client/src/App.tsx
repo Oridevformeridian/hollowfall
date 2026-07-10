@@ -2092,21 +2092,24 @@ export default function App() {
         <div
           style={{
             position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
+            bottom: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
             height: '210px',
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            backdropFilter: 'blur(12px)',
-            borderTop: '2px solid var(--border-light)',
-            padding: '12px 24px',
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '24px',
+            padding: '12px 32px',
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
             zIndex: 100,
-            boxShadow: '0 -10px 30px rgba(0,0,0,0.5)',
-            boxSizing: 'border-box'
+            boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
+            boxSizing: 'border-box',
+            maxWidth: '92vw',
+            width: 'auto'
           }}
         >
           {/* Left Summary label */}
