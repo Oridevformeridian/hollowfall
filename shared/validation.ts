@@ -153,19 +153,49 @@ export function isBorderBlocked(
 /**
  * Checks whether there is an unobstructed line of sight (LOS) between two micro-grid coordinates.
  */
+export function checkWrapping(
+  from: TokenPosition,
+  to: TokenPosition,
+  placedTiles: Record<string, PlacedTile>
+): { isEastWrap: boolean; isWestWrap: boolean; isNorthWrap: boolean; isSouthWrap: boolean; isWrap: boolean } {
+  const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
+
+  const rowXs = tileCoords.filter(c => c[1] === from.tileY).map(c => c[0]);
+  const minTileXOnRow = rowXs.length > 0 ? Math.min(...rowXs) : 0;
+  const maxTileXOnRow = rowXs.length > 0 ? Math.max(...rowXs) : 0;
+
+  const colYs = tileCoords.filter(c => c[0] === from.tileX).map(c => c[1]);
+  const minTileYOnCol = colYs.length > 0 ? Math.min(...colYs) : 0;
+  const maxTileYOnCol = colYs.length > 0 ? Math.max(...colYs) : 0;
+
+  const dx = to.tileX - from.tileX;
+  const dy = to.tileY - from.tileY;
+
+  const isEastWrap = from.tileX === maxTileXOnRow && to.tileX === minTileXOnRow && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0;
+  const isWestWrap = from.tileX === minTileXOnRow && to.tileX === maxTileXOnRow && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4;
+  const isNorthWrap = from.tileY === maxTileYOnCol && to.tileY === minTileYOnCol && dx === 0 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
+  const isSouthWrap = from.tileY === minTileYOnCol && to.tileY === maxTileYOnCol && dx === 0 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
+
+  const isWrap = isEastWrap || isWestWrap || isNorthWrap || isSouthWrap;
+
+  return { isEastWrap, isWestWrap, isNorthWrap, isSouthWrap, isWrap };
+}
+
 export function getNextCell(
   curr: TokenPosition,
   dir: 'E' | 'W' | 'N' | 'S',
-  minTileX: number,
-  maxTileX: number,
-  minTileY: number,
-  maxTileY: number
+  placedTiles: Record<string, PlacedTile>
 ): TokenPosition {
+  const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
+
   if (dir === 'E') {
     if (curr.c < 4) {
       return { tileX: curr.tileX, tileY: curr.tileY, r: curr.r, c: curr.c + 1 };
     } else {
-      const nextTileX = curr.tileX === maxTileX ? minTileX : curr.tileX + 1;
+      const rowXs = tileCoords.filter(c => c[1] === curr.tileY).map(c => c[0]);
+      const minTileXOnRow = rowXs.length > 0 ? Math.min(...rowXs) : 0;
+      const maxTileXOnRow = rowXs.length > 0 ? Math.max(...rowXs) : 0;
+      const nextTileX = curr.tileX === maxTileXOnRow ? minTileXOnRow : curr.tileX + 1;
       return { tileX: nextTileX, tileY: curr.tileY, r: curr.r, c: 0 };
     }
   }
@@ -173,7 +203,10 @@ export function getNextCell(
     if (curr.c > 0) {
       return { tileX: curr.tileX, tileY: curr.tileY, r: curr.r, c: curr.c - 1 };
     } else {
-      const nextTileX = curr.tileX === minTileX ? maxTileX : curr.tileX - 1;
+      const rowXs = tileCoords.filter(c => c[1] === curr.tileY).map(c => c[0]);
+      const minTileXOnRow = rowXs.length > 0 ? Math.min(...rowXs) : 0;
+      const maxTileXOnRow = rowXs.length > 0 ? Math.max(...rowXs) : 0;
+      const nextTileX = curr.tileX === minTileXOnRow ? maxTileXOnRow : curr.tileX - 1;
       return { tileX: nextTileX, tileY: curr.tileY, r: curr.r, c: 4 };
     }
   }
@@ -181,7 +214,10 @@ export function getNextCell(
     if (curr.r > 0) {
       return { tileX: curr.tileX, tileY: curr.tileY, r: curr.r - 1, c: curr.c };
     } else {
-      const nextTileY = curr.tileY === maxTileY ? minTileY : curr.tileY + 1;
+      const colYs = tileCoords.filter(c => c[0] === curr.tileX).map(c => c[1]);
+      const minTileYOnCol = colYs.length > 0 ? Math.min(...colYs) : 0;
+      const maxTileYOnCol = colYs.length > 0 ? Math.max(...colYs) : 0;
+      const nextTileY = curr.tileY === maxTileYOnCol ? minTileYOnCol : curr.tileY + 1;
       return { tileX: curr.tileX, tileY: nextTileY, r: 4, c: curr.c };
     }
   }
@@ -189,7 +225,10 @@ export function getNextCell(
     if (curr.r < 4) {
       return { tileX: curr.tileX, tileY: curr.tileY, r: curr.r + 1, c: curr.c };
     } else {
-      const nextTileY = curr.tileY === minTileY ? maxTileY : curr.tileY - 1;
+      const colYs = tileCoords.filter(c => c[0] === curr.tileX).map(c => c[1]);
+      const minTileYOnCol = colYs.length > 0 ? Math.min(...colYs) : 0;
+      const maxTileYOnCol = colYs.length > 0 ? Math.max(...colYs) : 0;
+      const nextTileY = curr.tileY === minTileYOnCol ? maxTileYOnCol : curr.tileY - 1;
       return { tileX: curr.tileX, tileY: nextTileY, r: 0, c: curr.c };
     }
   }
@@ -210,25 +249,7 @@ export function hasLineOfSight(
     return true;
   }
 
-  // Find board bounds in tile coordinates
-  const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
-  const xs = tileCoords.map(c => c[0]);
-  const ys = tileCoords.map(c => c[1]);
-  const minTileX = xs.length > 0 ? Math.min(...xs) : 0;
-  const maxTileX = xs.length > 0 ? Math.max(...xs) : 0;
-  const minTileY = ys.length > 0 ? Math.min(...ys) : 0;
-  const maxTileY = ys.length > 0 ? Math.max(...ys) : 0;
-
-  const dx = to.tileX - from.tileX;
-  const dy = to.tileY - from.tileY;
-
-  // Determine if this is a wrapping step (pacman-wrap)
-  const isEastWrap = from.tileX === maxTileX && to.tileX === minTileX && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0;
-  const isWestWrap = from.tileX === minTileX && to.tileX === maxTileX && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4;
-  const isNorthWrap = from.tileY === maxTileY && to.tileY === minTileY && dx === 0 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
-  const isSouthWrap = from.tileY === minTileY && to.tileY === maxTileY && dx === 0 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
-
-  const isWrap = isEastWrap || isWestWrap || isNorthWrap || isSouthWrap;
+  const { isWrap } = checkWrapping(from, to, placedTiles);
 
   // If different tiles or wrapping, LOS must be horizontal along row 2 or vertical along col 2
   if (from.tileX !== to.tileX || from.tileY !== to.tileY || isWrap) {
@@ -245,7 +266,7 @@ export function hasLineOfSight(
         if (curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
           break;
         }
-        const next = getNextCell(curr, 'E', minTileX, maxTileX, minTileY, maxTileY);
+        const next = getNextCell(curr, 'E', placedTiles);
         if (!validateTokenMove(curr, next, placedTiles, doorsState, ws).valid) {
           eastPathClear = false;
           break;
@@ -265,7 +286,7 @@ export function hasLineOfSight(
         if (curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
           break;
         }
-        const next = getNextCell(curr, 'W', minTileX, maxTileX, minTileY, maxTileY);
+        const next = getNextCell(curr, 'W', placedTiles);
         if (!validateTokenMove(curr, next, placedTiles, doorsState, ws).valid) {
           westPathClear = false;
           break;
@@ -288,7 +309,7 @@ export function hasLineOfSight(
         if (curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
           break;
         }
-        const next = getNextCell(curr, 'N', minTileX, maxTileX, minTileY, maxTileY);
+        const next = getNextCell(curr, 'N', placedTiles);
         if (!validateTokenMove(curr, next, placedTiles, doorsState, ws).valid) {
           northPathClear = false;
           break;
@@ -308,7 +329,7 @@ export function hasLineOfSight(
         if (curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
           break;
         }
-        const next = getNextCell(curr, 'S', minTileX, maxTileX, minTileY, maxTileY);
+        const next = getNextCell(curr, 'S', placedTiles);
         if (!validateTokenMove(curr, next, placedTiles, doorsState, ws).valid) {
           southPathClear = false;
           break;
@@ -485,25 +506,12 @@ export function validateTokenMove(
     }
   }
 
-  // Find board bounds in tile coordinates
-  const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
-  const xs = tileCoords.map(c => c[0]);
-  const ys = tileCoords.map(c => c[1]);
-  const minTileX = xs.length > 0 ? Math.min(...xs) : 0;
-  const maxTileX = xs.length > 0 ? Math.max(...xs) : 0;
-  const minTileY = ys.length > 0 ? Math.min(...ys) : 0;
-  const maxTileY = ys.length > 0 ? Math.max(...ys) : 0;
 
   const dx = to.tileX - from.tileX;
   const dy = to.tileY - from.tileY;
 
-  // Determine if this is a wrapping step (pacman-wrap)
-  const isEastWrap = from.tileX === maxTileX && to.tileX === minTileX && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0;
-  const isWestWrap = from.tileX === minTileX && to.tileX === maxTileX && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4;
-  const isNorthWrap = from.tileY === maxTileY && to.tileY === minTileY && dx === 0 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
-  const isSouthWrap = from.tileY === minTileY && to.tileY === maxTileY && dx === 0 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
-
-  const isWrap = isEastWrap || isWestWrap || isNorthWrap || isSouthWrap;
+  // Determine if this is a wrapping step (pacman-wrap) using row/col specific bounds
+  const { isEastWrap, isWestWrap, isNorthWrap, isSouthWrap, isWrap } = checkWrapping(from, to, placedTiles);
 
   // 1. Same-Tile Movement validation (excluding wrapping steps)
   if (from.tileX === to.tileX && from.tileY === to.tileY && !isWrap) {

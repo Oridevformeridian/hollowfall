@@ -273,6 +273,29 @@ describe('hasLineOfSight', () => {
     const res = validateTokenMove(from, to, placedTiles, {});
     expect(res.valid).toBe(true);
   });
+
+  it('should allow wrap-around movement on a 1-tile wide board', () => {
+    const singleTile: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' }
+    };
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    const res = validateTokenMove(from, to, singleTile, {});
+    expect(res.valid).toBe(true);
+  });
+
+  it('should allow wrap-around movement on an L-shaped board with row/col specific boundaries', () => {
+    const lShapedTiles: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '0,1': { tileId: 2, position: { x: 0, y: 1 }, rotation: 0, placedBy: 'p2' },
+      '1,1': { tileId: 3, position: { x: 1, y: 1 }, rotation: 0, placedBy: 'p1' }
+    };
+    // On row 0, only '0,0' exists. So c=4 (East) should wrap to c=0 (West) of '0,0'.
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    const res = validateTokenMove(from, to, lShapedTiles, {});
+    expect(res.valid).toBe(true);
+  });
 });
 
 describe('getWrappingManhattanDistance', () => {
