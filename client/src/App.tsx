@@ -344,6 +344,16 @@ export default function App() {
     gameStateRef.current = gameState;
   }, [gameState]);
 
+  const usernameRef = React.useRef(username);
+  useEffect(() => {
+    usernameRef.current = username;
+  }, [username]);
+
+  const roomCodeRef = React.useRef(roomCode);
+  useEffect(() => {
+    roomCodeRef.current = roomCode;
+  }, [roomCode]);
+
   useEffect(() => {
     if (gameState?.phase === 'GAME_OVER') {
       if (!playedGameOverSound) {
@@ -388,6 +398,21 @@ export default function App() {
     s.on('connect', () => {
       console.log('Connected to server');
       setError(null);
+
+      // Auto-rejoin check
+      const savedRoom = sessionStorage.getItem('hollowfall_active_room');
+      const savedUsername = sessionStorage.getItem('hollowfall_active_username');
+      if (savedRoom && savedUsername) {
+        const cleanRoom = savedRoom.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+        const cleanUsername = savedUsername.trim().toLowerCase();
+        const sessionToken = localStorage.getItem(`hollowfall_session_${cleanRoom}_${cleanUsername}`) || undefined;
+
+        console.log(`Auto-rejoining room ${cleanRoom} as ${savedUsername}...`);
+        s.emit('message', JSON.stringify({
+          event: 'JOIN_ROOM',
+          payload: { username: savedUsername, roomCode: cleanRoom, color: '', emoji: '', sessionToken }
+        }));
+      }
     });
 
     s.on('message', (messageStr: string) => {
@@ -398,13 +423,20 @@ export default function App() {
           setError(null);
           
           // Store session token for reconnection resilience
-          if (username) {
+          const currentUsername = usernameRef.current || sessionStorage.getItem('hollowfall_active_username') || '';
+          if (currentUsername) {
             const myPlayer = Object.values(msg.payload.players).find(
-              (p: any) => p.username.toLowerCase() === username.toLowerCase()
+              (p: any) => p.username.toLowerCase() === currentUsername.toLowerCase()
             );
             if (myPlayer && myPlayer.sessionToken) {
               const cleanRoom = msg.payload.roomCode.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
               localStorage.setItem(`hollowfall_session_${cleanRoom}_${myPlayer.username.toLowerCase()}`, myPlayer.sessionToken);
+              
+              // Keep sessionStorage and React state in sync
+              sessionStorage.setItem('hollowfall_active_room', msg.payload.roomCode);
+              sessionStorage.setItem('hollowfall_active_username', myPlayer.username);
+              if (!usernameRef.current) setUsername(myPlayer.username);
+              if (!roomCodeRef.current) setRoomCode(msg.payload.roomCode);
             }
           }
         } else if (msg.event === 'PLAY_CARD_ANIMATION') {
@@ -424,6 +456,9 @@ export default function App() {
           }
         } else if (msg.event === 'ERROR') {
           setError(msg.payload.message);
+          // If auto-rejoin failed (e.g. room deleted), clear sessionStorage to prevent boot loops
+          sessionStorage.removeItem('hollowfall_active_room');
+          sessionStorage.removeItem('hollowfall_active_username');
         }
       } catch (err) {
         console.error('Failed to parse server message', err);
@@ -535,10 +570,14 @@ export default function App() {
   };
 
   const handleResetGame = () => {
+    sessionStorage.removeItem('hollowfall_active_room');
+    sessionStorage.removeItem('hollowfall_active_username');
     sendEvent({ event: 'RESET_GAME' });
   };
 
   const handleConcede = () => {
+    sessionStorage.removeItem('hollowfall_active_room');
+    sessionStorage.removeItem('hollowfall_active_username');
     sendEvent({ event: 'CONCEDE' });
   };
 
