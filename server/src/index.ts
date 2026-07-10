@@ -711,6 +711,8 @@ io.on('connection', (socket) => {
               c: target.c
             };
 
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Miststep, teleporting to Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
+
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
               payload: { cardId: card.id, casterId: playerId, target }
@@ -743,6 +745,8 @@ io.on('connection', (socket) => {
             const wallKey = `${target.tileX},${target.tileY}:${target.r},${target.c}:${target.direction}`;
             room.wallsState[wallKey] = true;
 
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Raise Stone, creating a wall on the ${target.direction === 'H' ? 'horizontal' : 'vertical'} border of Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
+
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
               payload: { cardId: card.id, casterId: playerId, target }
@@ -753,6 +757,8 @@ io.on('connection', (socket) => {
             player.maxThread += 2;
             player.thread = Math.min(player.maxThread, player.thread + 2);
 
+            broadcastSystemMessage(currentRoomCode, `${player.username} invoked the Bear-Charm Rite, gaining +2 Max Thread and healing 2 Thread.`);
+
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
               payload: { cardId: card.id, casterId: playerId }
@@ -762,6 +768,8 @@ io.on('connection', (socket) => {
           } else if (card.id === 'working_don_wolf') {
             player.form = 'wolf';
 
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Don the Wolf, shifting into wolf form (moves cost 0 AP).`);
+
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
               payload: { cardId: card.id, casterId: playerId }
@@ -770,6 +778,8 @@ io.on('connection', (socket) => {
 
           } else if (card.id === 'offering_deep_breath') {
             player.ap += 2;
+
+            broadcastSystemMessage(currentRoomCode, `${player.username} offered Deep Breath, gaining +2 Action Points.`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
