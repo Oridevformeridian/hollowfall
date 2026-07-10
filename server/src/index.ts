@@ -2,12 +2,23 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import path from 'path';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, Card } from '../../shared/types';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance } from '../../shared/validation';
 import { HEROES, BASIC_CARDS } from '../../shared/constants';
 
 const app = express();
 app.use(cors());
+
+// Serve client build in production
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.resolve(process.cwd(), '../client/dist');
+  app.use(express.static(clientBuildPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
+
 
 const server = http.createServer(app);
 const io = new Server(server, {
