@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
-import { FIXED_TILES, TileLayout, HEROES } from './shared/constants.ts';
+import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight } from './shared/validation.ts';
 
 const renderTileSvgContent = (
@@ -1846,6 +1846,111 @@ export default function App() {
                 {activeAnimation.cardId === 'offering_deep_breath' && (
                   <div className="deep-breath-effect" style={{ left: pFrom.x, top: pFrom.y }} />
                 )}
+
+                {/* Floating Card Announcement */}
+                {(() => {
+                  const card = BASIC_CARDS.find(c => c.id === activeAnimation.cardId);
+                  const caster = gameState?.players[activeAnimation.casterId];
+                  if (!card || !caster) return null;
+
+                  const typeColors = {
+                    bane: 'var(--accent-crimson)',
+                    ward: 'var(--accent-gold)',
+                    working: 'var(--accent-cyan)',
+                    talisman: 'var(--accent-green)',
+                    offering: '#FFAB40'
+                  };
+                  const color = typeColors[card.type] || '#FFFFFF';
+
+                  return (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        zIndex: 150,
+                        pointerEvents: 'none',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '12px',
+                        animation: 'floatingCardReveal 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
+                      }}
+                    >
+                      <div style={{
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        color: '#E2E8F0',
+                        textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+                        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                        padding: '4px 12px',
+                        borderRadius: '12px',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        backdropFilter: 'blur(4px)'
+                      }}>
+                        {caster.username} plays:
+                      </div>
+                      <div
+                        style={{
+                          width: '160px',
+                          height: '240px',
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: `2px solid ${color}`,
+                          borderRadius: '16px',
+                          boxShadow: `0 0 25px ${color}`,
+                          padding: '16px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          backdropFilter: 'blur(12px)',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute',
+                          top: '-10px',
+                          right: '-10px',
+                          width: '40px',
+                          height: '40px',
+                          background: color,
+                          transform: 'rotate(45deg)',
+                          opacity: 0.15
+                        }} />
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{
+                            fontSize: '11px',
+                            textTransform: 'uppercase',
+                            letterSpacing: '2px',
+                            color: color,
+                            fontWeight: 'bold'
+                          }}>
+                            {card.type}
+                          </div>
+                          <div style={{
+                            fontSize: '16px',
+                            fontWeight: 'bold',
+                            color: 'white',
+                            lineHeight: '1.2'
+                          }}>
+                            {card.name}
+                          </div>
+                        </div>
+
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#94a3b8',
+                          lineHeight: '1.4',
+                          marginBottom: '16px'
+                        }}>
+                          {card.description}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}

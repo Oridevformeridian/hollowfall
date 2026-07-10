@@ -569,4 +569,27 @@ h1, h2, h3, h4 {
   100% { transform: rotate(360deg) scale(2); opacity: 0; }
 }
 
+@keyframes floatingCardReveal {
+  0% {
+    transform: translate(-50%, -30%) scale(0.3);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 1;
+  }
+  25% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -70%) scale(0.8);
+    opacity: 0;
+  }
+}
+
 
