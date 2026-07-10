@@ -1086,9 +1086,60 @@ export default function App() {
         <div className="sidebar-section">
           <div>
             <h1 className="text-xl font-black text-[var(--accent-cyan)] m-0 tracking-wider">HOLLOWFALL</h1>
-            <p className="text-gray-400 text-xs m-0">
+            <p className="text-gray-400 text-xs m-0" style={{ marginBottom: '4px' }}>
               {gameState.phase === 'PLACEMENT' ? 'Tile Setup' : 'Gameplay Phase'}
             </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 'bold' }}>
+                Room: {gameState.roomCode}
+              </span>
+              <button
+                onClick={handleCopyRoomCode}
+                title="Copy Room Code"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: copied ? 'var(--accent-green)' : '#64748b',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'color 0.2s',
+                  position: 'relative'
+                }}
+              >
+                {copied ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                )}
+                {copied && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-20px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: '#00E676',
+                    color: 'black',
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    padding: '1px 4px',
+                    borderRadius: '3px',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                    zIndex: 10
+                  }}>
+                    Copied!
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           {gameState.phase === 'PLACEMENT' && activeTileLayout && (
