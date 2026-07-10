@@ -326,6 +326,8 @@ export default function App() {
     countered?: 'turn_aside' | 'spirit_skin' | null;
   } | null>(null);
   const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
 
   const gameStateRef = React.useRef(gameState);
   useEffect(() => {
@@ -499,6 +501,7 @@ export default function App() {
       payload: { cardId, target }
     });
     setTargetingCardId(null);
+    setSelectedCardId(null);
   };
 
   const handleResetGame = () => {
@@ -1962,53 +1965,55 @@ export default function App() {
             bottom: 0,
             left: 0,
             right: 0,
-            height: '180px',
+            height: '75px',
             backgroundColor: 'rgba(15, 23, 42, 0.95)',
             backdropFilter: 'blur(12px)',
             borderTop: '2px solid var(--border-light)',
-            padding: '16px 24px',
+            padding: '4px 24px',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             zIndex: 100,
             boxShadow: '0 -10px 30px rgba(0,0,0,0.5)',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            overflow: 'visible'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Your Hand ({self.hand.length}/7 Rites)
-              </span>
-              {targetingCardId && (
-                <span style={{ fontSize: '11px', color: 'var(--accent-crimson)', animation: 'pulse 1.5s infinite', fontWeight: 'bold' }}>
-                  🎯 SELECT A TARGET ON THE BOARD FOR {self.hand.find(c => c.id === targetingCardId)?.name.toUpperCase()}
-                </span>
-              )}
-            </div>
+          {/* Left Summary label */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', zIndex: 125 }}>
+            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Your Hand
+            </span>
+            <span style={{ fontSize: '10px', color: '#94a3b8' }}>
+              ({self.hand.length}/7 Rites)
+            </span>
             {targetingCardId && (
-              <button
-                onClick={() => setTargetingCardId(null)}
-                className="btn-secondary"
-                style={{ padding: '2px 8px', fontSize: '11px', color: 'var(--accent-crimson)', borderColor: 'var(--accent-crimson)' }}
-              >
-                Cancel Target
-              </button>
+              <span style={{ fontSize: '10px', color: 'var(--accent-crimson)', animation: 'pulse 1.5s infinite', fontWeight: 'bold', marginTop: '2px' }}>
+                🎯 Target Needed
+              </span>
             )}
           </div>
 
-          {/* Horizontal Cards Scroll list */}
+          {/* Cards List (Fanned out from bottom center) */}
           <div
             style={{
+              position: 'absolute',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              bottom: '-10px',
               display: 'flex',
-              gap: '16px',
-              overflowX: 'auto',
-              paddingBottom: '8px',
-              flexGrow: 1
+              gap: '12px',
+              overflow: 'visible',
+              pointerEvents: 'auto',
+              paddingBottom: '20px'
             }}
           >
             {self.hand.map((card) => {
-              const isTargeting = targetingCardId === card.id;
+              const isSelected = selectedCardId === card.id;
+              const isHovered = hoveredCardId === card.id;
+              const raised = isSelected || isHovered;
+
               const isBane = card.type === 'bane';
               const isWard = card.type === 'ward';
               const isWorking = card.type === 'working';
@@ -2029,76 +2034,151 @@ export default function App() {
               return (
                 <div
                   key={card.id}
+                  onMouseEnter={() => setHoveredCardId(card.id)}
+                  onMouseLeave={() => setHoveredCardId(null)}
+                  onClick={() => {
+                    if (!canCast) return;
+                    const noTargetNeeded = card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath';
+                    if (isSelected) {
+                      if (noTargetNeeded) {
+                        handlePlayCard(card.id);
+                        setSelectedCardId(null);
+                      } else {
+                        setTargetingCardId(null);
+                        setSelectedCardId(null);
+                      }
+                    } else {
+                      setSelectedCardId(card.id);
+                      if (!noTargetNeeded) {
+                        setTargetingCardId(card.id);
+                      } else {
+                        setTargetingCardId(null);
+                      }
+                    }
+                  }}
                   style={{
-                    minWidth: '220px',
-                    maxWidth: '220px',
-                    backgroundColor: 'rgba(255,255,255,0.02)',
-                    border: isTargeting ? '2px solid var(--accent-cyan)' : `1px solid ${typeColor}66`,
-                    borderRadius: '10px',
+                    width: '110px',
+                    height: '160px',
+                    backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                    border: isSelected ? '2px solid var(--accent-cyan)' : `1px solid ${typeColor}`,
+                    borderRadius: '12px',
+                    boxShadow: isSelected 
+                      ? `0 0 20px var(--accent-cyan)` 
+                      : isHovered 
+                      ? `0 0 12px ${typeColor}` 
+                      : `0 0 6px ${typeColor}22`,
                     padding: '10px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    boxShadow: isTargeting ? '0 0 10px var(--accent-cyan)44' : 'none',
-                    opacity: (targetingCardId && !isTargeting) ? 0.4 : 1,
-                    transition: 'all 0.2s',
-                    boxSizing: 'border-box'
+                    cursor: canCast ? 'pointer' : 'not-allowed',
+                    transform: raised ? 'translateY(-110px) scale(1.05)' : 'translateY(15px)',
+                    transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                    zIndex: raised ? 120 : 105,
+                    boxSizing: 'border-box',
+                    position: 'relative',
+                    opacity: (targetingCardId && !isSelected) ? 0.5 : 1
                   }}
                 >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white' }}>{card.name}</span>
-                      <span
-                        style={{
-                          fontSize: '8px',
-                          fontWeight: 'bold',
-                          color: typeColor,
-                          border: `1px solid ${typeColor}`,
-                          padding: '1px 4px',
-                          borderRadius: '4px',
-                          textTransform: 'uppercase'
-                        }}
-                      >
-                        {card.type}
-                      </span>
+                  {/* Circular AP Cost Indicator */}
+                  {!isOffering && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      left: '-6px',
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--accent-cyan)',
+                      color: 'black',
+                      fontSize: '9px',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 0 4px var(--accent-cyan)',
+                      zIndex: 10
+                    }}>
+                      1
                     </div>
-                    <p style={{ fontSize: '10px', color: '#94a3b8', margin: '4px 0 0 0', lineHeight: '1.3' }}>
-                      {card.description}
-                    </p>
+                  )}
+
+                  {/* Corner Accent */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    right: '-6px',
+                    width: '20px',
+                    height: '20px',
+                    background: typeColor,
+                    transform: 'rotate(45deg)',
+                    opacity: 0.15,
+                    pointerEvents: 'none'
+                  }} />
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                    <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                      {card.type}
+                    </span>
+                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {card.name}
+                    </span>
                   </div>
 
-                  <div style={{ marginTop: '8px' }}>
-                    {isWard ? (
-                      <span style={{ fontSize: '9px', color: '#64748b', fontStyle: 'italic', display: 'block', textAlign: 'center' }}>
-                        Auto-triggers on defense
-                      </span>
-                    ) : (
-                      <button
-                        disabled={!canCast}
-                        onClick={() => {
-                          const noTargetNeeded = card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath';
-                          if (noTargetNeeded) {
-                            handlePlayCard(card.id);
-                          } else {
-                            setTargetingCardId(card.id);
-                          }
-                        }}
-                        className={canCast ? 'btn-primary' : 'btn-secondary'}
-                        style={{
-                          width: '100%',
-                          padding: '4px 0',
-                          fontSize: '11px',
-                          opacity: canCast ? 1 : 0.5,
-                          cursor: canCast ? 'pointer' : 'not-allowed'
-                        }}
-                      >
-                        {isTargeting ? 'Select Target...' : 'Cast Rite'}
-                      </button>
-                    )}
+                  {/* Description - visible only when raised */}
+                  <div style={{
+                    fontSize: '9px',
+                    color: '#94a3b8',
+                    lineHeight: '1.25',
+                    opacity: raised ? 1 : 0,
+                    transition: 'opacity 0.2s',
+                    flexGrow: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    marginTop: '4px'
+                  }}>
+                    {card.description}
+                  </div>
+
+                  {/* CTA Label - visible only when raised */}
+                  <div style={{
+                    fontSize: '8px',
+                    fontWeight: 'bold',
+                    color: isSelected ? 'var(--accent-cyan)' : '#64748b',
+                    textAlign: 'center',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    opacity: raised ? 1 : 0,
+                    transition: 'opacity 0.2s',
+                    marginTop: '2px'
+                  }}>
+                    {isWard
+                      ? '🛡️ Defense'
+                      : isSelected 
+                      ? (card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath'
+                        ? '➔ Click to Cast' 
+                        : '🎯 Target board') 
+                      : '⚡ Cast Rite'}
                   </div>
                 </div>
               );
             })}
+          </div>
+
+          {/* Right helper buttons / controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', zIndex: 125 }}>
+            {targetingCardId && (
+              <button
+                onClick={() => {
+                  setTargetingCardId(null);
+                  setSelectedCardId(null);
+                }}
+                className="btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '11px', color: 'var(--accent-crimson)', borderColor: 'var(--accent-crimson)' }}
+              >
+                Cancel Target
+              </button>
+            )}
           </div>
         </div>
       )}
