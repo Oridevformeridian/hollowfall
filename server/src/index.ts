@@ -221,9 +221,46 @@ io.on('connection', (socket) => {
 
           if (existingReconnectingPlayer) {
             // Reconnection path!
-            playerId = existingReconnectingPlayer.id; // Map this connection's playerId to the existing player ID
+            const oldPlayerId = existingReconnectingPlayer.id;
+            const newPlayerId = socket.id;
+
+            // Update player ID and key in room
+            existingReconnectingPlayer.id = newPlayerId;
+            room.players[newPlayerId] = existingReconnectingPlayer;
+            delete room.players[oldPlayerId];
+
+            // Update in turnOrder
+            room.turnOrder = room.turnOrder.map(id => id === oldPlayerId ? newPlayerId : id);
+
+            // Update in tokenPositions
+            if (room.tokenPositions[oldPlayerId]) {
+              room.tokenPositions[newPlayerId] = room.tokenPositions[oldPlayerId];
+              delete room.tokenPositions[oldPlayerId];
+            }
+
+            // Update in treasures
+            if (room.treasures) {
+              for (const tId of Object.keys(room.treasures)) {
+                const treasure = room.treasures[tId];
+                if (treasure.ownerId === oldPlayerId) {
+                  treasure.ownerId = newPlayerId;
+                }
+                if (treasure.carrierId === oldPlayerId) {
+                  treasure.carrierId = newPlayerId;
+                }
+              }
+            }
+
+            // Update in roomMetadata
+            const meta = roomMetadata.get(targetRoomCode);
+            if (meta && meta.secondaryTiles && meta.secondaryTiles[oldPlayerId] !== undefined) {
+              meta.secondaryTiles[newPlayerId] = meta.secondaryTiles[oldPlayerId];
+              delete meta.secondaryTiles[oldPlayerId];
+            }
+
+            // Map this connection's playerId variable to the new ID
+            playerId = newPlayerId;
             existingReconnectingPlayer.isDisconnected = false;
-            
 
             currentRoomCode = targetRoomCode;
             socket.join(targetRoomCode);
