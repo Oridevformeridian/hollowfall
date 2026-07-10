@@ -1654,6 +1654,20 @@ export default function App() {
                             isMiststepTarget = dist <= 3 && !isOccupied;
                           }
 
+                          // 3.5. Don the Wolf targeting
+                          let isDonWolfTarget = false;
+                          if (targetingCardId === 'working_don_wolf' && isActiveTurn && myTokenPos) {
+                            const globalR_from = myTokenPos.tileY * 5 + myTokenPos.r;
+                            const globalC_from = myTokenPos.tileX * 5 + myTokenPos.c;
+                            const globalR_to = y * 5 + r;
+                            const globalC_to = x * 5 + c;
+                            const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
+                            const isOccupied = Object.values(gameState.tokenPositions).some(pos => {
+                              return pos.tileX === x && pos.tileY === y && pos.r === r && pos.c === c;
+                            });
+                            isDonWolfTarget = dist <= 4 && !isOccupied;
+                          }
+
                           // 4. Raise Stone cell detection (player's current cell)
                           const isRaiseStoneCell = targetingCardId === 'working_raise_stone' && isActiveTurn && myTokenPos && myTokenPos.tileX === x && myTokenPos.tileY === y && myTokenPos.r === r && myTokenPos.c === c;
 
@@ -1661,31 +1675,34 @@ export default function App() {
                             <div
                               key={`cell-overlay-${r}-${c}`}
                               onClick={(e) => {
-                                if (lashablePlayer) {
-                                  e.stopPropagation();
-                                  sendEvent({ event: 'LASH_ATTACK', payload: { targetPlayerId: lashablePlayer.id } });
-                                } else if (isValidMove) {
-                                  e.stopPropagation();
-                                  handleMoveToken(targetPos);
-                                } else if (isKindleTarget) {
-                                  e.stopPropagation();
-                                  handlePlayCard('ash_kindle_storm', targetPos);
-                                } else if (isMiststepTarget) {
-                                  e.stopPropagation();
-                                  handlePlayCard('working_miststep', targetPos);
-                                }
+                                  if (lashablePlayer) {
+                                    e.stopPropagation();
+                                    sendEvent({ event: 'LASH_ATTACK', payload: { targetPlayerId: lashablePlayer.id } });
+                                  } else if (isValidMove) {
+                                    e.stopPropagation();
+                                    handleMoveToken(targetPos);
+                                  } else if (isKindleTarget) {
+                                    e.stopPropagation();
+                                    handlePlayCard('ash_kindle_storm', targetPos);
+                                  } else if (isMiststepTarget) {
+                                    e.stopPropagation();
+                                    handlePlayCard('working_miststep', targetPos);
+                                  } else if (isDonWolfTarget) {
+                                    e.stopPropagation();
+                                    handlePlayCard('working_don_wolf', targetPos);
+                                  }
                               }}
                               style={{
                                 position: 'relative',
-                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget) ? 'pointer' : 'default',
-                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isRaiseStoneCell) ? 'auto' : 'none',
+                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget) ? 'pointer' : 'default',
+                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isRaiseStoneCell) ? 'auto' : 'none',
                                 border: lashablePlayer
                                   ? '2px solid var(--accent-crimson)'
                                   : isValidMove
                                   ? '1.5px dashed var(--accent-green)'
                                   : isKindleTarget
                                   ? '2px solid var(--accent-crimson)'
-                                  : isMiststepTarget
+                                  : (isMiststepTarget || isDonWolfTarget)
                                   ? '1.5px dashed var(--accent-cyan)'
                                   : 'none',
                                 backgroundColor: lashablePlayer
@@ -1694,7 +1711,7 @@ export default function App() {
                                   ? 'rgba(0, 230, 118, 0.1)'
                                   : isKindleTarget
                                   ? 'rgba(255, 23, 68, 0.15)'
-                                  : isMiststepTarget
+                                  : (isMiststepTarget || isDonWolfTarget)
                                   ? 'rgba(0, 229, 255, 0.1)'
                                   : 'transparent',
                                 borderRadius: '4px',
@@ -1707,6 +1724,8 @@ export default function App() {
                                   ? 'Target with Kindle the Storm'
                                   : isMiststepTarget
                                   ? 'Teleport here'
+                                  : isDonWolfTarget
+                                  ? 'Wolf Leap here'
                                   : ''
                               }
                             >
@@ -1902,11 +1921,12 @@ export default function App() {
                   <div className="bear-charm-effect" style={{ left: pFrom.x, top: pFrom.y }} />
                 )}
 
-                {activeAnimation.cardId === 'working_don_wolf' && (
-                  <div className="don-wolf-effect" style={{ left: pFrom.x, top: pFrom.y }}>
-                    🐺
-                  </div>
-                )}
+                 {activeAnimation.cardId === 'working_don_wolf' && pTo && (
+                   <div className="don-wolf-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                     <div className="miststep-fadeout" style={{ left: pFrom.x, top: pFrom.y, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🐺</div>
+                     <div className="miststep-fadein" style={{ left: pTo.x, top: pTo.y, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🐺</div>
+                   </div>
+                 )}
 
                 {activeAnimation.cardId === 'offering_deep_breath' && (
                   <div className="deep-breath-effect" style={{ left: pFrom.x, top: pFrom.y }} />
@@ -2152,7 +2172,7 @@ export default function App() {
                   onMouseLeave={() => setHoveredCardId(null)}
                   onClick={() => {
                     if (!canCast) return;
-                    const noTargetNeeded = card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath';
+                    const noTargetNeeded = card.id === 'talisman_bear_charm' || card.id === 'offering_deep_breath';
                     if (isSelected) {
                       if (noTargetNeeded) {
                         handlePlayCard(card.id);

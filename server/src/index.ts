@@ -429,8 +429,7 @@ io.on('connection', (socket) => {
           const player = room.players[playerId];
           if (!player) return;
 
-          const isWolf = player.form === 'wolf';
-          if (!isWolf && player.ap < 1) {
+          if (player.ap < 1) {
             sendError(socket, 'No Action Points (AP) remaining.');
             return;
           }
@@ -464,9 +463,7 @@ io.on('connection', (socket) => {
             }
           }
 
-          if (!isWolf) {
-            player.ap--;
-          }
+          player.ap--;
 
           // Auto-pass if 0 AP
           if (player.ap === 0) {
@@ -766,13 +763,61 @@ io.on('connection', (socket) => {
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
           } else if (card.id === 'working_don_wolf') {
-            player.form = 'wolf';
+            if (!target) {
+              sendError(socket, 'Don the Wolf requires a target cell.');
+              return;
+            }
+            const targetTile = room.placedTiles[`${target.tileX},${target.tileY}`];
+            if (!targetTile) {
+              sendError(socket, 'Target cell must be on a placed tile.');
+              return;
+            }
+            // Check occupancy
+            const isOccupied = Object.values(room.tokenPositions).some(pos => {
+              return pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
+            });
+            if (isOccupied) {
+              sendError(socket, 'Target cell is already occupied by another player.');
+              return;
+            }
+            // Check distance <= 4 Manhattan
+            const from = room.tokenPositions[playerId];
+            if (!from) return;
+            const globalR_from = from.tileY * 5 + from.r;
+            const globalC_from = from.tileX * 5 + from.c;
+            const globalR_to = target.tileY * 5 + target.r;
+            const globalC_to = target.tileX * 5 + target.c;
+            const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
+            if (dist > 4) {
+              sendError(socket, 'Target is too far (max distance 4 cells).');
+              return;
+            }
 
-            broadcastSystemMessage(currentRoomCode, `${player.username} cast Don the Wolf, shifting into wolf form (moves cost 0 AP).`);
+            room.tokenPositions[playerId] = {
+              tileX: target.tileX,
+              tileY: target.tileY,
+              r: target.r,
+              c: target.c
+            };
+
+            // Update carried treasure if any
+            if (room.treasures) {
+              for (const treasureId of Object.keys(room.treasures)) {
+                const treasure = room.treasures[treasureId];
+                if (treasure.carrierId === playerId) {
+                  treasure.tileX = target.tileX;
+                  treasure.tileY = target.tileY;
+                  treasure.r = target.r;
+                  treasure.c = target.c;
+                }
+              }
+            }
+
+            broadcastSystemMessage(currentRoomCode, `${player.username} invoked Don the Wolf, leaping to Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
-              payload: { cardId: card.id, casterId: playerId }
+              payload: { cardId: card.id, casterId: playerId, target }
             };
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 

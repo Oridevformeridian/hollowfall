@@ -173,7 +173,7 @@ export const BASIC_CARDS: Card[] = [
     id: 'working_don_wolf',
     name: 'Don the Wolf',
     type: 'working',
-    description: 'Form: Transform into a Wolf. Moves cost 0 AP (speed boost!).'
+    description: 'Leap: Teleport up to 4 cells Manhattan distance, even around corners.'
   },
   {
     id: 'offering_deep_breath',
