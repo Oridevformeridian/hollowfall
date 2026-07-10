@@ -1997,16 +1997,7 @@ export default function App() {
                             overflow: 'hidden'
                           }}
                         >
-                          <div style={{
-                            position: 'absolute',
-                            top: '-10px',
-                            right: '-10px',
-                            width: '40px',
-                            height: '40px',
-                            background: cColor,
-                            transform: 'rotate(45deg)',
-                            opacity: 0.15
-                          }} />
+
 
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             <div style={{
@@ -2221,41 +2212,7 @@ export default function App() {
                     opacity: (targetingCardId && !isSelected) ? 0.5 : 1
                   }}
                 >
-                  {/* Circular AP Cost Indicator */}
-                  {!isOffering && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      left: '-6px',
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--accent-cyan)',
-                      color: 'black',
-                      fontSize: '9px',
-                      fontWeight: 'bold',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 0 4px var(--accent-cyan)',
-                      zIndex: 10
-                    }}>
-                      1
-                    </div>
-                  )}
 
-                  {/* Corner Accent */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '-6px',
-                    right: '-6px',
-                    width: '20px',
-                    height: '20px',
-                    background: typeColor,
-                    transform: 'rotate(45deg)',
-                    opacity: 0.15,
-                    pointerEvents: 'none'
-                  }} />
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                     <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
