@@ -296,6 +296,23 @@ describe('hasLineOfSight', () => {
     const res = validateTokenMove(from, to, lShapedTiles, {});
     expect(res.valid).toBe(true);
   });
+
+  it('should allow vertical wrap-around line-of-sight and movement on a 2-tile high board', () => {
+    const twoTilesVert: Record<string, PlacedTile> = {
+      '0,0': { tileId: 4, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '0,1': { tileId: 4, position: { x: 0, y: 1 }, rotation: 0, placedBy: 'p2' }
+    };
+    // From South edge of tile 0,1 to North edge of tile 0,0
+    const from: TokenPosition = { tileX: 0, tileY: 1, r: 4, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 0, c: 2 };
+    
+    // Check movement
+    const resMove = validateTokenMove(from, to, twoTilesVert, {});
+    expect(resMove.valid).toBe(true);
+
+    // Check LOS
+    expect(hasLineOfSight(from, to, twoTilesVert, {})).toBe(true);
+  });
 });
 
 describe('getWrappingManhattanDistance', () => {

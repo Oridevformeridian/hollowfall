@@ -173,8 +173,8 @@ export function checkWrapping(
 
   const isEastWrap = from.tileX === maxTileXOnRow && to.tileX === minTileXOnRow && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0;
   const isWestWrap = from.tileX === minTileXOnRow && to.tileX === maxTileXOnRow && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4;
-  const isNorthWrap = from.tileY === maxTileYOnCol && to.tileY === minTileYOnCol && dx === 0 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
-  const isSouthWrap = from.tileY === minTileYOnCol && to.tileY === maxTileYOnCol && dx === 0 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
+  const isNorthWrap = from.tileY === minTileYOnCol && to.tileY === maxTileYOnCol && dx === 0 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
+  const isSouthWrap = from.tileY === maxTileYOnCol && to.tileY === minTileYOnCol && dx === 0 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
 
   const isWrap = isEastWrap || isWestWrap || isNorthWrap || isSouthWrap;
 
