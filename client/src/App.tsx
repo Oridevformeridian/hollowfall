@@ -2058,107 +2058,120 @@ export default function App() {
                   }}
                   style={{
                     width: '110px',
-                    height: '160px',
-                    backgroundColor: 'rgba(15, 23, 42, 0.98)',
-                    border: isSelected ? '2px solid var(--accent-cyan)' : `1px solid ${typeColor}`,
-                    borderRadius: '12px',
-                    boxShadow: isSelected 
-                      ? `0 0 20px var(--accent-cyan)` 
-                      : isHovered 
-                      ? `0 0 12px ${typeColor}` 
-                      : `0 0 6px ${typeColor}22`,
-                    padding: '10px',
+                    height: raised ? '190px' : '55px',
+                    position: 'relative',
+                    cursor: canCast ? 'pointer' : 'not-allowed',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    cursor: canCast ? 'pointer' : 'not-allowed',
-                    transform: raised ? 'translateY(-110px) scale(1.05)' : 'translateY(15px)',
+                    justifyContent: 'flex-start',
+                    overflow: 'visible',
                     transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                    zIndex: raised ? 120 : 105,
-                    boxSizing: 'border-box',
-                    position: 'relative',
-                    opacity: (targetingCardId && !isSelected) ? 0.5 : 1
+                    zIndex: raised ? 120 : 105
                   }}
                 >
-                  {/* Circular AP Cost Indicator */}
-                  {!isOffering && (
+                  <div
+                    style={{
+                      width: '110px',
+                      height: '160px',
+                      backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                      border: isSelected ? '2px solid var(--accent-cyan)' : `1px solid ${typeColor}`,
+                      borderRadius: '12px',
+                      boxShadow: isSelected 
+                        ? `0 0 20px var(--accent-cyan)` 
+                        : isHovered 
+                        ? `0 0 12px ${typeColor}` 
+                        : `0 0 6px ${typeColor}22`,
+                      padding: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      transform: raised ? 'scale(1.05)' : 'scale(1)',
+                      transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                      boxSizing: 'border-box',
+                      position: 'relative',
+                      opacity: (targetingCardId && !isSelected) ? 0.5 : 1
+                    }}
+                  >
+                    {/* Circular AP Cost Indicator */}
+                    {!isOffering && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        left: '-6px',
+                        width: '16px',
+                        height: '16px',
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--accent-cyan)',
+                        color: 'black',
+                        fontSize: '9px',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 0 4px var(--accent-cyan)',
+                        zIndex: 10
+                      }}>
+                        1
+                      </div>
+                    )}
+
+                    {/* Corner Accent */}
                     <div style={{
                       position: 'absolute',
                       top: '-6px',
-                      left: '-6px',
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--accent-cyan)',
-                      color: 'black',
+                      right: '-6px',
+                      width: '20px',
+                      height: '20px',
+                      background: typeColor,
+                      transform: 'rotate(45deg)',
+                      opacity: 0.15,
+                      pointerEvents: 'none'
+                    }} />
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                        {card.type}
+                      </span>
+                      <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {card.name}
+                      </span>
+                    </div>
+
+                    {/* Description - visible only when raised */}
+                    <div style={{
                       fontSize: '9px',
-                      fontWeight: 'bold',
+                      color: '#94a3b8',
+                      lineHeight: '1.25',
+                      opacity: raised ? 1 : 0,
+                      transition: 'opacity 0.2s',
+                      flexGrow: 1,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 0 4px var(--accent-cyan)',
-                      zIndex: 10
+                      marginTop: '4px'
                     }}>
-                      1
+                      {card.description}
                     </div>
-                  )}
 
-                  {/* Corner Accent */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '-6px',
-                    right: '-6px',
-                    width: '20px',
-                    height: '20px',
-                    background: typeColor,
-                    transform: 'rotate(45deg)',
-                    opacity: 0.15,
-                    pointerEvents: 'none'
-                  }} />
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
-                      {card.type}
-                    </span>
-                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {card.name}
-                    </span>
-                  </div>
-
-                  {/* Description - visible only when raised */}
-                  <div style={{
-                    fontSize: '9px',
-                    color: '#94a3b8',
-                    lineHeight: '1.25',
-                    opacity: raised ? 1 : 0,
-                    transition: 'opacity 0.2s',
-                    flexGrow: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginTop: '4px'
-                  }}>
-                    {card.description}
-                  </div>
-
-                  {/* CTA Label - visible only when raised */}
-                  <div style={{
-                    fontSize: '8px',
-                    fontWeight: 'bold',
-                    color: isSelected ? 'var(--accent-cyan)' : '#64748b',
-                    textAlign: 'center',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    opacity: raised ? 1 : 0,
-                    transition: 'opacity 0.2s',
-                    marginTop: '2px'
-                  }}>
-                    {isWard
-                      ? '🛡️ Defense'
-                      : isSelected 
-                      ? (card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath'
-                        ? '➔ Click to Cast' 
-                        : '🎯 Target board') 
-                      : '⚡ Cast Rite'}
+                    {/* CTA Label - visible only when raised */}
+                    <div style={{
+                      fontSize: '8px',
+                      fontWeight: 'bold',
+                      color: isSelected ? 'var(--accent-cyan)' : '#64748b',
+                      textAlign: 'center',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      opacity: raised ? 1 : 0,
+                      transition: 'opacity 0.2s',
+                      marginTop: '2px'
+                    }}>
+                      {isWard
+                        ? '🛡️ Defense'
+                        : isSelected 
+                        ? (card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath'
+                          ? '➔ Click to Cast' 
+                          : '🎯 Target board') 
+                        : '⚡ Cast Rite'}
+                    </div>
                   </div>
                 </div>
               );
