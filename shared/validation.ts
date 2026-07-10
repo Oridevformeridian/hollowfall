@@ -336,6 +336,40 @@ export function hasLineOfSight(
 }
 
 /**
+ * Calculates the shortest Manhattan distance between two micro-grid coordinates on a wrapping board.
+ */
+export function getWrappingManhattanDistance(
+  from: TokenPosition,
+  to: TokenPosition,
+  placedTiles: Record<string, PlacedTile>
+): number {
+  const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
+  const xs = tileCoords.map(c => c[0]);
+  const ys = tileCoords.map(c => c[1]);
+  const minTileX = xs.length > 0 ? Math.min(...xs) : 0;
+  const maxTileX = xs.length > 0 ? Math.max(...xs) : 0;
+  const minTileY = ys.length > 0 ? Math.min(...ys) : 0;
+  const maxTileY = ys.length > 0 ? Math.max(...ys) : 0;
+
+  const boardWidth = (maxTileX - minTileX + 1) * 5;
+  const boardHeight = (maxTileY - minTileY + 1) * 5;
+
+  const globalR_from = from.tileY * 5 + from.r;
+  const globalC_from = from.tileX * 5 + from.c;
+  const globalR_to = to.tileY * 5 + to.r;
+  const globalC_to = to.tileX * 5 + to.c;
+
+  let diffC = Math.abs(globalC_to - globalC_from);
+  diffC = Math.min(diffC, boardWidth - diffC);
+
+  let diffR = Math.abs(globalR_to - globalR_from);
+  diffR = Math.min(diffR, boardHeight - diffR);
+
+  return diffC + diffR;
+}
+
+
+/**
  * Validates player token movement step.
  */
 export function validateTokenMove(

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -264,3 +264,25 @@ describe('hasLineOfSight', () => {
     expect(res.valid).toBe(true);
   });
 });
+
+describe('getWrappingManhattanDistance', () => {
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+    '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+  };
+
+  it('should calculate shortest path wrapping horizontally', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 4 };
+    // Straight distance is 9 subcells. Wrapping distance is 1 subcell.
+    expect(getWrappingManhattanDistance(from, to, placedTiles)).toBe(1);
+  });
+
+  it('should calculate shortest path wrapping vertically on 1-tile high board', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 0, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 4, c: 2 };
+    // Straight distance is 4 subcells. Wrapping distance is 1 subcell.
+    expect(getWrappingManhattanDistance(from, to, placedTiles)).toBe(1);
+  });
+});
+

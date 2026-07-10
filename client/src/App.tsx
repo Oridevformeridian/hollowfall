@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, getWrappingManhattanDistance } from './shared/validation.ts';
 
 const renderTileSvgContent = (
   layout: TileLayout,
@@ -1641,11 +1641,7 @@ export default function App() {
                           // 3. Miststep targeting
                           let isMiststepTarget = false;
                           if (targetingCardId === 'working_miststep' && isActiveTurn && myTokenPos) {
-                            const globalR_from = myTokenPos.tileY * 5 + myTokenPos.r;
-                            const globalC_from = myTokenPos.tileX * 5 + myTokenPos.c;
-                            const globalR_to = y * 5 + r;
-                            const globalC_to = x * 5 + c;
-                            const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
+                            const dist = getWrappingManhattanDistance(myTokenPos, targetPos, gameState.placedTiles);
                             const hasLos = hasLineOfSight(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
                             isMiststepTarget = dist <= 3 && !occupiedPlayerId && hasLos;
                           }
@@ -1653,11 +1649,7 @@ export default function App() {
                           // 3.5. Don the Wolf targeting
                           let isDonWolfTarget = false;
                           if (targetingCardId === 'working_don_wolf' && isActiveTurn && myTokenPos) {
-                            const globalR_from = myTokenPos.tileY * 5 + myTokenPos.r;
-                            const globalC_from = myTokenPos.tileX * 5 + myTokenPos.c;
-                            const globalR_to = y * 5 + r;
-                            const globalC_to = x * 5 + c;
-                            const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
+                            const dist = getWrappingManhattanDistance(myTokenPos, targetPos, gameState.placedTiles);
                             isDonWolfTarget = dist <= 4 && !occupiedPlayerId;
                           }
 

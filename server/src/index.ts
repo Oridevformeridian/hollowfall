@@ -3,7 +3,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, Card } from '../../shared/types';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight } from '../../shared/validation';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance } from '../../shared/validation';
 import { HEROES, BASIC_CARDS } from '../../shared/constants';
 
 const app = express();
@@ -689,14 +689,10 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
-            // Check distance <= 3 Manhattan
+            // Check distance <= 3 Manhattan (with wrap-around)
             const from = room.tokenPositions[playerId];
             if (!from) return;
-            const globalR_from = from.tileY * 5 + from.r;
-            const globalC_from = from.tileX * 5 + from.c;
-            const globalR_to = target.tileY * 5 + target.r;
-            const globalC_to = target.tileX * 5 + target.c;
-            const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
+            const dist = getWrappingManhattanDistance(from, target, room.placedTiles);
             if (dist > 3) {
               sendError(socket, 'Target is too far (max distance 3 cells).');
               return;
@@ -784,14 +780,10 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
-            // Check distance <= 4 Manhattan
+            // Check distance <= 4 Manhattan (with wrap-around)
             const from = room.tokenPositions[playerId];
             if (!from) return;
-            const globalR_from = from.tileY * 5 + from.r;
-            const globalC_from = from.tileX * 5 + from.c;
-            const globalR_to = target.tileY * 5 + target.r;
-            const globalC_to = target.tileX * 5 + target.c;
-            const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
+            const dist = getWrappingManhattanDistance(from, target, room.placedTiles);
             if (dist > 4) {
               sendError(socket, 'Target is too far (max distance 4 cells).');
               return;
