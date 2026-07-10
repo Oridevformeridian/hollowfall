@@ -87,4 +87,5 @@ export type ClientMessage =
 
 export type ServerMessage =
   | { event: 'STATE_UPDATE'; payload: GameState }
+  | { event: 'PLAY_CARD_ANIMATION'; payload: { cardId: string; casterId: string; target?: any; countered?: 'turn_aside' | 'spirit_skin' | null } }
   | { event: 'ERROR'; payload: { message: string } };

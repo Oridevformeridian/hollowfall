@@ -608,10 +608,11 @@ io.on('connection', (socket) => {
             // Mark attack used
             player.hasAttackedThisTurn = true;
 
-            // Auto Ward response checking
-            const turnAsideIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_turn_aside');
-            const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
- 
+             // Auto Ward response checking
+             const turnAsideIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_turn_aside');
+             const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
+
+             const countered = turnAsideIndex !== -1 ? 'turn_aside' : spiritSkinIndex !== -1 ? 'spirit_skin' : null;
             if (turnAsideIndex !== -1) {
               targetPlayer.hand.splice(turnAsideIndex, 1);
               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Turn Aside to counter Kindle the Storm!`);
@@ -623,6 +624,12 @@ io.on('connection', (socket) => {
               targetPlayer.thread = Math.max(0, targetPlayer.thread - 3);
               broadcastSystemMessage(currentRoomCode, `${player.username} cast Kindle the Storm on ${targetPlayer.username} for 3 damage!`);
             }
+
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId, target, countered }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
  
             // Victory check / Death respawn
             if (targetPlayer.thread <= 0) {
@@ -704,6 +711,12 @@ io.on('connection', (socket) => {
               c: target.c
             };
 
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId, target }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
           } else if (card.id === 'working_raise_stone') {
             if (!target || target.direction === undefined) {
               sendError(socket, 'Raise Stone requires a target border.');
@@ -730,15 +743,39 @@ io.on('connection', (socket) => {
             const wallKey = `${target.tileX},${target.tileY}:${target.r},${target.c}:${target.direction}`;
             room.wallsState[wallKey] = true;
 
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId, target }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
           } else if (card.id === 'talisman_bear_charm') {
             player.maxThread += 2;
             player.thread = Math.min(player.maxThread, player.thread + 2);
 
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
           } else if (card.id === 'working_don_wolf') {
             player.form = 'wolf';
 
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
           } else if (card.id === 'offering_deep_breath') {
             player.ap += 2;
+
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
           } else {
             sendError(socket, 'Unknown card played.');

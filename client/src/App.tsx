@@ -318,6 +318,18 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [targetingCardId, setTargetingCardId] = useState<string | null>(null);
   const [playedGameOverSound, setPlayedGameOverSound] = useState(false);
+  const [activeAnimation, setActiveAnimation] = useState<{
+    cardId: string;
+    casterId: string;
+    from: { tileX: number; tileY: number; r: number; c: number };
+    to?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' };
+    countered?: 'turn_aside' | 'spirit_skin' | null;
+  } | null>(null);
+
+  const gameStateRef = React.useRef(gameState);
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
 
   useEffect(() => {
     if (gameState?.phase === 'GAME_OVER') {
@@ -371,6 +383,21 @@ export default function App() {
         if (msg.event === 'STATE_UPDATE') {
           setGameState(msg.payload);
           setError(null);
+        } else if (msg.event === 'PLAY_CARD_ANIMATION') {
+          const { cardId, casterId, target, countered } = msg.payload;
+          const casterPos = gameStateRef.current?.tokenPositions[casterId];
+          if (casterPos) {
+            setActiveAnimation({
+              cardId,
+              casterId,
+              from: { ...casterPos },
+              to: target ? { ...target } : undefined,
+              countered
+            });
+            setTimeout(() => {
+              setActiveAnimation(null);
+            }, 1500);
+          }
         } else if (msg.event === 'ERROR') {
           setError(msg.payload.message);
         }
@@ -911,6 +938,32 @@ export default function App() {
   const cellWidth = gameState.phase === 'GAMEPLAY' ? 320 : 110;
   const subCellSize = cellWidth / 5;
   const tokenSize = Math.floor(subCellSize * 0.8);
+
+  const getCellCoords = (tileX: number, tileY: number, r: number, c: number) => {
+    const colIdx = tileX - minX;
+    const rowIdx = tileY - minY;
+    const x = 24 + colIdx * (cellWidth + 16) + c * subCellSize + subCellSize / 2;
+    const y = 24 + rowIdx * (cellWidth + 16) + r * subCellSize + subCellSize / 2;
+    return { x, y };
+  };
+
+  const getBorderCoords = (tileX: number, tileY: number, r: number, c: number, direction: 'H' | 'V') => {
+    const colIdx = tileX - minX;
+    const rowIdx = tileY - minY;
+    const tileLeft = 24 + colIdx * (cellWidth + 16);
+    const tileTop = 24 + rowIdx * (cellWidth + 16);
+    if (direction === 'H') {
+      return {
+        x: tileLeft + c * subCellSize + subCellSize / 2,
+        y: tileTop + (r + 1) * subCellSize
+      };
+    } else {
+      return {
+        x: tileLeft + (c + 1) * subCellSize,
+        y: tileTop + r * subCellSize + subCellSize / 2
+      };
+    }
+  };
 
   const isMobile = dimensions.width <= 768;
   const availableWidth = dimensions.width - (isMobile ? 0 : 320) - 80;
@@ -1727,6 +1780,75 @@ export default function App() {
               </div>
             );
           })}
+
+          {/* Spell Animations Overlay */}
+          {activeAnimation && (() => {
+            const pFrom = getCellCoords(activeAnimation.from.tileX, activeAnimation.from.tileY, activeAnimation.from.r, activeAnimation.from.c);
+            let pTo = activeAnimation.to ? getCellCoords(activeAnimation.to.tileX, activeAnimation.to.tileY, activeAnimation.to.r, activeAnimation.to.c) : null;
+            if (activeAnimation.cardId === 'working_raise_stone' && activeAnimation.to && activeAnimation.to.direction) {
+              pTo = getBorderCoords(activeAnimation.to.tileX, activeAnimation.to.tileY, activeAnimation.to.r, activeAnimation.to.c, activeAnimation.to.direction);
+            }
+
+            return (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  pointerEvents: 'none',
+                  zIndex: 100,
+                  gridColumn: '1 / -1',
+                  gridRow: '1 / -1'
+                }}
+              >
+                {activeAnimation.cardId === 'ash_kindle_storm' && pTo && (
+                  <div
+                    className="kindle-spell-effect"
+                    style={{
+                      '--from-x': `${pFrom.x}px`,
+                      '--from-y': `${pFrom.y}px`,
+                      '--to-x': `${pTo.x}px`,
+                      '--to-y': `${pTo.y}px`
+                    } as React.CSSProperties}
+                  >
+                    <div className="caster-glow" style={{ left: pFrom.x, top: pFrom.y }} />
+                    <div className="kindle-projectile" />
+                    <div className="kindle-explosion" style={{ left: pTo.x, top: pTo.y }} />
+                    {activeAnimation.countered && (
+                      <div className="shield-effect" style={{ left: pTo.x, top: pTo.y }} />
+                    )}
+                  </div>
+                )}
+
+                {activeAnimation.cardId === 'working_miststep' && pTo && (
+                  <div className="miststep-effect">
+                    <div className="miststep-fadeout" style={{ left: pFrom.x, top: pFrom.y }} />
+                    <div className="miststep-fadein" style={{ left: pTo.x, top: pTo.y }} />
+                  </div>
+                )}
+
+                {activeAnimation.cardId === 'working_raise_stone' && pTo && (
+                  <div className="raise-stone-effect" style={{ left: pTo.x, top: pTo.y }} />
+                )}
+
+                {activeAnimation.cardId === 'talisman_bear_charm' && (
+                  <div className="bear-charm-effect" style={{ left: pFrom.x, top: pFrom.y }} />
+                )}
+
+                {activeAnimation.cardId === 'working_don_wolf' && (
+                  <div className="don-wolf-effect" style={{ left: pFrom.x, top: pFrom.y }}>
+                    🐺
+                  </div>
+                )}
+
+                {activeAnimation.cardId === 'offering_deep_breath' && (
+                  <div className="deep-breath-effect" style={{ left: pFrom.x, top: pFrom.y }} />
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
