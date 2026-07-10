@@ -2058,7 +2058,7 @@ export default function App() {
                   }}
                   style={{
                     width: '110px',
-                    height: raised ? '190px' : '55px',
+                    height: raised ? '195px' : '55px',
                     position: 'relative',
                     cursor: canCast ? 'pointer' : 'not-allowed',
                     display: 'flex',
@@ -2072,7 +2072,7 @@ export default function App() {
                   <div
                     style={{
                       width: '110px',
-                      height: '160px',
+                      height: '165px',
                       backgroundColor: 'rgba(15, 23, 42, 0.98)',
                       border: isSelected ? '2px solid var(--accent-cyan)' : `1px solid ${typeColor}`,
                       borderRadius: '12px',
