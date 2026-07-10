@@ -755,7 +755,7 @@ export default function App() {
           }}
         >
           <div className="flex flex-col items-center justify-center border-b border-[var(--border-light)] pb-4 text-center gap-1.5">
-            <div className="flex items-center gap-2 justify-center">
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
               <h2 className="text-2xl font-bold text-[var(--accent-cyan)] m-0">Lobby Room: {gameState.roomCode}</h2>
               <button
                 onClick={handleCopyRoomCode}
