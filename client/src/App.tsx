@@ -518,6 +518,10 @@ export default function App() {
     sendEvent({ event: 'RESET_GAME' });
   };
 
+  const handleConcede = () => {
+    sendEvent({ event: 'CONCEDE' });
+  };
+
   const handleCopyRoomCode = () => {
     if (gameState?.roomCode) {
       navigator.clipboard.writeText(gameState.roomCode);
@@ -1261,9 +1265,9 @@ export default function App() {
                 </button>
               )}
 
-              {/* Reset / Exit Match Button */}
+              {/* Concede Button */}
               <button
-                onClick={handleResetGame}
+                onClick={handleConcede}
                 className="btn-secondary"
                 style={{
                   width: '100%',
@@ -1275,7 +1279,7 @@ export default function App() {
                   padding: '6px 0',
                 }}
               >
-                🚪 Quit to Lobby
+                🏳️ Concede
               </button>
             </div>
           )}

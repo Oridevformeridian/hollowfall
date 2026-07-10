@@ -18,6 +18,7 @@ export interface Player {
   hasAttackedThisTurn: boolean;
   isFirstTurnOfMatch: boolean;
   form: 'normal' | 'wolf';
+  hasConceded?: boolean;
 }
 
 export interface Treasure {
@@ -83,7 +84,8 @@ export type ClientMessage =
   | { event: 'RESET_GAME' }
   | { event: 'LASH_ATTACK'; payload: { targetPlayerId: string } }
   | { event: 'PICKUP_TREASURE'; payload: { treasureId: string } }
-  | { event: 'DROP_TREASURE'; payload: { treasureId: string } };
+  | { event: 'DROP_TREASURE'; payload: { treasureId: string } }
+  | { event: 'CONCEDE' };
 
 export type ServerMessage =
   | { event: 'STATE_UPDATE'; payload: GameState }

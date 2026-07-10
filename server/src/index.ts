@@ -1126,6 +1126,78 @@ io.on('connection', (socket) => {
           break;
         }
 
+        case 'CONCEDE': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'GAMEPLAY') return;
+
+          const player = room.players[playerId];
+          if (!player) return;
+
+          player.hasConceded = true;
+          broadcastSystemMessage(currentRoomCode, `${player.username} has conceded.`);
+
+          // Drop any carried treasures
+          if (room.treasures && room.tokenPositions[playerId]) {
+            const pos = room.tokenPositions[playerId];
+            for (const tId of Object.keys(room.treasures)) {
+              const treasure = room.treasures[tId];
+              if (treasure.carrierId === playerId) {
+                treasure.carrierId = null;
+                treasure.tileX = pos.tileX;
+                treasure.tileY = pos.tileY;
+                treasure.r = pos.r;
+                treasure.c = pos.c;
+              }
+            }
+          }
+
+          // Remove conceded player from token positions
+          delete room.tokenPositions[playerId];
+
+          // Filter out conceded players to find remaining active players
+          const nonConcededPlayers = Object.values(room.players).filter(p => !p.hasConceded);
+
+          if (nonConcededPlayers.length <= 1) {
+            // End the game
+            room.phase = 'GAME_OVER';
+            // Give victory points to the remaining player if there is one
+            if (nonConcededPlayers.length === 1) {
+              const winner = nonConcededPlayers[0];
+              winner.severPoints = Math.max(winner.severPoints || 0, 2);
+              recalculatePoints(room);
+              broadcastSystemMessage(currentRoomCode, `Game Over! ${winner.username} is victorious!`);
+            }
+          } else {
+            // More than 1 player remains. The game continues.
+            // If it was the conceding player's turn, we must pass the turn first.
+            const activePlayerId = room.turnOrder[room.activePlayerIndex];
+            if (playerId === activePlayerId) {
+              passTurn(room);
+            }
+
+            // Capture the ID of the player whose turn it now is
+            const currentTurnPlayerId = room.turnOrder[room.activePlayerIndex];
+
+            // Filter out the conceding player from turnOrder
+            room.turnOrder = room.turnOrder.filter(id => id !== playerId);
+
+            // Re-align activePlayerIndex
+            const newIndex = room.turnOrder.indexOf(currentTurnPlayerId);
+            if (newIndex !== -1) {
+              room.activePlayerIndex = newIndex;
+            } else {
+              room.activePlayerIndex = 0;
+            }
+            
+            // Re-calculate points
+            recalculatePoints(room);
+          }
+
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
         default:
           sendError(socket, 'Unhandled event type.');
       }
