@@ -2085,7 +2085,6 @@ export default function App() {
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
-                      transform: raised ? 'scale(1.05)' : 'scale(1)',
                       transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
                       boxSizing: 'border-box',
                       position: 'relative',
