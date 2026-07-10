@@ -1590,35 +1590,40 @@ export default function App() {
                           const c = idx % 5;
                           const targetPos = { tileX: x, tileY: y, r, c };
 
+                          // Find if any player occupies this specific subcell (r, c) on tile (x, y)
+                          const occupiedPlayerId = Object.keys(gameState.tokenPositions).find(pId => {
+                            const pos = gameState.tokenPositions[pId];
+                            return pos.tileX === x && pos.tileY === y && pos.r === r && pos.c === c;
+                          });
+
                           // Check if this cell contains a lashable player
-                           const lashablePlayer = !targetingCardId && gameState && myTokenPos && self && isActiveTurn && self.ap > 0 && !self.hasAttackedThisTurn && !self.isFirstTurnOfMatch
-                             ? Object.values(gameState.players).find(p => {
-                                 if (p.id === socket?.id || p.thread <= 0) return false;
-                                 const toPos = gameState.tokenPositions[p.id];
-                                 if (!toPos) return false;
-                                 if (toPos.tileX !== x || toPos.tileY !== y || toPos.r !== r || toPos.c !== c) return false;
+                          const lashablePlayer = !targetingCardId && gameState && myTokenPos && self && isActiveTurn && self.ap > 0 && !self.hasAttackedThisTurn && !self.isFirstTurnOfMatch && occupiedPlayerId && occupiedPlayerId !== socket?.id
+                            ? (() => {
+                                const p = gameState.players[occupiedPlayerId];
+                                if (!p || p.thread <= 0) return null;
+                                const toPos = gameState.tokenPositions[occupiedPlayerId];
+                                const dr = Math.abs(toPos.r - myTokenPos.r);
+                                const dc = Math.abs(toPos.c - myTokenPos.c);
+                                const dx = toPos.tileX - myTokenPos.tileX;
+                                const dy = toPos.tileY - myTokenPos.tileY;
+                                const dtX = Math.abs(dx);
+                                const dtY = Math.abs(dy);
 
-                                 const dr = Math.abs(toPos.r - myTokenPos.r);
-                                 const dc = Math.abs(toPos.c - myTokenPos.c);
-                                 const dx = toPos.tileX - myTokenPos.tileX;
-                                 const dy = toPos.tileY - myTokenPos.tileY;
-                                 const dtX = Math.abs(dx);
-                                 const dtY = Math.abs(dy);
+                                const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
+                                const isAdjacent = (dtX <= 1 && dtY <= 1) && (
+                                  (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
+                                  (dx === 1 && dy === 0 && myTokenPos.r === 2 && myTokenPos.c === 4 && toPos.r === 2 && toPos.c === 0) ||
+                                  (dx === -1 && dy === 0 && myTokenPos.r === 2 && myTokenPos.c === 0 && toPos.r === 2 && toPos.c === 4) ||
+                                  (dx === 0 && dy === 1 && myTokenPos.r === 0 && myTokenPos.c === 2 && toPos.r === 4 && toPos.c === 2) ||
+                                  (dx === 0 && dy === -1 && myTokenPos.r === 4 && myTokenPos.c === 2 && toPos.r === 0 && toPos.c === 2)
+                                );
 
-                                 const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
-                                 const isAdjacent = (dtX <= 1 && dtY <= 1) && (
-                                   (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
-                                   (dx === 1 && dy === 0 && myTokenPos.r === 2 && myTokenPos.c === 4 && toPos.r === 2 && toPos.c === 0) ||
-                                   (dx === -1 && dy === 0 && myTokenPos.r === 2 && myTokenPos.c === 0 && toPos.r === 2 && toPos.c === 4) ||
-                                   (dx === 0 && dy === 1 && myTokenPos.r === 0 && myTokenPos.c === 2 && toPos.r === 4 && toPos.c === 2) ||
-                                   (dx === 0 && dy === -1 && myTokenPos.r === 4 && myTokenPos.c === 2 && toPos.r === 0 && toPos.c === 2)
-                                 );
-
-                                 if (!isSameCell && !isAdjacent) return false;
-                                 
-                                 return hasLineOfSight(myTokenPos, toPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
-                               })
-                             : null;
+                                if (!isSameCell && !isAdjacent) return null;
+                                
+                                const hasLos = hasLineOfSight(myTokenPos, toPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
+                                return hasLos ? p : null;
+                              })()
+                            : null;
 
                           // 1. Regular token movement highlight
                           const isValidMove = !targetingCardId && !lashablePlayer && myTokenPos && isActiveTurn && self && self.ap > 0 && validateTokenMove(
@@ -1631,14 +1636,7 @@ export default function App() {
                           ).valid;
 
                           // 2. Kindle the Storm targeting
-                          let isKindleTarget = false;
-                          if (targetingCardId === 'ash_kindle_storm' && isActiveTurn) {
-                            const occupiedPlayerId = Object.keys(gameState.tokenPositions).find(pId => {
-                              const pos = gameState.tokenPositions[pId];
-                              return pos.tileX === x && pos.tileY === y && pos.r === r && pos.c === c;
-                            });
-                            isKindleTarget = !!occupiedPlayerId && occupiedPlayerId !== socket?.id;
-                          }
+                          const isKindleTarget = targetingCardId === 'ash_kindle_storm' && isActiveTurn && !!occupiedPlayerId && occupiedPlayerId !== socket?.id;
 
                           // 3. Miststep targeting
                           let isMiststepTarget = false;
@@ -1648,12 +1646,8 @@ export default function App() {
                             const globalR_to = y * 5 + r;
                             const globalC_to = x * 5 + c;
                             const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
-                            const isOccupied = Object.values(gameState.tokenPositions).some(pos => {
-                              return pos.tileX === x && pos.tileY === y && pos.r === r && pos.c === c;
-                            });
-                            const targetPos = { tileX: x, tileY: y, r, c };
                             const hasLos = hasLineOfSight(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
-                            isMiststepTarget = dist <= 3 && !isOccupied && hasLos;
+                            isMiststepTarget = dist <= 3 && !occupiedPlayerId && hasLos;
                           }
 
                           // 3.5. Don the Wolf targeting
@@ -1664,10 +1658,7 @@ export default function App() {
                             const globalR_to = y * 5 + r;
                             const globalC_to = x * 5 + c;
                             const dist = Math.abs(globalR_from - globalR_to) + Math.abs(globalC_from - globalC_to);
-                            const isOccupied = Object.values(gameState.tokenPositions).some(pos => {
-                              return pos.tileX === x && pos.tileY === y && pos.r === r && pos.c === c;
-                            });
-                            isDonWolfTarget = dist <= 4 && !isOccupied;
+                            isDonWolfTarget = dist <= 4 && !occupiedPlayerId;
                           }
 
                           // 4. Raise Stone cell detection (player's current cell)
@@ -1694,10 +1685,20 @@ export default function App() {
                                     handlePlayCard('working_don_wolf', targetPos);
                                   }
                               }}
+                              onMouseEnter={() => {
+                                if (occupiedPlayerId) {
+                                  setHoveredPlayerId(occupiedPlayerId);
+                                }
+                              }}
+                              onMouseLeave={() => {
+                                if (occupiedPlayerId) {
+                                  setHoveredPlayerId(null);
+                                }
+                              }}
                               style={{
                                 position: 'relative',
-                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget) ? 'pointer' : 'default',
-                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isRaiseStoneCell) ? 'auto' : 'none',
+                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || occupiedPlayerId) ? 'pointer' : 'default',
+                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isRaiseStoneCell || occupiedPlayerId) ? 'auto' : 'none',
                                 border: lashablePlayer
                                   ? '2px solid var(--accent-crimson)'
                                   : isValidMove
@@ -1818,8 +1819,6 @@ export default function App() {
                         return (
                           <div
                             key={pId}
-                            onMouseEnter={() => setHoveredPlayerId(pId)}
-                            onMouseLeave={() => setHoveredPlayerId(null)}
                             style={{
                               position: 'absolute',
                               left: `${pos.c * subCellSize}px`,
@@ -1833,8 +1832,8 @@ export default function App() {
                               justifyContent: 'center',
                               filter: `drop-shadow(0 0 6px ${player?.color})`,
                               zIndex: 30,
-                              pointerEvents: 'auto',
-                              cursor: 'pointer'
+                              pointerEvents: 'none',
+                              cursor: 'default'
                             }}
                             className="floating-emoji"
                           >
