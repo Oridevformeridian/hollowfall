@@ -2139,9 +2139,10 @@ export default function App() {
               padding: '0 24px'
             }}
           >
-            {self.hand.map((card) => {
-              const isSelected = selectedCardId === card.id;
-              const isHovered = hoveredCardId === card.id;
+            {self.hand.map((card, idx) => {
+              const cardKey = `${card.id}-${idx}`;
+              const isSelected = selectedCardId === cardKey;
+              const isHovered = hoveredCardId === cardKey;
 
               const isBane = card.type === 'bane';
               const isWard = card.type === 'ward';
@@ -2162,8 +2163,8 @@ export default function App() {
 
               return (
                 <div
-                  key={card.id}
-                  onMouseEnter={() => setHoveredCardId(card.id)}
+                  key={cardKey}
+                  onMouseEnter={() => setHoveredCardId(cardKey)}
                   onMouseLeave={() => setHoveredCardId(null)}
                   onClick={() => {
                     if (!canCast) return;
@@ -2177,7 +2178,7 @@ export default function App() {
                         setSelectedCardId(null);
                       }
                     } else {
-                      setSelectedCardId(card.id);
+                      setSelectedCardId(cardKey);
                       if (!noTargetNeeded) {
                         setTargetingCardId(card.id);
                       } else {
