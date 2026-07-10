@@ -217,8 +217,7 @@ io.on('connection', (socket) => {
           // Check if this is a reconnection attempt
           const existingReconnectingPlayer = Object.values(room.players).find(p => 
             p.username.toLowerCase() === requestedName.toLowerCase() && 
-            p.sessionToken && 
-            p.sessionToken === sessionToken
+            (p.isDisconnected || (sessionToken && p.sessionToken === sessionToken))
           );
 
           if (existingReconnectingPlayer) {
