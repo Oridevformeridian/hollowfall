@@ -396,6 +396,17 @@ export default function App() {
         if (msg.event === 'STATE_UPDATE') {
           setGameState(msg.payload);
           setError(null);
+          
+          // Store session token for reconnection resilience
+          if (username) {
+            const myPlayer = Object.values(msg.payload.players).find(
+              (p: any) => p.username.toLowerCase() === username.toLowerCase()
+            );
+            if (myPlayer && myPlayer.sessionToken) {
+              const cleanRoom = msg.payload.roomCode.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+              localStorage.setItem(`hollowfall_session_${cleanRoom}_${myPlayer.username.toLowerCase()}`, myPlayer.sessionToken);
+            }
+          }
         } else if (msg.event === 'PLAY_CARD_ANIMATION') {
           const { cardId, casterId, target, countered } = msg.payload;
           const casterPos = gameStateRef.current?.tokenPositions[casterId];
@@ -440,9 +451,13 @@ export default function App() {
       setError('Username and Room Code are required.');
       return;
     }
+    const cleanRoomCode = roomCode.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+    const cleanUsername = username.trim().toLowerCase();
+    const sessionToken = localStorage.getItem(`hollowfall_session_${cleanRoomCode}_${cleanUsername}`) || undefined;
+
     sendEvent({
       event: 'JOIN_ROOM',
-      payload: { username, roomCode, color: '', emoji: '' }
+      payload: { username, roomCode, color: '', emoji: '', sessionToken }
     });
   };
 
@@ -453,9 +468,14 @@ export default function App() {
     }
     const newRoomCode = generateLobbyName();
     setRoomCode(newRoomCode);
+    
+    const cleanRoomCode = newRoomCode.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+    const cleanUsername = username.trim().toLowerCase();
+    const sessionToken = localStorage.getItem(`hollowfall_session_${cleanRoomCode}_${cleanUsername}`) || undefined;
+
     sendEvent({
       event: 'JOIN_ROOM',
-      payload: { username, roomCode: newRoomCode, color: '', emoji: '' }
+      payload: { username, roomCode: newRoomCode, color: '', emoji: '', sessionToken }
     });
   };
 
@@ -1380,8 +1400,8 @@ export default function App() {
                   }}
                 >
                   <span style={{ fontSize: '22px', lineHeight: '1' }}>{player.emoji}</span>
-                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
-                    {player.username} {pId === socket?.id && '(You)'}
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
+                    {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && ' (Offline)'}
                   </span>
                 </div>
               );
@@ -1423,12 +1443,12 @@ export default function App() {
                 <span style={{ fontSize: '24px' }}>{player.emoji}</span>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
-                      {player.username} {isMe && '(You)'}
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
+                      {player.username} {isMe && '(You)'} {player.isDisconnected && ' (Offline)'}
                     </span>
                   </div>
-                  <span style={{ fontSize: '10px', color: '#64748b' }}>
-                    {isActive ? 'Active Turn' : 'Waiting...'}
+                  <span style={{ fontSize: '10px', color: player.isDisconnected ? '#ef4444' : '#64748b' }}>
+                    {player.isDisconnected ? 'Disconnected' : isActive ? 'Active Turn' : 'Waiting...'}
                   </span>
                 </div>
               </div>

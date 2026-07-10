@@ -19,6 +19,77 @@ const io = new Server(server, {
 
 // In-memory store for game rooms
 const rooms = new Map<string, GameState>();
+const disconnectTimers = new Map<string, NodeJS.Timeout>();
+
+function concedePlayer(roomCode: string, pId: string) {
+  const room = rooms.get(roomCode);
+  if (!room || room.phase !== 'GAMEPLAY' && room.phase !== 'PLACEMENT') return;
+
+  const player = room.players[pId];
+  if (!player) return;
+
+  player.hasConceded = true;
+  broadcastSystemMessage(roomCode, `${player.username} has conceded.`);
+
+  // Drop any carried treasures
+  if (room.treasures && room.tokenPositions[pId]) {
+    const pos = room.tokenPositions[pId];
+    for (const tId of Object.keys(room.treasures)) {
+      const treasure = room.treasures[tId];
+      if (treasure.carrierId === pId) {
+        treasure.carrierId = null;
+        treasure.tileX = pos.tileX;
+        treasure.tileY = pos.tileY;
+        treasure.r = pos.r;
+        treasure.c = pos.c;
+      }
+    }
+  }
+
+  // Remove conceded player from token positions
+  delete room.tokenPositions[pId];
+
+  // Filter out conceded players to find remaining active players
+  const nonConcededPlayers = Object.values(room.players).filter(p => !p.hasConceded);
+
+  if (nonConcededPlayers.length <= 1) {
+    // End the game
+    room.phase = 'GAME_OVER';
+    // Give victory points to the remaining player if there is one
+    if (nonConcededPlayers.length === 1) {
+      const winner = nonConcededPlayers[0];
+      winner.severPoints = Math.max(winner.severPoints || 0, 2);
+      recalculatePoints(room);
+      broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
+    }
+  } else {
+    // More than 1 player remains. The game continues.
+    // If it was the conceding player's turn, we must pass the turn first.
+    const activePlayerId = room.turnOrder[room.activePlayerIndex];
+    if (pId === activePlayerId) {
+      passTurn(room);
+    }
+
+    // Capture the ID of the player whose turn it now is
+    const currentTurnPlayerId = room.turnOrder[room.activePlayerIndex];
+
+    // Filter out the conceding player from turnOrder
+    room.turnOrder = room.turnOrder.filter(id => id !== pId);
+
+    // Re-align activePlayerIndex
+    const newIndex = room.turnOrder.indexOf(currentTurnPlayerId);
+    if (newIndex !== -1) {
+      room.activePlayerIndex = newIndex;
+    } else {
+      room.activePlayerIndex = 0;
+    }
+    
+    // Re-calculate points
+    recalculatePoints(room);
+  }
+
+  broadcastState(roomCode, room);
+}
 
 // Generate a random color if not specified
 const getRandomColor = () => {
@@ -113,7 +184,7 @@ io.on('connection', (socket) => {
 
       switch (message.event) {
         case 'JOIN_ROOM': {
-          const { username, roomCode, color, emoji } = message.payload;
+          const { username, roomCode, color, emoji, sessionToken } = message.payload;
           const targetRoomCode = roomCode.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
 
           if (!targetRoomCode) {
@@ -141,7 +212,37 @@ io.on('connection', (socket) => {
           }
 
           const existingPlayers = Object.values(room.players);
+          const requestedName = username.trim() || `Player_${playerId.substring(0, 4)}`;
 
+          // Check if this is a reconnection attempt
+          const existingReconnectingPlayer = Object.values(room.players).find(p => 
+            p.username.toLowerCase() === requestedName.toLowerCase() && 
+            p.sessionToken && 
+            p.sessionToken === sessionToken
+          );
+
+          if (existingReconnectingPlayer) {
+            // Reconnection path!
+            playerId = existingReconnectingPlayer.id; // Map this connection's playerId to the existing player ID
+            existingReconnectingPlayer.isDisconnected = false;
+            
+            // Clear reconnection/concession timer if active
+            const timerKey = `${targetRoomCode}:${playerId}`;
+            if (disconnectTimers.has(timerKey)) {
+              clearTimeout(disconnectTimers.get(timerKey));
+              disconnectTimers.delete(timerKey);
+            }
+
+            currentRoomCode = targetRoomCode;
+            socket.join(targetRoomCode);
+
+            console.log(`Player ${existingReconnectingPlayer.username} reconnected to room ${targetRoomCode}`);
+            broadcastSystemMessage(targetRoomCode, `${existingReconnectingPlayer.username} reconnected.`);
+            broadcastState(targetRoomCode, room);
+            break;
+          }
+
+          // Normal new player join path:
           // Room is full constraint (max 6 players)
           if (existingPlayers.length >= 6 && !room.players[playerId]) {
             sendError(socket, 'Room is full.');
@@ -154,7 +255,6 @@ io.on('connection', (socket) => {
           }
 
           // Ensure username is unique in this room
-          const requestedName = username.trim() || `Player_${playerId.substring(0, 4)}`;
           const nameExists = existingPlayers.some(p => p.id !== playerId && p.username.toLowerCase() === requestedName.toLowerCase());
           if (nameExists) {
             sendError(socket, 'Username is already taken in this room.');
@@ -179,9 +279,10 @@ io.on('connection', (socket) => {
 
           // Add player
           const isHost = existingPlayers.length === 0;
+          const newSessionToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
           const player: Player = {
             id: playerId,
-            username: username.trim() || `Player_${playerId.substring(0, 4)}`,
+            username: requestedName,
             color: playerColor,
             emoji: playerEmoji,
             isReady: false,
@@ -195,7 +296,8 @@ io.on('connection', (socket) => {
             severPoints: 0,
             hasAttackedThisTurn: false,
             isFirstTurnOfMatch: true,
-            form: 'normal'
+            form: 'normal',
+            sessionToken: newSessionToken
           };
 
           room.players[playerId] = player;
@@ -1128,73 +1230,7 @@ io.on('connection', (socket) => {
 
         case 'CONCEDE': {
           if (!currentRoomCode) return;
-          const room = rooms.get(currentRoomCode);
-          if (!room || room.phase !== 'GAMEPLAY') return;
-
-          const player = room.players[playerId];
-          if (!player) return;
-
-          player.hasConceded = true;
-          broadcastSystemMessage(currentRoomCode, `${player.username} has conceded.`);
-
-          // Drop any carried treasures
-          if (room.treasures && room.tokenPositions[playerId]) {
-            const pos = room.tokenPositions[playerId];
-            for (const tId of Object.keys(room.treasures)) {
-              const treasure = room.treasures[tId];
-              if (treasure.carrierId === playerId) {
-                treasure.carrierId = null;
-                treasure.tileX = pos.tileX;
-                treasure.tileY = pos.tileY;
-                treasure.r = pos.r;
-                treasure.c = pos.c;
-              }
-            }
-          }
-
-          // Remove conceded player from token positions
-          delete room.tokenPositions[playerId];
-
-          // Filter out conceded players to find remaining active players
-          const nonConcededPlayers = Object.values(room.players).filter(p => !p.hasConceded);
-
-          if (nonConcededPlayers.length <= 1) {
-            // End the game
-            room.phase = 'GAME_OVER';
-            // Give victory points to the remaining player if there is one
-            if (nonConcededPlayers.length === 1) {
-              const winner = nonConcededPlayers[0];
-              winner.severPoints = Math.max(winner.severPoints || 0, 2);
-              recalculatePoints(room);
-              broadcastSystemMessage(currentRoomCode, `Game Over! ${winner.username} is victorious!`);
-            }
-          } else {
-            // More than 1 player remains. The game continues.
-            // If it was the conceding player's turn, we must pass the turn first.
-            const activePlayerId = room.turnOrder[room.activePlayerIndex];
-            if (playerId === activePlayerId) {
-              passTurn(room);
-            }
-
-            // Capture the ID of the player whose turn it now is
-            const currentTurnPlayerId = room.turnOrder[room.activePlayerIndex];
-
-            // Filter out the conceding player from turnOrder
-            room.turnOrder = room.turnOrder.filter(id => id !== playerId);
-
-            // Re-align activePlayerIndex
-            const newIndex = room.turnOrder.indexOf(currentTurnPlayerId);
-            if (newIndex !== -1) {
-              room.activePlayerIndex = newIndex;
-            } else {
-              room.activePlayerIndex = 0;
-            }
-            
-            // Re-calculate points
-            recalculatePoints(room);
-          }
-
-          broadcastState(currentRoomCode, room);
+          concedePlayer(currentRoomCode, playerId);
           break;
         }
 
@@ -1212,33 +1248,69 @@ io.on('connection', (socket) => {
     if (currentRoomCode) {
       const room = rooms.get(currentRoomCode);
       if (room) {
-        // Remove player
-        delete room.players[playerId];
-        const remainingPlayers = Object.values(room.players);
+        const player = room.players[playerId];
 
-        if (remainingPlayers.length === 0) {
-          // Clean up room
-          rooms.delete(currentRoomCode);
-          roomMetadata.delete(currentRoomCode);
-          console.log(`Room ${currentRoomCode} deleted because it is empty.`);
-        } else {
-          // If the host disconnected, reassign host
-          if (!remainingPlayers.some(p => p.isHost)) {
-            remainingPlayers[0].isHost = true;
-          }
-          // Reset game back to lobby if someone leaves during active play
-          if (room.phase !== 'LOBBY') {
-            room.phase = 'LOBBY';
-            room.placedTiles = {};
-            room.tokenPositions = {};
-            room.treasures = {};
-            room.turnOrder = [];
-            for (const p of remainingPlayers) {
-              p.isReady = false;
-              p.assignedTileIndex = null;
+        if (room.phase === 'PLACEMENT' || room.phase === 'GAMEPLAY') {
+          // Game is active: mark player as disconnected and start grace period
+          if (player) {
+            player.isDisconnected = true;
+            broadcastSystemMessage(currentRoomCode, `${player.username} disconnected. Waiting 60 seconds for reconnection...`);
+            
+            // Check if all players in the room are now disconnected
+            const allDisconnected = Object.values(room.players).every(p => p.isDisconnected || p.hasConceded);
+            if (allDisconnected) {
+              rooms.delete(currentRoomCode);
+              roomMetadata.delete(currentRoomCode);
+              // Clear any timers for this room
+              for (const key of disconnectTimers.keys()) {
+                if (key.startsWith(`${currentRoomCode}:`)) {
+                  clearTimeout(disconnectTimers.get(key));
+                  disconnectTimers.delete(key);
+                }
+              }
+              console.log(`Room ${currentRoomCode} deleted because all players disconnected.`);
+              return;
+            }
+
+            // Start concession countdown
+            const timerKey = `${currentRoomCode}:${playerId}`;
+            // Clear existing timer if any (shouldn't be one, but safe)
+            if (disconnectTimers.has(timerKey)) {
+              clearTimeout(disconnectTimers.get(timerKey));
+            }
+            const timer = setTimeout(() => {
+              console.log(`Grace period expired for player ${player.username} in room ${currentRoomCode}`);
+              disconnectTimers.delete(timerKey);
+              concedePlayer(currentRoomCode!, playerId);
+            }, 60000);
+            disconnectTimers.set(timerKey, timer);
+
+            // Reassign host if the disconnected player was the host
+            if (player.isHost) {
+              player.isHost = false;
+              const remainingPlayers = Object.values(room.players).filter(p => p.id !== playerId);
+              if (remainingPlayers.length > 0) {
+                remainingPlayers[0].isHost = true;
+              }
             }
           }
           broadcastState(currentRoomCode, room);
+        } else {
+          // Lobby or Game Over: clean up player immediately
+          delete room.players[playerId];
+          const remainingPlayers = Object.values(room.players);
+
+          if (remainingPlayers.length === 0) {
+            rooms.delete(currentRoomCode);
+            roomMetadata.delete(currentRoomCode);
+            console.log(`Room ${currentRoomCode} deleted because it is empty.`);
+          } else {
+            // Reassign host if needed
+            if (!remainingPlayers.some(p => p.isHost)) {
+              remainingPlayers[0].isHost = true;
+            }
+            broadcastState(currentRoomCode, room);
+          }
         }
       }
     }

@@ -19,6 +19,8 @@ export interface Player {
   isFirstTurnOfMatch: boolean;
   form: 'normal' | 'wolf';
   hasConceded?: boolean;
+  sessionToken?: string;
+  isDisconnected?: boolean;
 }
 
 export interface Treasure {
@@ -72,7 +74,7 @@ export interface GameState {
 }
 
 export type ClientMessage =
-  | { event: 'JOIN_ROOM'; payload: { username: string; roomCode: string; color: string; emoji: string } }
+  | { event: 'JOIN_ROOM'; payload: { username: string; roomCode: string; color: string; emoji: string; sessionToken?: string } }
   | { event: 'TOGGLE_READY' }
   | { event: 'START_GAME' }
   | { event: 'PLACE_TILE'; payload: { x: number; y: number; rotation: 0 | 90 | 180 | 270 } }
