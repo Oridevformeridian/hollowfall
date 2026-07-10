@@ -2066,13 +2066,19 @@ export default function App() {
                     justifyContent: 'flex-start',
                     overflow: 'visible',
                     transition: 'all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                    zIndex: raised ? 120 : 105
+                    zIndex: raised ? 120 : 105,
+                    flexShrink: 0
                   }}
                 >
                   <div
                     style={{
                       width: '110px',
                       height: '165px',
+                      minWidth: '110px',
+                      maxWidth: '110px',
+                      minHeight: '165px',
+                      maxHeight: '165px',
+                      flexShrink: 0,
                       backgroundColor: 'rgba(15, 23, 42, 0.98)',
                       border: isSelected ? '2px solid var(--accent-cyan)' : `1px solid ${typeColor}`,
                       borderRadius: '12px',
