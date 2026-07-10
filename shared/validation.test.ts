@@ -159,6 +159,20 @@ describe('validateTokenMove', () => {
     expect(res.valid).toBe(false);
     expect(res.error).toContain('already occupied by another player');
   });
+
+  it('should allow wrap-around moves between opposite outer board boundaries', () => {
+    // East-to-West wrap: from rightmost tile (1,0) East gate (2,4) to leftmost tile (0,0) West gate (2,0)
+    const from: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 4 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    const res = validateTokenMove(from, to, placedTiles, {});
+    expect(res.valid).toBe(true);
+
+    // West-to-East wrap: from leftmost tile (0,0) West gate (2,0) to rightmost tile (1,0) East gate (2,4)
+    const from2: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    const to2: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 4 };
+    const res2 = validateTokenMove(from2, to2, placedTiles, {});
+    expect(res2.valid).toBe(true);
+  });
 });
 
 describe('validateDoorInteract', () => {

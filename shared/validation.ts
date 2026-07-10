@@ -122,8 +122,11 @@ export function isBorderBlocked(
   const ur = rotateBorderCoordinate(r, c, direction, unrotation);
   const layout = FIXED_TILES[tile.tileId - 1];
 
+  const isGate = (direction === 'V' && r === 2 && (c === 0 || c === 4)) ||
+                 (direction === 'H' && c === 2 && (r === 0 || r === 4));
+
   if (ur.direction === 'H') {
-    if (layout.hWalls.some(w => w.r === ur.r && w.c === ur.c)) {
+    if (!isGate && layout.hWalls.some(w => w.r === ur.r && w.c === ur.c)) {
       return { blocked: true, reason: 'Blocked by a wall.' };
     }
     if (layout.hDoors.some(d => d.r === ur.r && d.c === ur.c)) {
@@ -133,7 +136,7 @@ export function isBorderBlocked(
       }
     }
   } else {
-    if (layout.vWalls.some(w => w.r === ur.r && w.c === ur.c)) {
+    if (!isGate && layout.vWalls.some(w => w.r === ur.r && w.c === ur.c)) {
       return { blocked: true, reason: 'Blocked by a wall.' };
     }
     if (layout.vDoors.some(d => d.r === ur.r && d.c === ur.c)) {
@@ -362,39 +365,65 @@ export function validateTokenMove(
   // 2. Inter-Tile Crossing validation
   const dx = to.tileX - from.tileX;
   const dy = to.tileY - from.tileY;
-  const tDist = Math.abs(dx) + Math.abs(dy);
 
-  if (tDist === 1) {
-    // East crossing
-    if (dx === 1 && dy === 0) {
-      if (from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) {
-        return { valid: true };
-      }
-    }
-    // West crossing
-    if (dx === -1 && dy === 0) {
-      if (from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) {
-        return { valid: true };
-      }
-    }
-    // North crossing (y increases going North in our standard axis or rows)
-    // Wait, in grid display, macro grid coordinate y+1 is up (North)
-    if (dx === 0 && dy === 1) {
-      if (from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) {
-        return { valid: true };
-      }
-    }
-    // South crossing
-    if (dx === 0 && dy === -1) {
-      if (from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2) {
-        return { valid: true };
-      }
-    }
+  // Find board bounds in tile coordinates
+  const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
+  const xs = tileCoords.map(c => c[0]);
+  const ys = tileCoords.map(c => c[1]);
+  const minTileX = xs.length > 0 ? Math.min(...xs) : 0;
+  const maxTileX = xs.length > 0 ? Math.max(...xs) : 0;
+  const minTileY = ys.length > 0 ? Math.min(...ys) : 0;
+  const maxTileY = ys.length > 0 ? Math.max(...ys) : 0;
 
-    return { valid: false, error: 'Border crossing is only allowed through aligned exits.' };
+  // East crossing
+  const isEastCrossing = (dx === 1 && dy === 0) || (from.tileX === maxTileX && to.tileX === minTileX && dy === 0);
+  if (isEastCrossing) {
+    if (from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) {
+      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 4, 'V', placedTiles, doorsState, wallsState);
+      if (checkFrom.blocked) return { valid: false, error: checkFrom.reason || 'Blocked by a wall or door.' };
+      const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 0, 'V', placedTiles, doorsState, wallsState);
+      if (checkTo.blocked) return { valid: false, error: checkTo.reason || 'Blocked by a wall or door.' };
+      return { valid: true };
+    }
   }
 
-  return { valid: false, error: 'Movement target cell is too far.' };
+  // West crossing
+  const isWestCrossing = (dx === -1 && dy === 0) || (from.tileX === minTileX && to.tileX === maxTileX && dy === 0);
+  if (isWestCrossing) {
+    if (from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) {
+      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 0, 'V', placedTiles, doorsState, wallsState);
+      if (checkFrom.blocked) return { valid: false, error: checkFrom.reason || 'Blocked by a wall or door.' };
+      const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 4, 'V', placedTiles, doorsState, wallsState);
+      if (checkTo.blocked) return { valid: false, error: checkTo.reason || 'Blocked by a wall or door.' };
+      return { valid: true };
+    }
+  }
+
+  // North crossing
+  const isNorthCrossing = (dx === 0 && dy === 1) || (from.tileY === maxTileY && to.tileY === minTileY && dx === 0);
+  if (isNorthCrossing) {
+    if (from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) {
+      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 0, 2, 'H', placedTiles, doorsState, wallsState);
+      if (checkFrom.blocked) return { valid: false, error: checkFrom.reason || 'Blocked by a wall or door.' };
+      const checkTo = isBorderBlocked(to.tileX, to.tileY, 4, 2, 'H', placedTiles, doorsState, wallsState);
+      if (checkTo.blocked) return { valid: false, error: checkTo.reason || 'Blocked by a wall or door.' };
+      return { valid: true };
+    }
+  }
+
+  // South crossing
+  const isSouthCrossing = (dx === 0 && dy === -1) || (from.tileY === minTileY && to.tileY === maxTileY && dx === 0);
+  if (isSouthCrossing) {
+    if (from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2) {
+      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 4, 2, 'H', placedTiles, doorsState, wallsState);
+      if (checkFrom.blocked) return { valid: false, error: checkFrom.reason || 'Blocked by a wall or door.' };
+      const checkTo = isBorderBlocked(to.tileX, to.tileY, 0, 2, 'H', placedTiles, doorsState, wallsState);
+      if (checkTo.blocked) return { valid: false, error: checkTo.reason || 'Blocked by a wall or door.' };
+      return { valid: true };
+    }
+  }
+
+  return { valid: false, error: 'Border crossing is only allowed through aligned exits.' };
 }
 
 /**
