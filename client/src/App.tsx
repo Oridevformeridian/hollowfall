@@ -1910,13 +1910,108 @@ export default function App() {
                   if (!card || !caster) return null;
 
                   const typeColors = {
-                    bane: 'var(--accent-crimson)',
-                    ward: 'var(--accent-gold)',
-                    working: 'var(--accent-cyan)',
-                    talisman: 'var(--accent-green)',
+                    bane: '#ff1744',
+                    ward: '#ffd600',
+                    working: '#00e5ff',
+                    talisman: '#00e676',
                     offering: '#FFAB40'
                   };
-                  const color = typeColors[card.type] || '#FFFFFF';
+
+                  // Determine if this spell was countered
+                  const isCountered = !!activeAnimation.countered;
+                  const counterCardId = isCountered ? `ash_${activeAnimation.countered}` : null;
+                  const counterCard = counterCardId ? BASIC_CARDS.find(c => c.id === counterCardId) : null;
+                  // Who casted the counter card? It's the other player!
+                  const targetPlayerId = Object.keys(gameState?.players || {}).find(pId => pId !== activeAnimation.casterId);
+                  const counterCaster = targetPlayerId ? gameState?.players[targetPlayerId] : null;
+
+                  // Render function for a single card component
+                  const renderSpellCard = (c: typeof card, cName: string, animName: string, isWardCard = false) => {
+                    const cColor = typeColors[c.type] || '#FFFFFF';
+                    return (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '12px',
+                          animation: `${animName} 2.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards`
+                        }}
+                      >
+                        <div style={{
+                          fontSize: '13px',
+                          fontWeight: 'bold',
+                          color: '#E2E8F0',
+                          textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+                          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                          padding: '4px 12px',
+                          borderRadius: '12px',
+                          border: `1px solid ${isWardCard ? 'var(--accent-gold)' : 'rgba(255,255,255,0.05)'}`,
+                          backdropFilter: 'blur(4px)'
+                        }}>
+                          {cName} {isWardCard ? 'counters!' : 'plays:'}
+                        </div>
+                        <div
+                          style={{
+                            width: '160px',
+                            height: '240px',
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            border: `2px solid ${cColor}`,
+                            borderRadius: '16px',
+                            boxShadow: `0 0 25px ${cColor}`,
+                            padding: '16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            backdropFilter: 'blur(12px)',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <div style={{
+                            position: 'absolute',
+                            top: '-10px',
+                            right: '-10px',
+                            width: '40px',
+                            height: '40px',
+                            background: cColor,
+                            transform: 'rotate(45deg)',
+                            opacity: 0.15
+                          }} />
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{
+                              fontSize: '11px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '2px',
+                              color: cColor,
+                              fontWeight: 'bold'
+                            }}>
+                              {c.type}
+                            </div>
+                            <div style={{
+                              fontSize: '16px',
+                              fontWeight: 'bold',
+                              color: 'white',
+                              textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                              lineHeight: '1.2'
+                            }}>
+                              {c.name}
+                            </div>
+                          </div>
+
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#94a3b8',
+                            lineHeight: '1.4',
+                            marginBottom: '16px'
+                          }}>
+                            {c.description}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  };
 
                   return (
                     <div
@@ -1928,82 +2023,29 @@ export default function App() {
                         zIndex: 150,
                         pointerEvents: 'none',
                         display: 'flex',
-                        flexDirection: 'column',
+                        flexDirection: 'row',
                         alignItems: 'center',
-                        gap: '12px',
-                        animation: 'floatingCardReveal 2.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
+                        justifyContent: 'center',
+                        gap: '32px'
                       }}
                     >
-                      <div style={{
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        color: '#E2E8F0',
-                        textShadow: '0 2px 4px rgba(0,0,0,0.8)',
-                        backgroundColor: 'rgba(15, 23, 42, 0.8)',
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        border: '1px solid rgba(255,255,255,0.05)',
-                        backdropFilter: 'blur(4px)'
-                      }}>
-                        {caster.username} plays:
-                      </div>
-                      <div
-                        style={{
-                          width: '160px',
-                          height: '240px',
-                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                          border: `2px solid ${color}`,
-                          borderRadius: '16px',
-                          boxShadow: `0 0 25px ${color}`,
-                          padding: '16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          backdropFilter: 'blur(12px)',
-                          position: 'relative',
-                          overflow: 'hidden'
-                        }}
-                      >
-                        <div style={{
-                          position: 'absolute',
-                          top: '-10px',
-                          right: '-10px',
-                          width: '40px',
-                          height: '40px',
-                          background: color,
-                          transform: 'rotate(45deg)',
-                          opacity: 0.15
-                        }} />
+                      {/* Left: Caster's spell card */}
+                      {renderSpellCard(
+                        card,
+                        caster.username,
+                        isCountered ? 'counteredCardReveal' : 'normalCardReveal',
+                        false
+                      )}
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                          <div style={{
-                            fontSize: '11px',
-                            textTransform: 'uppercase',
-                            letterSpacing: '2px',
-                            color: color,
-                            fontWeight: 'bold'
-                          }}>
-                            {card.type}
-                          </div>
-                          <div style={{
-                            fontSize: '16px',
-                            fontWeight: 'bold',
-                            color: 'white',
-                            lineHeight: '1.2'
-                          }}>
-                            {card.name}
-                          </div>
-                        </div>
-
-                        <div style={{
-                          fontSize: '12px',
-                          color: '#94a3b8',
-                          lineHeight: '1.4',
-                          marginBottom: '16px'
-                        }}>
-                          {card.description}
-                        </div>
-                      </div>
+                      {/* Right: Counter/Defensive ward card if countered */}
+                      {isCountered && counterCard && counterCaster && (
+                        renderSpellCard(
+                          counterCard,
+                          counterCaster.username,
+                          'counterCardReveal',
+                          true
+                        )
+                      )}
                     </div>
                   );
                 })()}
