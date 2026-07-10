@@ -175,7 +175,7 @@ const random = Math.random;
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
   let currentRoomCode: string | null = null;
-  const playerId = socket.id;
+  let playerId = socket.id;
 
   socket.on('message', (messageStr: string) => {
     try {
