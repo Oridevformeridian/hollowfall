@@ -76,3 +76,15 @@ terraform apply
 This will deploy the Cloud Run service, set up session affinity (for Socket.io stability), and make the application publicly accessible.
 
 Once complete, Terraform will output the `service_url` where your Hollowfall lobby is live!
+
+---
+
+## Custom Domain Setup (`hollowfall.roge.life`)
+
+To route traffic to your custom domain with a managed Let's Encrypt TLS certificate:
+
+1. **Domain Verification**: Before Terraform can map the domain, you must verify ownership of `roge.life` (or the specific subdomain `hollowfall.roge.life`) in the [Google Search Console](https://search.google.com/search-console/welcome) using the same GCP identity that runs the deployment.
+2. **Apply Domain Mapping**: The Terraform configuration automatically creates the domain mapping.
+3. **Configure DNS Records**: After `terraform apply` finishes, it will output `domain_resource_records`. Update your DNS registrar settings (e.g. Cloudflare, GoDaddy, etc.) with the `A` or `CNAME` records shown in the output.
+4. **Wait for SSL/TLS Certificate**: Google Cloud Run will automatically provision a Let's Encrypt TLS certificate for `hollowfall.roge.life`. The SSL certificate registration takes between 5 to 15 minutes once the DNS records propagate.
+

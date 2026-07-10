@@ -20,3 +20,10 @@ variable "image_tag" {
   default     = "latest"
   description = "The tag of the Docker image to deploy"
 }
+
+variable "custom_domain" {
+  type        = string
+  default     = "hollowfall.roge.life"
+  description = "Custom domain to map to the Cloud Run service"
+}
+
