@@ -2142,8 +2142,7 @@ export default function App() {
                       fontSize: '9px',
                       color: '#94a3b8',
                       lineHeight: '1.25',
-                      opacity: raised ? 1 : 0,
-                      transition: 'opacity 0.2s',
+                      opacity: 1,
                       flexGrow: 1,
                       display: 'flex',
                       alignItems: 'center',
@@ -2160,8 +2159,7 @@ export default function App() {
                       textAlign: 'center',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
-                      opacity: raised ? 1 : 0,
-                      transition: 'opacity 0.2s',
+                      opacity: 1,
                       marginTop: '2px'
                     }}>
                       {isWard
