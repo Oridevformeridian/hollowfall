@@ -153,6 +153,49 @@ export function isBorderBlocked(
 /**
  * Checks whether there is an unobstructed line of sight (LOS) between two micro-grid coordinates.
  */
+export function getNextCell(
+  curr: TokenPosition,
+  dir: 'E' | 'W' | 'N' | 'S',
+  minTileX: number,
+  maxTileX: number,
+  minTileY: number,
+  maxTileY: number
+): TokenPosition {
+  if (dir === 'E') {
+    if (curr.c < 4) {
+      return { tileX: curr.tileX, tileY: curr.tileY, r: curr.r, c: curr.c + 1 };
+    } else {
+      const nextTileX = curr.tileX === maxTileX ? minTileX : curr.tileX + 1;
+      return { tileX: nextTileX, tileY: curr.tileY, r: curr.r, c: 0 };
+    }
+  }
+  if (dir === 'W') {
+    if (curr.c > 0) {
+      return { tileX: curr.tileX, tileY: curr.tileY, r: curr.r, c: curr.c - 1 };
+    } else {
+      const nextTileX = curr.tileX === minTileX ? maxTileX : curr.tileX - 1;
+      return { tileX: nextTileX, tileY: curr.tileY, r: curr.r, c: 4 };
+    }
+  }
+  if (dir === 'N') {
+    if (curr.r > 0) {
+      return { tileX: curr.tileX, tileY: curr.tileY, r: curr.r - 1, c: curr.c };
+    } else {
+      const nextTileY = curr.tileY === maxTileY ? minTileY : curr.tileY + 1;
+      return { tileX: curr.tileX, tileY: nextTileY, r: 4, c: curr.c };
+    }
+  }
+  if (dir === 'S') {
+    if (curr.r < 4) {
+      return { tileX: curr.tileX, tileY: curr.tileY, r: curr.r + 1, c: curr.c };
+    } else {
+      const nextTileY = curr.tileY === minTileY ? maxTileY : curr.tileY - 1;
+      return { tileX: curr.tileX, tileY: nextTileY, r: 0, c: curr.c };
+    }
+  }
+  return curr;
+}
+
 export function hasLineOfSight(
   from: TokenPosition,
   to: TokenPosition,
@@ -187,53 +230,97 @@ export function hasLineOfSight(
 
   const isWrap = isEastWrap || isWestWrap || isNorthWrap || isSouthWrap;
 
-  const isEastCrossing = (dx === 1 && dy === 0) || isEastWrap;
-  const isWestCrossing = (dx === -1 && dy === 0) || isWestWrap;
-  const isNorthCrossing = (dx === 0 && dy === 1) || isNorthWrap;
-  const isSouthCrossing = (dx === 0 && dy === -1) || isSouthWrap;
-
-  // If different tiles or wrapping:
+  // If different tiles or wrapping, LOS must be horizontal along row 2 or vertical along col 2
   if (from.tileX !== to.tileX || from.tileY !== to.tileY || isWrap) {
-    if (isEastCrossing) {
-      if (from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) {
-        const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 4, 'V', placedTiles, doorsState, ws);
-        if (checkFrom.blocked) return false;
-        const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 0, 'V', placedTiles, doorsState, ws);
-        if (checkTo.blocked) return false;
+    const isHorizontal = from.r === 2 && to.r === 2;
+    const isVertical = from.c === 2 && to.c === 2;
+
+    if (isHorizontal) {
+      // Trace East
+      let curr = { ...from };
+      let steps = 0;
+      let eastPathClear = true;
+      const maxSteps = 15;
+      while (steps < maxSteps) {
+        if (curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
+          break;
+        }
+        const next = getNextCell(curr, 'E', minTileX, maxTileX, minTileY, maxTileY);
+        if (!validateTokenMove(curr, next, placedTiles, doorsState, ws).valid) {
+          eastPathClear = false;
+          break;
+        }
+        curr = next;
+        steps++;
+      }
+      if (eastPathClear && curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
         return true;
       }
-      return false;
-    }
-    if (isWestCrossing) {
-      if (from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) {
-        const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 0, 'V', placedTiles, doorsState, ws);
-        if (checkFrom.blocked) return false;
-        const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 4, 'V', placedTiles, doorsState, ws);
-        if (checkTo.blocked) return false;
+
+      // Trace West
+      curr = { ...from };
+      steps = 0;
+      let westPathClear = true;
+      while (steps < maxSteps) {
+        if (curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
+          break;
+        }
+        const next = getNextCell(curr, 'W', minTileX, maxTileX, minTileY, maxTileY);
+        if (!validateTokenMove(curr, next, placedTiles, doorsState, ws).valid) {
+          westPathClear = false;
+          break;
+        }
+        curr = next;
+        steps++;
+      }
+      if (westPathClear && curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
         return true;
       }
-      return false;
     }
-    if (isNorthCrossing) {
-      if (from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) {
-        const checkFrom = isBorderBlocked(from.tileX, from.tileY, 0, 2, 'H', placedTiles, doorsState, ws);
-        if (checkFrom.blocked) return false;
-        const checkTo = isBorderBlocked(to.tileX, to.tileY, 4, 2, 'H', placedTiles, doorsState, ws);
-        if (checkTo.blocked) return false;
+
+    if (isVertical) {
+      // Trace North
+      let curr = { ...from };
+      let steps = 0;
+      let northPathClear = true;
+      const maxSteps = 15;
+      while (steps < maxSteps) {
+        if (curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
+          break;
+        }
+        const next = getNextCell(curr, 'N', minTileX, maxTileX, minTileY, maxTileY);
+        if (!validateTokenMove(curr, next, placedTiles, doorsState, ws).valid) {
+          northPathClear = false;
+          break;
+        }
+        curr = next;
+        steps++;
+      }
+      if (northPathClear && curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
         return true;
       }
-      return false;
-    }
-    if (isSouthCrossing) {
-      if (from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2) {
-        const checkFrom = isBorderBlocked(from.tileX, from.tileY, 4, 2, 'H', placedTiles, doorsState, ws);
-        if (checkFrom.blocked) return false;
-        const checkTo = isBorderBlocked(to.tileX, to.tileY, 0, 2, 'H', placedTiles, doorsState, ws);
-        if (checkTo.blocked) return false;
+
+      // Trace South
+      curr = { ...from };
+      steps = 0;
+      let southPathClear = true;
+      while (steps < maxSteps) {
+        if (curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
+          break;
+        }
+        const next = getNextCell(curr, 'S', minTileX, maxTileX, minTileY, maxTileY);
+        if (!validateTokenMove(curr, next, placedTiles, doorsState, ws).valid) {
+          southPathClear = false;
+          break;
+        }
+        curr = next;
+        steps++;
+      }
+      if (southPathClear && curr.tileX === to.tileX && curr.tileY === to.tileY && curr.r === to.r && curr.c === to.c) {
         return true;
       }
-      return false;
     }
+
     return false;
   }
 
@@ -282,7 +369,7 @@ export function hasLineOfSight(
     }
   }
 
-  // Linear raycast check for straight orthogonal/diagonal paths
+  // Linear raycast check for straight orthogonal/diagonal paths within same tile
   if (from.r === to.r) {
     const r = from.r;
     const startC = Math.min(from.c, to.c);

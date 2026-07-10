@@ -251,6 +251,16 @@ describe('hasLineOfSight', () => {
     expect(hasLineOfSight(from, to, placedTiles, {}, wallsState)).toBe(false);
   });
 
+  it('should allow line of sight across boundaries between non-exit cells in same straight path', () => {
+    const customTiles: Record<string, PlacedTile> = {
+      '0,0': { tileId: 4, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '1,0': { tileId: 4, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+    };
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 1 };
+    expect(hasLineOfSight(from, to, customTiles, {})).toBe(true);
+  });
+
   it('should allow wrap-around line of sight across opposite outer boundaries', () => {
     const from: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 4 };
     const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
