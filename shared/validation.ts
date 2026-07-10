@@ -167,29 +167,72 @@ export function hasLineOfSight(
     return true;
   }
 
-  // If different tiles:
-  if (from.tileX !== to.tileX || from.tileY !== to.tileY) {
-    // Only orthogonal transitions through aligned exits are clear.
-    const dx = to.tileX - from.tileX;
-    const dy = to.tileY - from.tileY;
-    if (Math.abs(dx) + Math.abs(dy) !== 1) {
-      return false; // Diagonal across tiles is blocked
+  // Find board bounds in tile coordinates
+  const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
+  const xs = tileCoords.map(c => c[0]);
+  const ys = tileCoords.map(c => c[1]);
+  const minTileX = xs.length > 0 ? Math.min(...xs) : 0;
+  const maxTileX = xs.length > 0 ? Math.max(...xs) : 0;
+  const minTileY = ys.length > 0 ? Math.min(...ys) : 0;
+  const maxTileY = ys.length > 0 ? Math.max(...ys) : 0;
+
+  const dx = to.tileX - from.tileX;
+  const dy = to.tileY - from.tileY;
+
+  // Determine if this is a wrapping step (pacman-wrap)
+  const isEastWrap = from.tileX === maxTileX && to.tileX === minTileX && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0;
+  const isWestWrap = from.tileX === minTileX && to.tileX === maxTileX && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4;
+  const isNorthWrap = from.tileY === maxTileY && to.tileY === minTileY && dx === 0 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
+  const isSouthWrap = from.tileY === minTileY && to.tileY === maxTileY && dx === 0 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
+
+  const isWrap = isEastWrap || isWestWrap || isNorthWrap || isSouthWrap;
+
+  const isEastCrossing = (dx === 1 && dy === 0) || isEastWrap;
+  const isWestCrossing = (dx === -1 && dy === 0) || isWestWrap;
+  const isNorthCrossing = (dx === 0 && dy === 1) || isNorthWrap;
+  const isSouthCrossing = (dx === 0 && dy === -1) || isSouthWrap;
+
+  // If different tiles or wrapping:
+  if (from.tileX !== to.tileX || from.tileY !== to.tileY || isWrap) {
+    if (isEastCrossing) {
+      if (from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) {
+        const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 4, 'V', placedTiles, doorsState, ws);
+        if (checkFrom.blocked) return false;
+        const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 0, 'V', placedTiles, doorsState, ws);
+        if (checkTo.blocked) return false;
+        return true;
+      }
+      return false;
     }
-    // East crossing
-    if (dx === 1 && dy === 0) {
-      return from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0;
+    if (isWestCrossing) {
+      if (from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) {
+        const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 0, 'V', placedTiles, doorsState, ws);
+        if (checkFrom.blocked) return false;
+        const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 4, 'V', placedTiles, doorsState, ws);
+        if (checkTo.blocked) return false;
+        return true;
+      }
+      return false;
     }
-    // West crossing
-    if (dx === -1 && dy === 0) {
-      return from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4;
+    if (isNorthCrossing) {
+      if (from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) {
+        const checkFrom = isBorderBlocked(from.tileX, from.tileY, 0, 2, 'H', placedTiles, doorsState, ws);
+        if (checkFrom.blocked) return false;
+        const checkTo = isBorderBlocked(to.tileX, to.tileY, 4, 2, 'H', placedTiles, doorsState, ws);
+        if (checkTo.blocked) return false;
+        return true;
+      }
+      return false;
     }
-    // North crossing
-    if (dx === 0 && dy === 1) {
-      return from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
-    }
-    // South crossing
-    if (dx === 0 && dy === -1) {
-      return from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
+    if (isSouthCrossing) {
+      if (from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2) {
+        const checkFrom = isBorderBlocked(from.tileX, from.tileY, 4, 2, 'H', placedTiles, doorsState, ws);
+        if (checkFrom.blocked) return false;
+        const checkTo = isBorderBlocked(to.tileX, to.tileY, 0, 2, 'H', placedTiles, doorsState, ws);
+        if (checkTo.blocked) return false;
+        return true;
+      }
+      return false;
     }
     return false;
   }
@@ -321,8 +364,28 @@ export function validateTokenMove(
     }
   }
 
-  // 1. Same-Tile Movement validation
-  if (from.tileX === to.tileX && from.tileY === to.tileY) {
+  // Find board bounds in tile coordinates
+  const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
+  const xs = tileCoords.map(c => c[0]);
+  const ys = tileCoords.map(c => c[1]);
+  const minTileX = xs.length > 0 ? Math.min(...xs) : 0;
+  const maxTileX = xs.length > 0 ? Math.max(...xs) : 0;
+  const minTileY = ys.length > 0 ? Math.min(...ys) : 0;
+  const maxTileY = ys.length > 0 ? Math.max(...ys) : 0;
+
+  const dx = to.tileX - from.tileX;
+  const dy = to.tileY - from.tileY;
+
+  // Determine if this is a wrapping step (pacman-wrap)
+  const isEastWrap = from.tileX === maxTileX && to.tileX === minTileX && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0;
+  const isWestWrap = from.tileX === minTileX && to.tileX === maxTileX && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4;
+  const isNorthWrap = from.tileY === maxTileY && to.tileY === minTileY && dx === 0 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
+  const isSouthWrap = from.tileY === minTileY && to.tileY === maxTileY && dx === 0 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
+
+  const isWrap = isEastWrap || isWestWrap || isNorthWrap || isSouthWrap;
+
+  // 1. Same-Tile Movement validation (excluding wrapping steps)
+  if (from.tileX === to.tileX && from.tileY === to.tileY && !isWrap) {
     const dr = to.r - from.r;
     const dc = to.c - from.c;
     const dist = Math.abs(dr) + Math.abs(dc);
@@ -362,21 +425,8 @@ export function validateTokenMove(
     return { valid: true };
   }
 
-  // 2. Inter-Tile Crossing validation
-  const dx = to.tileX - from.tileX;
-  const dy = to.tileY - from.tileY;
-
-  // Find board bounds in tile coordinates
-  const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
-  const xs = tileCoords.map(c => c[0]);
-  const ys = tileCoords.map(c => c[1]);
-  const minTileX = xs.length > 0 ? Math.min(...xs) : 0;
-  const maxTileX = xs.length > 0 ? Math.max(...xs) : 0;
-  const minTileY = ys.length > 0 ? Math.min(...ys) : 0;
-  const maxTileY = ys.length > 0 ? Math.max(...ys) : 0;
-
-  // East crossing
-  const isEastCrossing = (dx === 1 && dy === 0) || (from.tileX === maxTileX && to.tileX === minTileX && dy === 0);
+  // 2. Inter-Tile Crossing/Wrapping validation
+  const isEastCrossing = (dx === 1 && dy === 0) || isEastWrap;
   if (isEastCrossing) {
     if (from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) {
       const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 4, 'V', placedTiles, doorsState, wallsState);
@@ -387,8 +437,7 @@ export function validateTokenMove(
     }
   }
 
-  // West crossing
-  const isWestCrossing = (dx === -1 && dy === 0) || (from.tileX === minTileX && to.tileX === maxTileX && dy === 0);
+  const isWestCrossing = (dx === -1 && dy === 0) || isWestWrap;
   if (isWestCrossing) {
     if (from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) {
       const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 0, 'V', placedTiles, doorsState, wallsState);
@@ -399,8 +448,7 @@ export function validateTokenMove(
     }
   }
 
-  // North crossing
-  const isNorthCrossing = (dx === 0 && dy === 1) || (from.tileY === maxTileY && to.tileY === minTileY && dx === 0);
+  const isNorthCrossing = (dx === 0 && dy === 1) || isNorthWrap;
   if (isNorthCrossing) {
     if (from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) {
       const checkFrom = isBorderBlocked(from.tileX, from.tileY, 0, 2, 'H', placedTiles, doorsState, wallsState);
@@ -411,8 +459,7 @@ export function validateTokenMove(
     }
   }
 
-  // South crossing
-  const isSouthCrossing = (dx === 0 && dy === -1) || (from.tileY === minTileY && to.tileY === maxTileY && dx === 0);
+  const isSouthCrossing = (dx === 0 && dy === -1) || isSouthWrap;
   if (isSouthCrossing) {
     if (from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2) {
       const checkFrom = isBorderBlocked(from.tileX, from.tileY, 4, 2, 'H', placedTiles, doorsState, wallsState);

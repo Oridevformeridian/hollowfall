@@ -239,4 +239,28 @@ describe('hasLineOfSight', () => {
     const to: TokenPosition = { tileX: 2, tileY: 0, r: 2, c: 2 }; // Tile (2,0) doesn't exist/not adjacent
     expect(hasLineOfSight(from, to, placedTiles, {})).toBe(false);
   });
+
+  it('should block line of sight across tile boundaries if a wall/door blocks it', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
+    const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 0 };
+    // Clear path initially
+    expect(hasLineOfSight(from, to, placedTiles, {})).toBe(true);
+
+    // Blocked by a dynamic wall at the boundary
+    const wallsState = { '0,0:2,4:V': true };
+    expect(hasLineOfSight(from, to, placedTiles, {}, wallsState)).toBe(false);
+  });
+
+  it('should allow wrap-around line of sight across opposite outer boundaries', () => {
+    const from: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 4 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    expect(hasLineOfSight(from, to, placedTiles, {})).toBe(true);
+  });
+
+  it('should allow vertical wrap-around movement on a 1-tile high board', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 0, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 4, c: 2 };
+    const res = validateTokenMove(from, to, placedTiles, {});
+    expect(res.valid).toBe(true);
+  });
 });
