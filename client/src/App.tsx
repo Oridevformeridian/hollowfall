@@ -312,6 +312,15 @@ function generateLobbyName(): string {
   return `${w1}-${w2}-${w3}`;
 }
 
+const getCardTypeEmoji = (cardId: string) => {
+  if (cardId === 'ash_kindle_storm' || cardId === 'talisman_bear_charm') return '⚔️';
+  if (cardId === 'working_miststep' || cardId === 'working_don_wolf') return '🌀';
+  if (cardId === 'offering_deep_breath') return '🏥';
+  if (cardId === 'ash_turn_aside' || cardId === 'ash_spirit_skin') return '🛡️';
+  if (cardId === 'working_raise_stone') return '🧱';
+  return '✨';
+};
+
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -1990,13 +1999,23 @@ export default function App() {
                               {c.type}
                             </div>
                             <div style={{
-                              fontSize: '16px',
-                              fontWeight: 'bold',
-                              color: 'white',
-                              textShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                              lineHeight: '1.2'
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%'
                             }}>
-                              {c.name}
+                              <span style={{
+                                fontSize: '16px',
+                                fontWeight: 'bold',
+                                color: 'white',
+                                textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                                lineHeight: '1.2'
+                              }}>
+                                {c.name}
+                              </span>
+                              <span style={{ fontSize: '18px' }} title={c.type}>
+                                {getCardTypeEmoji(c.id)}
+                              </span>
                             </div>
                           </div>
 
@@ -2222,9 +2241,14 @@ export default function App() {
                     <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
                       {card.type}
                     </span>
-                    <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {card.name}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
+                        {card.name}
+                      </span>
+                      <span style={{ fontSize: '11px', flexShrink: 0 }}>
+                        {getCardTypeEmoji(card.id)}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Description */}
