@@ -325,6 +325,7 @@ export default function App() {
     to?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' };
     countered?: 'turn_aside' | 'spirit_skin' | null;
   } | null>(null);
+  const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
 
   const gameStateRef = React.useRef(gameState);
   useEffect(() => {
@@ -396,7 +397,7 @@ export default function App() {
             });
             setTimeout(() => {
               setActiveAnimation(null);
-            }, 1500);
+            }, 2500);
           }
         } else if (msg.event === 'ERROR') {
           setError(msg.payload.message);
@@ -1026,105 +1027,6 @@ export default function App() {
                 <p style={{ fontSize: '11px', color: '#cbd5e1', margin: '0' }}>All 4 sectors aligned.</p>
               </div>
 
-              {/* Character HUD List */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <h3 className="text-xs font-bold text-gray-400 m-0 uppercase tracking-widest">Player Status</h3>
-                {gameState.turnOrder.map((pId) => {
-                  const player = gameState.players[pId];
-                  const isActive = pId === activePlayerId;
-                  const isMe = pId === socket?.id;
-                  
-                  // Render Action Points as Emoji Lightning bolts
-                  const apCount = player.ap || 0;
-                  const apIcons = '⚡'.repeat(apCount) + '⚪'.repeat(Math.max(0, 3 - apCount));
-
-                  return (
-                    <div
-                      key={pId}
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                        border: isActive ? `2px solid ${player.color}` : '1px solid #1a1f26',
-                        borderRadius: '12px',
-                        padding: '12px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        boxShadow: isActive ? `0 0 12px ${player.color}33` : 'none',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '24px' }}>{player.emoji}</span>
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
-                                {player.username} {isMe && '(You)'}
-                              </span>
-                              {player.form === 'wolf' && (
-                                <span style={{ fontSize: '10px', color: 'var(--accent-cyan)' }} title="Wolf Form: Moves cost 0 AP!">🐺 Wolf</span>
-                              )}
-                            </div>
-                            <span style={{ fontSize: '10px', color: '#64748b' }}>
-                              {isActive ? 'Active Turn' : 'Waiting...'}
-                            </span>
-                          </div>
-                        </div>
-                        {isActive && (
-                          <span style={{ fontSize: '12px', color: player.color, fontWeight: 'bold' }}>
-                            ACTIVE
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Vitals indicators */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', marginTop: '4px' }}>
-                        {/* Health (Thread) */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>🧵 Thread:</span>
-                          <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>
-                            {player.thread} / {player.maxThread}
-                          </span>
-                        </div>
-                        {/* Score */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>🏆 Score:</span>
-                          <span style={{ fontSize: '11px', color: 'var(--accent-gold)', fontWeight: 'bold' }}>
-                            {player.points} / 2 pts
-                          </span>
-                        </div>
-                        {/* Attack status */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>⚔️ Attack:</span>
-                          <span style={{ fontSize: '11px', color: player.hasAttackedThisTurn ? '#ef4444' : player.isFirstTurnOfMatch ? '#64748b' : 'var(--accent-green)', fontWeight: 'bold' }}>
-                            {player.hasAttackedThisTurn ? 'Used' : player.isFirstTurnOfMatch ? 'Forbidden' : 'Ready'}
-                          </span>
-                        </div>
-                        {/* Carrying status */}
-                        {(() => {
-                          const carried = gameState.treasures ? Object.values(gameState.treasures).find(t => t.carrierId === pId) : null;
-                          if (carried) {
-                            return (
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
-                                <span style={{ fontSize: '11px', color: '#94a3b8' }}>💎 Carrying:</span>
-                                <span style={{ fontSize: '11px', color: 'var(--accent-cyan)', fontWeight: 'bold' }}>
-                                  {carried.ownerId === pId ? 'Own Mask' : "Rival's Mask"}
-                                </span>
-                              </div>
-                            );
-                          }
-                          return null;
-                        })()}
-                        {/* AP Actions */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
-                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>Actions:</span>
-                          <span style={{ fontSize: '13px', letterSpacing: '2px' }}>{apIcons}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
 
               {/* Active Player Actions */}
               {isActiveTurn && (
@@ -1390,7 +1292,10 @@ export default function App() {
               return (
                 <div
                   key={pId}
+                  onMouseEnter={() => setHoveredPlayerId(pId)}
+                  onMouseLeave={() => setHoveredPlayerId(null)}
                   style={{
+                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
@@ -1411,6 +1316,95 @@ export default function App() {
             })}
           </div>
         )}
+
+        {/* Hover Player Status Inspector Panel */}
+        {hoveredPlayerId && (() => {
+          const player = gameState.players[hoveredPlayerId];
+          if (!player) return null;
+          const apCount = player.ap || 0;
+          const apIcons = '⚡'.repeat(apCount) + '⚪'.repeat(Math.max(0, 3 - apCount));
+          const isMe = hoveredPlayerId === socket?.id;
+          const isActive = hoveredPlayerId === activePlayerId;
+
+          return (
+            <div
+              className="player-inspector-card"
+              style={{
+                position: 'absolute',
+                top: '150px',
+                right: '24px',
+                zIndex: 45,
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(12px)',
+                border: `2px solid ${player.color}`,
+                boxShadow: `0 0 15px ${player.color}44`,
+                padding: '14px',
+                borderRadius: '16px',
+                width: '180px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '24px' }}>{player.emoji}</span>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+                      {player.username} {isMe && '(You)'}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>
+                    {isActive ? 'Active Turn' : 'Waiting...'}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>🧵 Thread:</span>
+                  <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>
+                    {player.thread} / {player.maxThread}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>🏆 Score:</span>
+                  <span style={{ fontSize: '11px', color: 'var(--accent-gold)', fontWeight: 'bold' }}>
+                    {player.points} / 2 pts
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>⚡ Breath AP:</span>
+                  <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>
+                    {apIcons}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>⚔️ Attack:</span>
+                  <span style={{ fontSize: '11px', color: player.hasAttackedThisTurn ? '#ef4444' : player.isFirstTurnOfMatch ? '#64748b' : 'var(--accent-green)', fontWeight: 'bold' }}>
+                    {player.hasAttackedThisTurn ? 'Used' : player.isFirstTurnOfMatch ? 'Forbidden' : 'Ready'}
+                  </span>
+                </div>
+                {/* Carrying status */}
+                {(() => {
+                  const carried = gameState.treasures ? Object.values(gameState.treasures).find(t => t.carrierId === hoveredPlayerId) : null;
+                  if (carried) {
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>💎 Carrying:</span>
+                        <span style={{ fontSize: '11px', color: 'var(--accent-cyan)', fontWeight: 'bold' }}>
+                          {carried.ownerId === hoveredPlayerId ? 'Own Mask' : "Rival's Mask"}
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
+            </div>
+          );
+        })()}
         {error && (
           <div style={{ position: 'absolute', top: '24px', left: '24px', right: '24px', zIndex: 50, backgroundColor: 'rgba(255,23,68,0.9)', border: '1px solid var(--accent-crimson)', color: 'white', padding: '12px', borderRadius: '8px', fontSize: '14px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
             {error}
@@ -1735,6 +1729,8 @@ export default function App() {
                         return (
                           <div
                             key={pId}
+                            onMouseEnter={() => setHoveredPlayerId(pId)}
+                            onMouseLeave={() => setHoveredPlayerId(null)}
                             style={{
                               position: 'absolute',
                               left: `${pos.c * subCellSize}px`,
@@ -1748,7 +1744,8 @@ export default function App() {
                               justifyContent: 'center',
                               filter: `drop-shadow(0 0 6px ${player?.color})`,
                               zIndex: 30,
-                              pointerEvents: 'none'
+                              pointerEvents: 'auto',
+                              cursor: 'pointer'
                             }}
                             className="floating-emoji"
                           >
@@ -1875,7 +1872,7 @@ export default function App() {
                         flexDirection: 'column',
                         alignItems: 'center',
                         gap: '12px',
-                        animation: 'floatingCardReveal 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
+                        animation: 'floatingCardReveal 2.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'
                       }}
                     >
                       <div style={{
