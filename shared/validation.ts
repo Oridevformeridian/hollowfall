@@ -133,7 +133,7 @@ export function isBorderBlocked(
       return { blocked: true, reason: 'Blocked by a wall.' };
     }
     if (layout.hDoors.some(d => d.r === ur.r && d.c === ur.c)) {
-      const doorKey = `${tileX},${tileY}:${r},${c}:H`;
+      const doorKey = `${tileX},${tileY}:${r},${c}:${direction}`;
       if (doorsState[doorKey] !== 'OPEN') {
         return { blocked: true, reason: 'Blocked by a closed door.' };
       }
@@ -143,7 +143,7 @@ export function isBorderBlocked(
       return { blocked: true, reason: 'Blocked by a wall.' };
     }
     if (layout.vDoors.some(d => d.r === ur.r && d.c === ur.c)) {
-      const doorKey = `${tileX},${tileY}:${r},${c}:V`;
+      const doorKey = `${tileX},${tileY}:${r},${c}:${direction}`;
       if (doorsState[doorKey] !== 'OPEN') {
         return { blocked: true, reason: 'Blocked by a closed door.' };
       }

@@ -269,6 +269,26 @@ describe('hasLineOfSight', () => {
     expect(hasLineOfSight(from, to, placedTiles, {}, wallsState)).toBe(false);
   });
 
+  it('should correctly evaluate line of sight through open/closed doors on rotated tiles', () => {
+    // Tile 1 has a vertical door at r:1, c:2 (separates c=2 and c=3 on row 1).
+    // Let's rotate Tile 1 by 90 degrees.
+    // rotateBorderCoordinate(1, 2, 'V', 90) -> (2, 3, 'H')
+    // So the placed door will be at r:2, c:3, direction: 'H'.
+    const rotatedTile1: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 90, placedBy: 'p1' }
+    };
+    // Let's check LOS from (0,0, 2,3) to (0,0, 3,3) which goes across that H-door.
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 3 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 3 };
+
+    // Initially closed, should block
+    expect(hasLineOfSight(from, to, rotatedTile1, {})).toBe(false);
+
+    // Open, should allow
+    const doorsState = { '0,0:2,3:H': 'OPEN' as const };
+    expect(hasLineOfSight(from, to, rotatedTile1, doorsState)).toBe(true);
+  });
+
   it('should allow line of sight across boundaries between non-exit cells in same straight path', () => {
     const customTiles: Record<string, PlacedTile> = {
       '0,0': { tileId: 4, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
