@@ -106,7 +106,8 @@ export function isBorderBlocked(
   direction: 'H' | 'V',
   placedTiles: Record<string, PlacedTile>,
   doorsState: Record<string, 'OPEN' | 'CLOSED'>,
-  wallsState?: Record<string, boolean>
+  wallsState?: Record<string, boolean>,
+  checkOuter?: boolean
 ): { blocked: boolean; reason?: string } {
   const tile = placedTiles[`${tileX},${tileY}`];
   if (!tile) return { blocked: true, reason: 'No tile found.' };
@@ -122,8 +123,10 @@ export function isBorderBlocked(
   const ur = rotateBorderCoordinate(r, c, direction, unrotation);
   const layout = FIXED_TILES[tile.tileId - 1];
 
-  const isGate = (direction === 'V' && r === 2 && (c === 0 || c === 4)) ||
-                 (direction === 'H' && c === 2 && (r === 0 || r === 4));
+  const isGate = !!checkOuter && (
+                 (direction === 'V' && r === 2 && (c === 0 || c === 4)) ||
+                 (direction === 'H' && c === 2 && (r === 0 || r === 4))
+  );
 
   if (ur.direction === 'H') {
     if (!isGate && layout.hWalls.some(w => w.r === ur.r && w.c === ur.c)) {
@@ -561,9 +564,9 @@ export function validateTokenMove(
   const isEastCrossing = (dx === 1 && dy === 0) || isEastWrap;
   if (isEastCrossing) {
     if (from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) {
-      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 4, 'V', placedTiles, doorsState, wallsState);
+      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 4, 'V', placedTiles, doorsState, wallsState, true);
       if (checkFrom.blocked) return { valid: false, error: checkFrom.reason || 'Blocked by a wall or door.' };
-      const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 0, 'V', placedTiles, doorsState, wallsState);
+      const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 0, 'V', placedTiles, doorsState, wallsState, true);
       if (checkTo.blocked) return { valid: false, error: checkTo.reason || 'Blocked by a wall or door.' };
       return { valid: true };
     }
@@ -572,9 +575,9 @@ export function validateTokenMove(
   const isWestCrossing = (dx === -1 && dy === 0) || isWestWrap;
   if (isWestCrossing) {
     if (from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) {
-      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 0, 'V', placedTiles, doorsState, wallsState);
+      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 2, 0, 'V', placedTiles, doorsState, wallsState, true);
       if (checkFrom.blocked) return { valid: false, error: checkFrom.reason || 'Blocked by a wall or door.' };
-      const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 4, 'V', placedTiles, doorsState, wallsState);
+      const checkTo = isBorderBlocked(to.tileX, to.tileY, 2, 4, 'V', placedTiles, doorsState, wallsState, true);
       if (checkTo.blocked) return { valid: false, error: checkTo.reason || 'Blocked by a wall or door.' };
       return { valid: true };
     }
@@ -583,9 +586,9 @@ export function validateTokenMove(
   const isNorthCrossing = (dx === 0 && dy === -1) || isNorthWrap;
   if (isNorthCrossing) {
     if (from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) {
-      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 0, 2, 'H', placedTiles, doorsState, wallsState);
+      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 0, 2, 'H', placedTiles, doorsState, wallsState, true);
       if (checkFrom.blocked) return { valid: false, error: checkFrom.reason || 'Blocked by a wall or door.' };
-      const checkTo = isBorderBlocked(to.tileX, to.tileY, 4, 2, 'H', placedTiles, doorsState, wallsState);
+      const checkTo = isBorderBlocked(to.tileX, to.tileY, 4, 2, 'H', placedTiles, doorsState, wallsState, true);
       if (checkTo.blocked) return { valid: false, error: checkTo.reason || 'Blocked by a wall or door.' };
       return { valid: true };
     }
@@ -594,9 +597,9 @@ export function validateTokenMove(
   const isSouthCrossing = (dx === 0 && dy === 1) || isSouthWrap;
   if (isSouthCrossing) {
     if (from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2) {
-      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 4, 2, 'H', placedTiles, doorsState, wallsState);
+      const checkFrom = isBorderBlocked(from.tileX, from.tileY, 4, 2, 'H', placedTiles, doorsState, wallsState, true);
       if (checkFrom.blocked) return { valid: false, error: checkFrom.reason || 'Blocked by a wall or door.' };
-      const checkTo = isBorderBlocked(to.tileX, to.tileY, 0, 2, 'H', placedTiles, doorsState, wallsState);
+      const checkTo = isBorderBlocked(to.tileX, to.tileY, 0, 2, 'H', placedTiles, doorsState, wallsState, true);
       if (checkTo.blocked) return { valid: false, error: checkTo.reason || 'Blocked by a wall or door.' };
       return { valid: true };
     }

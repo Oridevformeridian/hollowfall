@@ -331,6 +331,19 @@ describe('hasLineOfSight', () => {
     // Check LOS
     expect(hasLineOfSight(from, to, twoTilesVert, {})).toBe(true);
   });
+
+  it('should block inner movement on Tile 1 when wall matches a gate coordinate internally', () => {
+    const singleTile1: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' }
+    };
+    // Tile 1 has a horizontal wall at r=0, c=2.
+    // Moving internally from (0,0, 0,2) to (0,0, 1,2) should be blocked by this wall.
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 0, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 1, c: 2 };
+    const res = validateTokenMove(from, to, singleTile1, {});
+    expect(res.valid).toBe(false);
+    expect(res.error).toContain('Blocked by a wall');
+  });
 });
 
 describe('getWrappingManhattanDistance', () => {
