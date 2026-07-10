@@ -344,15 +344,7 @@ export default function App() {
     gameStateRef.current = gameState;
   }, [gameState]);
 
-  const usernameRef = React.useRef(username);
-  useEffect(() => {
-    usernameRef.current = username;
-  }, [username]);
 
-  const roomCodeRef = React.useRef(roomCode);
-  useEffect(() => {
-    roomCodeRef.current = roomCode;
-  }, [roomCode]);
 
   useEffect(() => {
     if (gameState?.phase === 'GAME_OVER') {
@@ -370,6 +362,16 @@ export default function App() {
   // Form states
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
+
+  const usernameRef = React.useRef(username);
+  useEffect(() => {
+    usernameRef.current = username;
+  }, [username]);
+
+  const roomCodeRef = React.useRef(roomCode);
+  useEffect(() => {
+    roomCodeRef.current = roomCode;
+  }, [roomCode]);
   const [dimensions, setDimensions] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
     height: typeof window !== 'undefined' ? window.innerHeight : 800
