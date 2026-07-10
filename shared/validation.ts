@@ -452,15 +452,18 @@ export function getWrappingManhattanDistance(
   placedTiles: Record<string, PlacedTile>
 ): number {
   const tileCoords = Object.keys(placedTiles).map(k => k.split(',').map(Number));
-  const xs = tileCoords.map(c => c[0]);
-  const ys = tileCoords.map(c => c[1]);
-  const minTileX = xs.length > 0 ? Math.min(...xs) : 0;
-  const maxTileX = xs.length > 0 ? Math.max(...xs) : 0;
-  const minTileY = ys.length > 0 ? Math.min(...ys) : 0;
-  const maxTileY = ys.length > 0 ? Math.max(...ys) : 0;
+  
+  // Row-specific width for horizontal wrapping
+  const rowXs = tileCoords.filter(c => c[1] === from.tileY).map(c => c[0]);
+  const minTileXOnRow = rowXs.length > 0 ? Math.min(...rowXs) : 0;
+  const maxTileXOnRow = rowXs.length > 0 ? Math.max(...rowXs) : 0;
+  const rowWidth = (maxTileXOnRow - minTileXOnRow + 1) * 5;
 
-  const boardWidth = (maxTileX - minTileX + 1) * 5;
-  const boardHeight = (maxTileY - minTileY + 1) * 5;
+  // Column-specific height for vertical wrapping
+  const colYs = tileCoords.filter(c => c[0] === from.tileX).map(c => c[1]);
+  const minTileYOnCol = colYs.length > 0 ? Math.min(...colYs) : 0;
+  const maxTileYOnCol = colYs.length > 0 ? Math.max(...colYs) : 0;
+  const colHeight = (maxTileYOnCol - minTileYOnCol + 1) * 5;
 
   const globalR_from = from.tileY * 5 + from.r;
   const globalC_from = from.tileX * 5 + from.c;
@@ -468,10 +471,10 @@ export function getWrappingManhattanDistance(
   const globalC_to = to.tileX * 5 + to.c;
 
   let diffC = Math.abs(globalC_to - globalC_from);
-  diffC = Math.min(diffC, boardWidth - diffC);
+  diffC = Math.min(diffC, rowWidth - diffC);
 
   let diffR = Math.abs(globalR_to - globalR_from);
-  diffR = Math.min(diffR, boardHeight - diffR);
+  diffR = Math.min(diffR, colHeight - diffR);
 
   return diffC + diffR;
 }

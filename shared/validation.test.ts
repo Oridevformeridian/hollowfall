@@ -334,5 +334,18 @@ describe('getWrappingManhattanDistance', () => {
     // Straight distance is 4 subcells. Wrapping distance is 1 subcell.
     expect(getWrappingManhattanDistance(from, to, placedTiles)).toBe(1);
   });
+
+  it('should calculate shortest path wrapping horizontally on an L-shaped board', () => {
+    const lShapedTiles: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '0,1': { tileId: 2, position: { x: 0, y: 1 }, rotation: 0, placedBy: 'p2' },
+      '1,1': { tileId: 3, position: { x: 1, y: 1 }, rotation: 0, placedBy: 'p1' }
+    };
+    // On row 0, only '0,0' is placed, so wrapping width on row 0 is 5 subcells.
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    // Straight distance is 4 subcells. Wrapping distance is 1 subcell.
+    expect(getWrappingManhattanDistance(from, to, lShapedTiles)).toBe(1);
+  });
 });
 
