@@ -2009,12 +2009,10 @@ export default function App() {
                   position: 'absolute',
                   top: 0,
                   left: 0,
-                  width: '100%',
-                  height: '100%',
+                  width: `${boardWidth}px`,
+                  height: `${boardHeight}px`,
                   pointerEvents: 'none',
-                  zIndex: 26,
-                  gridColumn: '1 / -1',
-                  gridRow: '1 / -1'
+                  zIndex: 26
                 }}
               >
                 <defs>
