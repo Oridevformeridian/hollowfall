@@ -1996,8 +1996,15 @@ export default function App() {
             const bridges = getActiveRainbowBridges(gameState.placedTiles);
             if (bridges.length === 0) return null;
 
+            // Calculate precise board dimensions including 16px gaps and 24px padding
+            const boardWidth = (maxX - minX + 1) * cellWidth + (maxX - minX) * 16 + 48;
+            const boardHeight = (maxY - minY + 1) * cellWidth + (maxY - minY) * 16 + 48;
+
             return (
               <svg
+                width={boardWidth}
+                height={boardHeight}
+                viewBox={`0 0 ${boardWidth} ${boardHeight}`}
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -2026,8 +2033,8 @@ export default function App() {
                 </defs>
                 {bridges.map((bridge, idx) => {
                   const getEdgeCoords = (t: { x: number; y: number; r: number; c: number }) => {
-                    let ex = (t.x - minX) * cellWidth;
-                    let ey = (maxY - t.y) * cellWidth;
+                    let ex = 24 + (t.x - minX) * (cellWidth + 16);
+                    let ey = 24 + (maxY - t.y) * (cellWidth + 16);
                     if (t.c === 4) {
                       ex += cellWidth;
                       ey += t.r * subCellSize + subCellSize / 2;
@@ -2046,7 +2053,7 @@ export default function App() {
                   const p2 = getEdgeCoords(bridge.tile2);
 
                   const midX = (p1.x + p2.x) / 2;
-                  const midY = (p1.y + p2.y) / 2 - 60; // Proportional arch height
+                  const midY = (p1.y + p2.y) / 2 - 60;
 
                   return (
                     <g key={`rainbow-bridge-${idx}`}>
