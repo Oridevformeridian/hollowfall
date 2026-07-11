@@ -252,6 +252,20 @@ export function hasLineOfSight(
     return true;
   }
 
+  // Check if there is an active Rainbow Bridge connecting these cells
+  const bridges = getActiveRainbowBridges(placedTiles);
+  const hasBridge = bridges.some(b => {
+    return (
+      (b.tile1.x === from.tileX && b.tile1.y === from.tileY && b.tile1.r === from.r && b.tile1.c === from.c &&
+       b.tile2.x === to.tileX && b.tile2.y === to.tileY && b.tile2.r === to.r && b.tile2.c === to.c) ||
+      (b.tile2.x === from.tileX && b.tile2.y === from.tileY && b.tile2.r === from.r && b.tile2.c === from.c &&
+       b.tile1.x === to.tileX && b.tile1.y === to.tileY && b.tile1.r === to.r && b.tile1.c === to.c)
+    );
+  });
+  if (hasBridge) {
+    return true;
+  }
+
   const { isWrap } = checkWrapping(from, to, placedTiles);
 
   // If different tiles or wrapping, LOS must be horizontal along row 2 or vertical along col 2
@@ -512,6 +526,20 @@ export function validateTokenMove(
     }
   }
 
+  // Check if there is an active Rainbow Bridge connecting these cells
+  const bridges = getActiveRainbowBridges(placedTiles);
+  const hasBridge = bridges.some(b => {
+    return (
+      (b.tile1.x === from.tileX && b.tile1.y === from.tileY && b.tile1.r === from.r && b.tile1.c === from.c &&
+       b.tile2.x === to.tileX && b.tile2.y === to.tileY && b.tile2.r === to.r && b.tile2.c === to.c) ||
+      (b.tile2.x === from.tileX && b.tile2.y === from.tileY && b.tile2.r === from.r && b.tile2.c === from.c &&
+       b.tile1.x === to.tileX && b.tile1.y === to.tileY && b.tile1.r === to.r && b.tile1.c === to.c)
+    );
+  });
+  if (hasBridge) {
+    return { valid: true };
+  }
+
 
   const dx = to.tileX - from.tileX;
   const dy = to.tileY - from.tileY;
@@ -652,4 +680,52 @@ export function validateDoorInteract(
   }
 
   return { valid: true };
+}
+
+export interface RainbowBridge {
+  tile1: { x: number; y: number; r: number; c: number };
+  tile2: { x: number; y: number; r: number; c: number };
+}
+
+export function getActiveRainbowBridges(placedTiles: Record<string, PlacedTile>): RainbowBridge[] {
+  const bridges: RainbowBridge[] = [];
+  const keys = Object.keys(placedTiles);
+
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const [x1, y1] = keys[i].split(',').map(Number);
+      const [x2, y2] = keys[j].split(',').map(Number);
+
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+
+      if (Math.abs(dx) === 1 && Math.abs(dy) === 1) {
+        const corner1Key = `${x1},${y2}`;
+        const corner2Key = `${x2},${y1}`;
+
+        if (placedTiles[corner1Key] || placedTiles[corner2Key]) {
+          let r1 = 0, c1 = 0, r2 = 0, c2 = 0;
+          if (dx === 1 && dy === 1) {
+            r1 = 4; c1 = 4;
+            r2 = 0; c2 = 0;
+          } else if (dx === 1 && dy === -1) {
+            r1 = 0; c1 = 4;
+            r2 = 4; c2 = 0;
+          } else if (dx === -1 && dy === 1) {
+            r1 = 4; c1 = 0;
+            r2 = 0; c2 = 4;
+          } else if (dx === -1 && dy === -1) {
+            r1 = 0; c1 = 0;
+            r2 = 4; c2 = 4;
+          }
+
+          bridges.push({
+            tile1: { x: x1, y: y1, r: r1, c: c1 },
+            tile2: { x: x2, y: y2, r: r2, c: c2 }
+          });
+        }
+      }
+    }
+  }
+  return bridges;
 }

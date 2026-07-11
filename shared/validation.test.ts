@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance, getActiveRainbowBridges } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -409,6 +409,37 @@ describe('getWrappingManhattanDistance', () => {
     const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
     // Straight distance is 4 subcells. Wrapping distance is 1 subcell.
     expect(getWrappingManhattanDistance(from, to, lShapedTiles)).toBe(1);
+  });
+});
+
+describe('getActiveRainbowBridges', () => {
+  it('should detect active Rainbow Bridge on L-shaped tile placements', () => {
+    const lShapedTiles: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' },
+      '1,1': { tileId: 3, position: { x: 1, y: 1 }, rotation: 0, placedBy: 'p3' }
+    };
+
+    const bridges = getActiveRainbowBridges(lShapedTiles);
+    expect(bridges.length).toBe(1);
+
+    // Diagonal tiles (0,0) and (1,1) should be connected at (0,0: 4,4) and (1,1: 0,0)
+    expect(bridges[0].tile1).toEqual({ x: 0, y: 0, r: 4, c: 4 });
+    expect(bridges[0].tile2).toEqual({ x: 1, y: 1, r: 0, c: 0 });
+  });
+
+  it('should allow movement across an active Rainbow Bridge', () => {
+    const lShapedTiles: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' },
+      '1,1': { tileId: 3, position: { x: 1, y: 1 }, rotation: 0, placedBy: 'p3' }
+    };
+
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 4, c: 4 };
+    const to: TokenPosition = { tileX: 1, tileY: 1, r: 0, c: 0 };
+
+    const moveRes = validateTokenMove(from, to, lShapedTiles, {});
+    expect(moveRes.valid).toBe(true);
   });
 });
 

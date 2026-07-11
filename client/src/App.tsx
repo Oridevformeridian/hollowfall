@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, getWrappingManhattanDistance } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, getWrappingManhattanDistance, getActiveRainbowBridges } from './shared/validation.ts';
 
 const renderTileSvgContent = (
   layout: TileLayout,
@@ -1990,6 +1990,79 @@ export default function App() {
               </div>
             );
           })}
+
+          {/* Rainbow Bridges Overlay */}
+          {gameState && (() => {
+            const bridges = getActiveRainbowBridges(gameState.placedTiles);
+            if (bridges.length === 0) return null;
+
+            return (
+              <svg
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                  zIndex: 26,
+                  gridColumn: '1 / -1',
+                  gridRow: '1 / -1'
+                }}
+              >
+                <defs>
+                  <linearGradient id="rainbow-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#ff0055" stopOpacity="0.8" />
+                    <stop offset="20%" stopColor="#ff7b00" stopOpacity="0.8" />
+                    <stop offset="40%" stopColor="#ffea00" stopOpacity="0.8" />
+                    <stop offset="60%" stopColor="#00e676" stopOpacity="0.8" />
+                    <stop offset="80%" stopColor="#00b0ff" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#d500f9" stopOpacity="0.8" />
+                  </linearGradient>
+                  <filter id="rainbow-glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+                {bridges.map((bridge, idx) => {
+                  const p1 = {
+                    x: (bridge.tile1.x - minX) * cellWidth + bridge.tile1.c * subCellSize + subCellSize / 2,
+                    y: (maxY - bridge.tile1.y) * cellWidth + bridge.tile1.r * subCellSize + subCellSize / 2
+                  };
+                  const p2 = {
+                    x: (bridge.tile2.x - minX) * cellWidth + bridge.tile2.c * subCellSize + subCellSize / 2,
+                    y: (maxY - bridge.tile2.y) * cellWidth + bridge.tile2.r * subCellSize + subCellSize / 2
+                  };
+
+                  const midX = (p1.x + p2.x) / 2;
+                  const midY = (p1.y + p2.y) / 2 - 35; // Arch up by 35px
+
+                  return (
+                    <g key={`rainbow-bridge-${idx}`}>
+                      {/* Glow backing path */}
+                      <path
+                        d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
+                        stroke="url(#rainbow-grad)"
+                        strokeWidth="10"
+                        fill="none"
+                        opacity="0.3"
+                        strokeLinecap="round"
+                        filter="url(#rainbow-glow)"
+                      />
+                      {/* Main bridge path */}
+                      <path
+                        d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
+                        stroke="url(#rainbow-grad)"
+                        strokeWidth="5"
+                        fill="none"
+                        strokeLinecap="round"
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+            );
+          })()}
 
           {/* Spell Animations Overlay */}
           {activeAnimation && (() => {
