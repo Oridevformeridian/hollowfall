@@ -142,14 +142,14 @@ export const BASIC_CARDS: Card[] = [
   {
     id: 'ash_turn_aside',
     name: 'Turn Aside',
-    type: 'ward',
-    description: 'Reaction: Auto-counter and cancel an incoming attack spell.'
+    type: 'working',
+    description: 'Aura: Block and cancel the next incoming attack spell (consumed on trigger).'
   },
   {
     id: 'ash_spirit_skin',
     name: 'Spirit-Skin',
-    type: 'ward',
-    description: 'Reaction: Auto-reduce incoming attack damage by 2.'
+    type: 'working',
+    description: 'Aura: Reduce the next incoming attack damage by 2 (consumed on trigger).'
   },
   {
     id: 'working_miststep',
@@ -164,10 +164,10 @@ export const BASIC_CARDS: Card[] = [
     description: 'Create a permanent stone wall on an adjacent border.'
   },
   {
-    id: 'talisman_bear_charm',
-    name: 'Bear-Charm',
+    id: 'talisman_thorns',
+    name: 'Thorns',
     type: 'talisman',
-    description: 'Carry: +2 Max Thread (Health) and heal 2 Thread.'
+    description: 'Talisman: Retaliate against attacks, dealing 1 damage back to the attacker.'
   },
   {
     id: 'working_don_wolf',

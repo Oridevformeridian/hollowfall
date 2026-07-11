@@ -75,6 +75,18 @@ describe('rotateBorderCoordinate', () => {
     expect(res.r).toBe(2);
     expect(res.c).toBe(3);
   });
+
+  it('should return the original coordinates when applying a rotation followed by its complementary unrotation', () => {
+    const rotation: 0 | 90 | 180 | 270 = 90;
+    const unrotation = ((360 - rotation) % 360) as 0 | 90 | 180 | 270;
+    
+    // Rotate V(1, 2) by 90 deg clockwise
+    const rotated = rotateBorderCoordinate(1, 2, 'V', rotation);
+    // Unrotate the result by 270 deg clockwise
+    const unrotated = rotateBorderCoordinate(rotated.r, rotated.c, rotated.direction, unrotation);
+    
+    expect(unrotated).toEqual({ r: 1, c: 2, direction: 'V' });
+  });
 });
 
 describe('validateTokenMove', () => {

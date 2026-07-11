@@ -758,22 +758,47 @@ io.on('connection', (socket) => {
             // Mark attack used
             player.hasAttackedThisTurn = true;
 
-             // Auto Ward response checking
-             const turnAsideIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_turn_aside');
-             const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
+             // Aura protection checks
+             let countered: 'turn_aside' | 'spirit_skin' | null = null;
+             if (targetPlayer.hasTurnAside) {
+               targetPlayer.hasTurnAside = false;
+               countered = 'turn_aside';
+               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Turn Aside aura countered Kindle the Storm!`);
+             } else if (targetPlayer.hasSpiritSkin) {
+               targetPlayer.hasSpiritSkin = false;
+               countered = 'spirit_skin';
+               targetPlayer.thread = Math.max(0, targetPlayer.thread - 1); // 3 damage reduced by 2
+               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura reduced Kindle the Storm damage by 2 (took 1 damage).`);
+             } else {
+               targetPlayer.thread = Math.max(0, targetPlayer.thread - 3);
+               broadcastSystemMessage(currentRoomCode, `${player.username} cast Kindle the Storm on ${targetPlayer.username} for 3 damage!`);
+             }
 
-             const countered = turnAsideIndex !== -1 ? 'turn_aside' : spiritSkinIndex !== -1 ? 'spirit_skin' : null;
-            if (turnAsideIndex !== -1) {
-              targetPlayer.hand.splice(turnAsideIndex, 1);
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Turn Aside to counter Kindle the Storm!`);
-            } else if (spiritSkinIndex !== -1) {
-              targetPlayer.hand.splice(spiritSkinIndex, 1);
-              targetPlayer.thread = Math.max(0, targetPlayer.thread - 1); // 3 damage reduced by 2
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Spirit-Skin to reduce Kindle the Storm damage by 2 (took 1 damage).`);
-            } else {
-              targetPlayer.thread = Math.max(0, targetPlayer.thread - 3);
-              broadcastSystemMessage(currentRoomCode, `${player.username} cast Kindle the Storm on ${targetPlayer.username} for 3 damage!`);
-            }
+             // Thorns retaliation
+             if (targetPlayer.hasThorns && countered !== 'turn_aside') {
+               player.thread = Math.max(0, player.thread - 1);
+               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+               // Check if player died from thorns
+               if (player.thread <= 0) {
+                 targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
+                 targetPlayer.hand.push(...player.hand);
+                 player.hand = [];
+                 if (targetPlayer.hand.length > 7) {
+                   targetPlayer.hand.splice(7);
+                 }
+                 player.thread = 15;
+                 const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
+                 if (playerTile) {
+                   room.tokenPositions[playerId] = {
+                     tileX: playerTile.position.x,
+                     tileY: playerTile.position.y,
+                     r: 2,
+                     c: 2
+                   };
+                 }
+                 broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
+               }
+             }
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -903,11 +928,29 @@ io.on('connection', (socket) => {
             };
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
-          } else if (card.id === 'talisman_bear_charm') {
-            player.maxThread += 2;
-            player.thread = Math.min(player.maxThread, player.thread + 2);
+          } else if (card.id === 'ash_turn_aside') {
+            player.hasTurnAside = true;
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Turn Aside, gaining a protective shield against the next attack spell.`);
 
-            broadcastSystemMessage(currentRoomCode, `${player.username} invoked the Bear-Charm Rite, gaining +2 Max Thread and healing 2 Thread.`);
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
+          } else if (card.id === 'ash_spirit_skin') {
+            player.hasSpiritSkin = true;
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Spirit-Skin, gaining a damage-reduction shield.`);
+
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
+          } else if (card.id === 'talisman_thorns') {
+            player.hasThorns = true;
+            broadcastSystemMessage(currentRoomCode, `${player.username} invoked the Thorns talisman, enabling retaliation against attacks.`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -1077,13 +1120,41 @@ io.on('connection', (socket) => {
           player.hasAttackedThisTurn = true;
           player.ap--;
 
-          const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
-          if (spiritSkinIndex !== -1) {
-            targetPlayer.hand.splice(spiritSkinIndex, 1);
-            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Spirit-Skin to block the Lash damage!`);
+          // Aura protection check
+          let tookDamage = false;
+          if (targetPlayer.hasSpiritSkin) {
+            targetPlayer.hasSpiritSkin = false;
+            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura blocked the Lash damage!`);
           } else {
             targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
+            tookDamage = true;
             broadcastSystemMessage(currentRoomCode, `${player.username} lashed ${targetPlayer.username} for 1 damage!`);
+          }
+
+          // Thorns retaliation
+          if (targetPlayer.hasThorns && tookDamage) {
+            player.thread = Math.max(0, player.thread - 1);
+            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+            // Check if player died from Thorns
+            if (player.thread <= 0) {
+              targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
+              targetPlayer.hand.push(...player.hand);
+              player.hand = [];
+              if (targetPlayer.hand.length > 7) {
+                targetPlayer.hand.splice(7);
+              }
+              player.thread = 15;
+              const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
+              if (playerTile) {
+                room.tokenPositions[playerId] = {
+                  tileX: playerTile.position.x,
+                  tileY: playerTile.position.y,
+                  r: 2,
+                  c: 2
+                };
+              }
+              broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
+            }
           }
 
           if (targetPlayer.thread <= 0) {

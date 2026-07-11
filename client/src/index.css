@@ -464,15 +464,15 @@ h1, h2, h3, h4 {
   animation: stone-rise 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-.bear-charm-effect {
+.thorns-effect {
   position: absolute;
   width: 60px;
   height: 60px;
   margin-left: -30px;
   margin-top: -30px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(0,230,118,0.4) 10%, rgba(0,230,118,0) 70%);
-  border: 2px solid rgba(0,230,118,0.8);
+  background: radial-gradient(circle, rgba(255,109,0,0.4) 10%, rgba(255,109,0,0) 70%);
+  border: 2px solid rgba(255,109,0,0.8);
   animation: heal-pulse 1s ease-out forwards;
 }
 

@@ -315,7 +315,8 @@ function generateLobbyName(): string {
 }
 
 const getCardTypeEmoji = (cardId: string) => {
-  if (cardId === 'ash_kindle_storm' || cardId === 'talisman_bear_charm') return '⚔️';
+  if (cardId === 'ash_kindle_storm') return '⚔️';
+  if (cardId === 'talisman_thorns') return '🌵';
   if (cardId === 'working_miststep' || cardId === 'working_don_wolf') return '🌀';
   if (cardId === 'offering_deep_breath') return '🏥';
   if (cardId === 'ash_turn_aside' || cardId === 'ash_spirit_skin') return '🛡️';
@@ -1574,6 +1575,17 @@ export default function App() {
                     {player.hasAttackedThisTurn ? 'Used' : player.isFirstTurnOfMatch ? 'Forbidden' : 'Ready'}
                   </span>
                 </div>
+                {/* Active Auras */}
+                {((player as any).hasTurnAside || (player as any).hasSpiritSkin || (player as any).hasThorns) && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>🛡️ Auras:</span>
+                    <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold', display: 'flex', gap: '4px' }}>
+                      {(player as any).hasTurnAside && <span title="Turn Aside Aura" style={{ color: 'var(--accent-cyan)' }}>🛡️</span>}
+                      {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura" style={{ color: 'var(--accent-green)' }}>🪨</span>}
+                      {(player as any).hasThorns && <span title="Thorns Talisman" style={{ color: '#FF6D00' }}>🌵</span>}
+                    </span>
+                  </div>
+                )}
                 {/* Carrying status */}
                 {(() => {
                   const carried = gameState.treasures ? Object.values(gameState.treasures).find(t => t.carrierId === hoveredPlayerId) : null;
@@ -2030,8 +2042,8 @@ export default function App() {
                   <div className="raise-stone-effect" style={{ left: pTo.x, top: pTo.y }} />
                 )}
 
-                {activeAnimation.cardId === 'talisman_bear_charm' && (
-                  <div className="bear-charm-effect" style={{ left: pFrom.x, top: pFrom.y }} />
+                {activeAnimation.cardId === 'talisman_thorns' && (
+                  <div className="thorns-effect" style={{ left: pFrom.x, top: pFrom.y }} />
                 )}
 
                  {activeAnimation.cardId === 'working_don_wolf' && pTo && (
@@ -2272,6 +2284,7 @@ export default function App() {
                 : '#94a3b8';
 
               const canCast = isActiveTurn && self.ap > 0 && !isWard;
+              const noTargetNeeded = card.id === 'talisman_thorns' || card.id === 'ash_turn_aside' || card.id === 'ash_spirit_skin' || card.id === 'offering_deep_breath';
 
               return (
                 <div
@@ -2280,7 +2293,6 @@ export default function App() {
                   onMouseLeave={() => setHoveredCardId(null)}
                   onClick={() => {
                     if (!canCast) return;
-                    const noTargetNeeded = card.id === 'talisman_bear_charm' || card.id === 'offering_deep_breath';
                     if (isSelected) {
                       if (noTargetNeeded) {
                         handlePlayCard(card.id);
@@ -2373,7 +2385,7 @@ export default function App() {
                     {isWard
                       ? '🛡️ Defense'
                       : isSelected 
-                      ? (card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath'
+                      ? (noTargetNeeded
                         ? '➔ Click to Cast' 
                         : '🎯 Target board') 
                       : '⚡ Cast Rite'}
