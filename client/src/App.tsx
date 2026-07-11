@@ -2052,28 +2052,32 @@ export default function App() {
                   const p1 = getEdgeCoords(bridge.tile1);
                   const p2 = getEdgeCoords(bridge.tile2);
 
-                  const midX = (p1.x + p2.x) / 2;
-                  const midY = (p1.y + p2.y) / 2 - 60;
+                  // Determine which exit is horizontal (East/West) vs vertical (North/South)
+                  const isTile1Horizontal = bridge.tile1.c === 0 || bridge.tile1.c === 4;
+                  
+                  // The intersection point of the horizontal exit line and the vertical exit line
+                  const controlX = isTile1Horizontal ? p2.x : p1.x;
+                  const controlY = isTile1Horizontal ? p1.y : p2.y;
 
                   return (
                     <g key={`rainbow-bridge-${idx}`}>
                       {/* Glow backing path */}
                       <path
-                        d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
+                        d={`M ${p1.x} ${p1.y} Q ${controlX} ${controlY} ${p2.x} ${p2.y}`}
                         stroke="url(#rainbow-grad)"
-                        strokeWidth={cellWidth * 0.7}
+                        strokeWidth={subCellSize * 0.7}
                         fill="none"
-                        opacity="0.25"
+                        opacity="0.3"
                         strokeLinecap="butt"
                         filter="url(#rainbow-glow)"
                       />
                       {/* Main bridge path */}
                       <path
-                        d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
+                        d={`M ${p1.x} ${p1.y} Q ${controlX} ${controlY} ${p2.x} ${p2.y}`}
                         stroke="url(#rainbow-grad)"
-                        strokeWidth={cellWidth * 0.7}
+                        strokeWidth={subCellSize * 0.7}
                         fill="none"
-                        opacity="0.35"
+                        opacity="0.45"
                         strokeLinecap="butt"
                       />
                     </g>
