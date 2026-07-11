@@ -703,20 +703,29 @@ export function getActiveRainbowBridges(placedTiles: Record<string, PlacedTile>)
         const corner1Key = `${x1},${y2}`;
         const corner2Key = `${x2},${y1}`;
 
-        if (placedTiles[corner1Key] || placedTiles[corner2Key]) {
-          let r1 = 0, c1 = 0, r2 = 0, c2 = 0;
-          if (dx === 1 && dy === 1) {
-            r1 = 4; c1 = 4;
-            r2 = 0; c2 = 0;
-          } else if (dx === 1 && dy === -1) {
-            r1 = 0; c1 = 4;
-            r2 = 4; c2 = 0;
-          } else if (dx === -1 && dy === 1) {
-            r1 = 4; c1 = 0;
-            r2 = 0; c2 = 4;
-          } else if (dx === -1 && dy === -1) {
-            r1 = 0; c1 = 0;
-            r2 = 4; c2 = 4;
+        const c1Placed = !!placedTiles[corner1Key];
+        const c2Placed = !!placedTiles[corner2Key];
+
+        // L-shape exists if exactly one intermediate corner tile is placed
+        if (c1Placed !== c2Placed) {
+          let r1 = 2, c1 = 2, r2 = 2, c2 = 2;
+
+          if (c1Placed && !c2Placed) {
+            // Empty corner is corner 2: (x2, y1) which is (x1 + dx, y1)
+            // T1(x1,y1) exit pointing to corner 2: horizontal move dx
+            c1 = dx === 1 ? 4 : 0;
+            r1 = 2;
+            // T2(x2,y2) exit pointing to corner 2: vertical move -dy
+            c2 = 2;
+            r2 = dy === 1 ? 4 : 0;
+          } else {
+            // Empty corner is corner 1: (x1, y2) which is (x1, y1 + dy)
+            // T1(x1,y1) exit pointing to corner 1: vertical move dy
+            c1 = 2;
+            r1 = dy === 1 ? 0 : 4;
+            // T2(x2,y2) exit pointing to corner 1: horizontal move -dx
+            c2 = dx === 1 ? 0 : 4;
+            r2 = 2;
           }
 
           bridges.push({
