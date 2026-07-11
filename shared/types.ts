@@ -21,6 +21,9 @@ export interface Player {
   hasConceded?: boolean;
   sessionToken?: string;
   isDisconnected?: boolean;
+  hasThorns?: boolean;
+  hasTurnAside?: boolean;
+  hasSpiritSkin?: boolean;
 }
 
 export interface Treasure {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance, getActiveRainbowBridges } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -74,6 +74,18 @@ describe('rotateBorderCoordinate', () => {
     expect(res.direction).toBe('H');
     expect(res.r).toBe(2);
     expect(res.c).toBe(3);
+  });
+
+  it('should return the original coordinates when applying a rotation followed by its complementary unrotation', () => {
+    const rotation: 0 | 90 | 180 | 270 = 90;
+    const unrotation = ((360 - rotation) % 360) as 0 | 90 | 180 | 270;
+    
+    // Rotate V(1, 2) by 90 deg clockwise
+    const rotated = rotateBorderCoordinate(1, 2, 'V', rotation);
+    // Unrotate the result by 270 deg clockwise
+    const unrotated = rotateBorderCoordinate(rotated.r, rotated.c, rotated.direction, unrotation);
+    
+    expect(unrotated).toEqual({ r: 1, c: 2, direction: 'V' });
   });
 });
 
@@ -397,6 +409,37 @@ describe('getWrappingManhattanDistance', () => {
     const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
     // Straight distance is 4 subcells. Wrapping distance is 1 subcell.
     expect(getWrappingManhattanDistance(from, to, lShapedTiles)).toBe(1);
+  });
+});
+
+describe('getActiveRainbowBridges', () => {
+  it('should detect active Rainbow Bridge on L-shaped tile placements', () => {
+    const lShapedTiles: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' },
+      '1,1': { tileId: 3, position: { x: 1, y: 1 }, rotation: 0, placedBy: 'p3' }
+    };
+
+    const bridges = getActiveRainbowBridges(lShapedTiles);
+    expect(bridges.length).toBe(1);
+
+    // Diagonal tiles (0,0) and (1,1) should be connected at their exits pointing to empty corner (0,1)
+    expect(bridges[0].tile1).toEqual({ x: 0, y: 0, r: 0, c: 2 });
+    expect(bridges[0].tile2).toEqual({ x: 1, y: 1, r: 2, c: 0 });
+  });
+
+  it('should allow movement across an active Rainbow Bridge', () => {
+    const lShapedTiles: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' },
+      '1,1': { tileId: 3, position: { x: 1, y: 1 }, rotation: 0, placedBy: 'p3' }
+    };
+
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 0, c: 2 };
+    const to: TokenPosition = { tileX: 1, tileY: 1, r: 2, c: 0 };
+
+    const moveRes = validateTokenMove(from, to, lShapedTiles, {});
+    expect(moveRes.valid).toBe(true);
   });
 });
 

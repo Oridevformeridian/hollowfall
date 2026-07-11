@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, getWrappingManhattanDistance } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, getWrappingManhattanDistance, getActiveRainbowBridges } from './shared/validation.ts';
 
 const renderTileSvgContent = (
   layout: TileLayout,
@@ -81,10 +81,11 @@ const renderTileSvgContent = (
       {/* Render Dynamic Raised Stone Walls */}
       {(() => {
         const dynamicWalls = [];
-        if (tilePos && wallsState) {
+        if (tilePos && wallsState && rotation !== undefined) {
           for (let r = 0; r < 5; r++) {
             for (let c = 0; c < 4; c++) {
-              const wallKey = `${tilePos.x},${tilePos.y}:${r},${c}:V`;
+              const placed = rotateBorderCoordinate(r, c, 'V', rot);
+              const wallKey = `${tilePos.x},${tilePos.y}:${placed.r},${placed.c}:${placed.direction}`;
               if (wallsState[wallKey]) {
                 dynamicWalls.push(
                   <line
@@ -104,7 +105,8 @@ const renderTileSvgContent = (
           }
           for (let r = 0; r < 4; r++) {
             for (let c = 0; c < 5; c++) {
-              const wallKey = `${tilePos.x},${tilePos.y}:${r},${c}:H`;
+              const placed = rotateBorderCoordinate(r, c, 'H', rot);
+              const wallKey = `${tilePos.x},${tilePos.y}:${placed.r},${placed.c}:${placed.direction}`;
               if (wallsState[wallKey]) {
                 dynamicWalls.push(
                   <line
@@ -313,8 +315,10 @@ function generateLobbyName(): string {
 }
 
 const getCardTypeEmoji = (cardId: string) => {
-  if (cardId === 'ash_kindle_storm' || cardId === 'talisman_bear_charm') return '⚔️';
+  if (cardId === 'ash_kindle_storm') return '⚔️';
+  if (cardId === 'talisman_thorns') return '🌵';
   if (cardId === 'working_miststep' || cardId === 'working_don_wolf') return '🌀';
+  if (cardId === 'working_shift_spirit') return '↔️';
   if (cardId === 'offering_deep_breath') return '🏥';
   if (cardId === 'ash_turn_aside' || cardId === 'ash_spirit_skin') return '🛡️';
   if (cardId === 'working_raise_stone') return '🧱';
@@ -1597,6 +1601,17 @@ export default function App() {
                     {player.hasAttackedThisTurn ? 'Used' : player.isFirstTurnOfMatch ? 'Forbidden' : 'Ready'}
                   </span>
                 </div>
+                {/* Active Auras */}
+                {((player as any).hasTurnAside || (player as any).hasSpiritSkin || (player as any).hasThorns) && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>🛡️ Auras:</span>
+                    <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold', display: 'flex', gap: '4px' }}>
+                      {(player as any).hasTurnAside && <span title="Turn Aside Aura" style={{ color: 'var(--accent-cyan)' }}>🛡️</span>}
+                      {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura" style={{ color: 'var(--accent-green)' }}>🪨</span>}
+                      {(player as any).hasThorns && <span title="Thorns Talisman" style={{ color: '#FF6D00' }}>🌵</span>}
+                    </span>
+                  </div>
+                )}
                 {/* Carrying status */}
                 {(() => {
                   const carried = gameState.treasures ? Object.values(gameState.treasures).find(t => t.carrierId === hoveredPlayerId) : null;
@@ -2019,6 +2034,100 @@ export default function App() {
             );
           })}
 
+          {/* Rainbow Bridges Overlay */}
+          {gameState && (() => {
+            const bridges = getActiveRainbowBridges(gameState.placedTiles);
+            if (bridges.length === 0) return null;
+
+            // Calculate precise board dimensions including 16px gaps and 24px padding (matching the absolute container padding box)
+            const boardWidth = (maxX - minX + 1) * cellWidth + (maxX - minX) * 16 + 48;
+            const boardHeight = (maxY - minY + 1) * cellWidth + (maxY - minY) * 16 + 48;
+
+            return (
+              <svg
+                width={boardWidth}
+                height={boardHeight}
+                viewBox={`0 0 ${boardWidth} ${boardHeight}`}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: `${boardWidth}px`,
+                  height: `${boardHeight}px`,
+                  pointerEvents: 'none',
+                  zIndex: 26
+                }}
+              >
+                <defs>
+                  <linearGradient id="rainbow-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#ff0055" stopOpacity="0.8" />
+                    <stop offset="20%" stopColor="#ff7b00" stopOpacity="0.8" />
+                    <stop offset="40%" stopColor="#ffea00" stopOpacity="0.8" />
+                    <stop offset="60%" stopColor="#00e676" stopOpacity="0.8" />
+                    <stop offset="80%" stopColor="#00b0ff" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#d500f9" stopOpacity="0.8" />
+                  </linearGradient>
+                  <filter id="rainbow-glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+                {bridges.map((bridge, idx) => {
+                  const getEdgeCoords = (t: { x: number; y: number; r: number; c: number }) => {
+                    let ex = 24 + (t.x - minX) * (cellWidth + 16);
+                    let ey = 24 + (maxY - t.y) * (cellWidth + 16);
+                    if (t.c === 4) {
+                      ex += cellWidth;
+                      ey += t.r * subCellSize + subCellSize / 2;
+                    } else if (t.c === 0) {
+                      ey += t.r * subCellSize + subCellSize / 2;
+                    } else if (t.r === 0) {
+                      ex += t.c * subCellSize + subCellSize / 2;
+                    } else if (t.r === 4) {
+                      ex += t.c * subCellSize + subCellSize / 2;
+                      ey += cellWidth;
+                    }
+                    return { x: ex, y: ey };
+                  };
+
+                  const p1 = getEdgeCoords(bridge.tile1);
+                  const p2 = getEdgeCoords(bridge.tile2);
+
+                  // Determine which exit is horizontal (East/West) vs vertical (North/South)
+                  const isTile1Horizontal = bridge.tile1.c === 0 || bridge.tile1.c === 4;
+                  
+                  // The intersection point of the horizontal exit line and the vertical exit line
+                  const controlX = isTile1Horizontal ? p2.x : p1.x;
+                  const controlY = isTile1Horizontal ? p1.y : p2.y;
+
+                  return (
+                    <g key={`rainbow-bridge-${idx}`}>
+                      {/* Glow backing path */}
+                      <path
+                        d={`M ${p1.x} ${p1.y} Q ${controlX} ${controlY} ${p2.x} ${p2.y}`}
+                        stroke="url(#rainbow-grad)"
+                        strokeWidth={subCellSize * 0.7}
+                        fill="none"
+                        opacity="0.3"
+                        strokeLinecap="butt"
+                        filter="url(#rainbow-glow)"
+                      />
+                      {/* Main bridge path */}
+                      <path
+                        d={`M ${p1.x} ${p1.y} Q ${controlX} ${controlY} ${p2.x} ${p2.y}`}
+                        stroke="url(#rainbow-grad)"
+                        strokeWidth={subCellSize * 0.7}
+                        fill="none"
+                        opacity="0.45"
+                        strokeLinecap="butt"
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+            );
+          })()}
+
           {/* Spell Animations Overlay */}
           {activeAnimation && (() => {
             const pFrom = getCellCoords(activeAnimation.from.tileX, activeAnimation.from.tileY, activeAnimation.from.r, activeAnimation.from.c);
@@ -2067,12 +2176,21 @@ export default function App() {
                   </div>
                 )}
 
+                {activeAnimation.cardId === 'working_shift_spirit' && pTo && (
+                  <div className="swap-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                    <div className="miststep-fadeout" style={{ left: pFrom.x, top: pFrom.y }} />
+                    <div className="miststep-fadein" style={{ left: pTo.x, top: pTo.y }} />
+                    <div className="miststep-fadein" style={{ left: pFrom.x, top: pFrom.y }} />
+                    <div className="miststep-fadeout" style={{ left: pTo.x, top: pTo.y }} />
+                  </div>
+                )}
+
                 {activeAnimation.cardId === 'working_raise_stone' && pTo && (
                   <div className="raise-stone-effect" style={{ left: pTo.x, top: pTo.y }} />
                 )}
 
-                {activeAnimation.cardId === 'talisman_bear_charm' && (
-                  <div className="bear-charm-effect" style={{ left: pFrom.x, top: pFrom.y }} />
+                {activeAnimation.cardId === 'talisman_thorns' && (
+                  <div className="thorns-effect" style={{ left: pFrom.x, top: pFrom.y }} />
                 )}
 
                  {activeAnimation.cardId === 'working_don_wolf' && pTo && (
@@ -2377,6 +2495,7 @@ export default function App() {
                 : '#94a3b8';
 
               const canCast = isActiveTurn && self.ap > 0 && !isWard;
+              const noTargetNeeded = card.id === 'talisman_thorns' || card.id === 'ash_turn_aside' || card.id === 'ash_spirit_skin' || card.id === 'offering_deep_breath';
 
               return (
                 <div
@@ -2385,7 +2504,6 @@ export default function App() {
                   onMouseLeave={() => setHoveredCardId(null)}
                   onClick={() => {
                     if (!canCast) return;
-                    const noTargetNeeded = card.id === 'talisman_bear_charm' || card.id === 'offering_deep_breath';
                     if (isSelected) {
                       if (noTargetNeeded) {
                         handlePlayCard(card.id);
@@ -2478,7 +2596,7 @@ export default function App() {
                     {isWard
                       ? '🛡️ Defense'
                       : isSelected 
-                      ? (card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath'
+                      ? (noTargetNeeded
                         ? '➔ Click to Cast' 
                         : '🎯 Target board') 
                       : '⚡ Cast Rite'}

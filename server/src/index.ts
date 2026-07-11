@@ -2,12 +2,23 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import path from 'path';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, Card } from '../../shared/types';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance } from '../../shared/validation';
 import { HEROES, BASIC_CARDS } from '../../shared/constants';
 
 const app = express();
 app.use(cors());
+
+// Serve client build in production
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.resolve(process.cwd(), '../client/dist');
+  app.use(express.static(clientBuildPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
+
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -250,6 +261,17 @@ io.on('connection', (socket) => {
                 }
               }
             }
+
+            // Update in placedTiles
+            if (room.placedTiles) {
+              for (const tileKey of Object.keys(room.placedTiles)) {
+                const tile = room.placedTiles[tileKey];
+                if (tile.placedBy === oldPlayerId) {
+                  tile.placedBy = newPlayerId;
+                }
+              }
+            }
+
 
             // Update in roomMetadata
             const meta = roomMetadata.get(targetRoomCode);
@@ -736,22 +758,47 @@ io.on('connection', (socket) => {
             // Mark attack used
             player.hasAttackedThisTurn = true;
 
-             // Auto Ward response checking
-             const turnAsideIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_turn_aside');
-             const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
+             // Aura protection checks
+             let countered: 'turn_aside' | 'spirit_skin' | null = null;
+             if (targetPlayer.hasTurnAside) {
+               targetPlayer.hasTurnAside = false;
+               countered = 'turn_aside';
+               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Turn Aside aura countered Kindle the Storm!`);
+             } else if (targetPlayer.hasSpiritSkin) {
+               targetPlayer.hasSpiritSkin = false;
+               countered = 'spirit_skin';
+               targetPlayer.thread = Math.max(0, targetPlayer.thread - 1); // 3 damage reduced by 2
+               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura reduced Kindle the Storm damage by 2 (took 1 damage).`);
+             } else {
+               targetPlayer.thread = Math.max(0, targetPlayer.thread - 3);
+               broadcastSystemMessage(currentRoomCode, `${player.username} cast Kindle the Storm on ${targetPlayer.username} for 3 damage!`);
+             }
 
-             const countered = turnAsideIndex !== -1 ? 'turn_aside' : spiritSkinIndex !== -1 ? 'spirit_skin' : null;
-            if (turnAsideIndex !== -1) {
-              targetPlayer.hand.splice(turnAsideIndex, 1);
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Turn Aside to counter Kindle the Storm!`);
-            } else if (spiritSkinIndex !== -1) {
-              targetPlayer.hand.splice(spiritSkinIndex, 1);
-              targetPlayer.thread = Math.max(0, targetPlayer.thread - 1); // 3 damage reduced by 2
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Spirit-Skin to reduce Kindle the Storm damage by 2 (took 1 damage).`);
-            } else {
-              targetPlayer.thread = Math.max(0, targetPlayer.thread - 3);
-              broadcastSystemMessage(currentRoomCode, `${player.username} cast Kindle the Storm on ${targetPlayer.username} for 3 damage!`);
-            }
+             // Thorns retaliation
+             if (targetPlayer.hasThorns && countered !== 'turn_aside') {
+               player.thread = Math.max(0, player.thread - 1);
+               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+               // Check if player died from thorns
+               if (player.thread <= 0) {
+                 targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
+                 targetPlayer.hand.push(...player.hand);
+                 player.hand = [];
+                 if (targetPlayer.hand.length > 7) {
+                   targetPlayer.hand.splice(7);
+                 }
+                 player.thread = 15;
+                 const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
+                 if (playerTile) {
+                   room.tokenPositions[playerId] = {
+                     tileX: playerTile.position.x,
+                     tileY: playerTile.position.y,
+                     r: 2,
+                     c: 2
+                   };
+                 }
+                 broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
+               }
+             }
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -881,11 +928,29 @@ io.on('connection', (socket) => {
             };
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
-          } else if (card.id === 'talisman_bear_charm') {
-            player.maxThread += 2;
-            player.thread = Math.min(player.maxThread, player.thread + 2);
+          } else if (card.id === 'ash_turn_aside') {
+            player.hasTurnAside = true;
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Turn Aside, gaining a protective shield against the next attack spell.`);
 
-            broadcastSystemMessage(currentRoomCode, `${player.username} invoked the Bear-Charm Rite, gaining +2 Max Thread and healing 2 Thread.`);
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
+          } else if (card.id === 'ash_spirit_skin') {
+            player.hasSpiritSkin = true;
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Spirit-Skin, gaining a damage-reduction shield.`);
+
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
+          } else if (card.id === 'talisman_thorns') {
+            player.hasThorns = true;
+            broadcastSystemMessage(currentRoomCode, `${player.username} invoked the Thorns talisman, enabling retaliation against attacks.`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -941,6 +1006,67 @@ io.on('connection', (socket) => {
             }
 
             broadcastSystemMessage(currentRoomCode, `${player.username} invoked Don the Wolf, leaping to Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
+
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId, target }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
+          } else if (card.id === 'working_shift_spirit') {
+            if (!target) {
+              sendError(socket, 'Shift Spirit requires a target cell.');
+              return;
+            }
+            const from = room.tokenPositions[playerId];
+            if (!from) return;
+
+            // Find the player occupied at target cell
+            const targetPlayerId = Object.keys(room.tokenPositions).find(pId => {
+              const pos = room.tokenPositions[pId];
+              return pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
+            });
+            if (!targetPlayerId) {
+              sendError(socket, 'Shift Spirit requires targeting a cell occupied by another Walker.');
+              return;
+            }
+            if (targetPlayerId === playerId) {
+              sendError(socket, 'You cannot target yourself.');
+              return;
+            }
+
+            // Check line of sight
+            if (!hasLineOfSight(from, target, room.placedTiles, room.doorsState, room.wallsState)) {
+              sendError(socket, 'Target Walker is not in your Line of Sight (LOS).');
+              return;
+            }
+
+            const targetPos = room.tokenPositions[targetPlayerId];
+            const targetPlayer = room.players[targetPlayerId];
+
+            // Perform position swap
+            room.tokenPositions[playerId] = { ...targetPos };
+            room.tokenPositions[targetPlayerId] = { ...from };
+
+            // Update carried treasures coordinates
+            if (room.treasures) {
+              for (const treasureId of Object.keys(room.treasures)) {
+                const treasure = room.treasures[treasureId];
+                if (treasure.carrierId === playerId) {
+                  treasure.tileX = targetPos.tileX;
+                  treasure.tileY = targetPos.tileY;
+                  treasure.r = targetPos.r;
+                  treasure.c = targetPos.c;
+                } else if (treasure.carrierId === targetPlayerId) {
+                  treasure.tileX = from.tileX;
+                  treasure.tileY = from.tileY;
+                  treasure.r = from.r;
+                  treasure.c = from.c;
+                }
+              }
+            }
+
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Shift Spirit, swapping positions with ${targetPlayer.username}!`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -1055,15 +1181,17 @@ io.on('connection', (socket) => {
           player.hasAttackedThisTurn = true;
           player.ap--;
 
+          // Aura protection check
+          let tookDamage = false;
           let damageDealt = 0;
           let blockedBySpiritSkin = false;
-          const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
-          if (spiritSkinIndex !== -1) {
-            targetPlayer.hand.splice(spiritSkinIndex, 1);
+          if (targetPlayer.hasSpiritSkin) {
+            targetPlayer.hasSpiritSkin = false;
             blockedBySpiritSkin = true;
-            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Spirit-Skin to block the Lash damage!`);
+            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura blocked the Lash damage!`);
           } else {
             targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
+            tookDamage = true;
             damageDealt = 1;
             broadcastSystemMessage(currentRoomCode, `${player.username} lashed ${targetPlayer.username} for 1 damage!`);
           }
@@ -1078,6 +1206,32 @@ io.on('connection', (socket) => {
             }
           };
           io.to(currentRoomCode).emit('message', JSON.stringify(lashAnimMsg));
+
+          // Thorns retaliation
+          if (targetPlayer.hasThorns && tookDamage) {
+            player.thread = Math.max(0, player.thread - 1);
+            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+            // Check if player died from Thorns
+            if (player.thread <= 0) {
+              targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
+              targetPlayer.hand.push(...player.hand);
+              player.hand = [];
+              if (targetPlayer.hand.length > 7) {
+                targetPlayer.hand.splice(7);
+              }
+              player.thread = 15;
+              const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
+              if (playerTile) {
+                room.tokenPositions[playerId] = {
+                  tileX: playerTile.position.x,
+                  tileY: playerTile.position.y,
+                  r: 2,
+                  c: 2
+                };
+              }
+              broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
+            }
+          }
 
           if (targetPlayer.thread <= 0) {
             player.severPoints = (player.severPoints || 0) + 1;
