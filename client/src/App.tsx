@@ -81,10 +81,11 @@ const renderTileSvgContent = (
       {/* Render Dynamic Raised Stone Walls */}
       {(() => {
         const dynamicWalls = [];
-        if (tilePos && wallsState) {
+        if (tilePos && wallsState && rotation !== undefined) {
           for (let r = 0; r < 5; r++) {
             for (let c = 0; c < 4; c++) {
-              const wallKey = `${tilePos.x},${tilePos.y}:${r},${c}:V`;
+              const placed = rotateBorderCoordinate(r, c, 'V', rot);
+              const wallKey = `${tilePos.x},${tilePos.y}:${placed.r},${placed.c}:${placed.direction}`;
               if (wallsState[wallKey]) {
                 dynamicWalls.push(
                   <line
@@ -104,7 +105,8 @@ const renderTileSvgContent = (
           }
           for (let r = 0; r < 4; r++) {
             for (let c = 0; c < 5; c++) {
-              const wallKey = `${tilePos.x},${tilePos.y}:${r},${c}:H`;
+              const placed = rotateBorderCoordinate(r, c, 'H', rot);
+              const wallKey = `${tilePos.x},${tilePos.y}:${placed.r},${placed.c}:${placed.direction}`;
               if (wallsState[wallKey]) {
                 dynamicWalls.push(
                   <line

@@ -262,6 +262,17 @@ io.on('connection', (socket) => {
               }
             }
 
+            // Update in placedTiles
+            if (room.placedTiles) {
+              for (const tileKey of Object.keys(room.placedTiles)) {
+                const tile = room.placedTiles[tileKey];
+                if (tile.placedBy === oldPlayerId) {
+                  tile.placedBy = newPlayerId;
+                }
+              }
+            }
+
+
             // Update in roomMetadata
             const meta = roomMetadata.get(targetRoomCode);
             if (meta && meta.secondaryTiles && meta.secondaryTiles[oldPlayerId] !== undefined) {
