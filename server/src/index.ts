@@ -1013,6 +1013,67 @@ io.on('connection', (socket) => {
             };
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
+          } else if (card.id === 'working_shift_spirit') {
+            if (!target) {
+              sendError(socket, 'Shift Spirit requires a target cell.');
+              return;
+            }
+            const from = room.tokenPositions[playerId];
+            if (!from) return;
+
+            // Find the player occupied at target cell
+            const targetPlayerId = Object.keys(room.tokenPositions).find(pId => {
+              const pos = room.tokenPositions[pId];
+              return pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
+            });
+            if (!targetPlayerId) {
+              sendError(socket, 'Shift Spirit requires targeting a cell occupied by another Walker.');
+              return;
+            }
+            if (targetPlayerId === playerId) {
+              sendError(socket, 'You cannot target yourself.');
+              return;
+            }
+
+            // Check line of sight
+            if (!hasLineOfSight(from, target, room.placedTiles, room.doorsState, room.wallsState)) {
+              sendError(socket, 'Target Walker is not in your Line of Sight (LOS).');
+              return;
+            }
+
+            const targetPos = room.tokenPositions[targetPlayerId];
+            const targetPlayer = room.players[targetPlayerId];
+
+            // Perform position swap
+            room.tokenPositions[playerId] = { ...targetPos };
+            room.tokenPositions[targetPlayerId] = { ...from };
+
+            // Update carried treasures coordinates
+            if (room.treasures) {
+              for (const treasureId of Object.keys(room.treasures)) {
+                const treasure = room.treasures[treasureId];
+                if (treasure.carrierId === playerId) {
+                  treasure.tileX = targetPos.tileX;
+                  treasure.tileY = targetPos.tileY;
+                  treasure.r = targetPos.r;
+                  treasure.c = targetPos.c;
+                } else if (treasure.carrierId === targetPlayerId) {
+                  treasure.tileX = from.tileX;
+                  treasure.tileY = from.tileY;
+                  treasure.r = from.r;
+                  treasure.c = from.c;
+                }
+              }
+            }
+
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Shift Spirit, swapping positions with ${targetPlayer.username}!`);
+
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId, target }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
           } else if (card.id === 'offering_deep_breath') {
             player.ap += 2;
 

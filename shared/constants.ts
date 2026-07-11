@@ -176,6 +176,12 @@ export const BASIC_CARDS: Card[] = [
     description: 'Leap: Teleport up to 4 cells Manhattan distance, even around corners.'
   },
   {
+    id: 'working_shift_spirit',
+    name: 'Shift Spirit',
+    type: 'working',
+    description: 'Swap positions with a Walker in your Line of Sight (LOS).'
+  },
+  {
     id: 'offering_deep_breath',
     name: 'Deep Breath',
     type: 'offering',

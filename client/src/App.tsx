@@ -318,6 +318,7 @@ const getCardTypeEmoji = (cardId: string) => {
   if (cardId === 'ash_kindle_storm') return '⚔️';
   if (cardId === 'talisman_thorns') return '🌵';
   if (cardId === 'working_miststep' || cardId === 'working_don_wolf') return '🌀';
+  if (cardId === 'working_shift_spirit') return '↔️';
   if (cardId === 'offering_deep_breath') return '🏥';
   if (cardId === 'ash_turn_aside' || cardId === 'ash_spirit_skin') return '🛡️';
   if (cardId === 'working_raise_stone') return '🧱';
@@ -2035,6 +2036,15 @@ export default function App() {
                   <div className="miststep-effect">
                     <div className="miststep-fadeout" style={{ left: pFrom.x, top: pFrom.y }} />
                     <div className="miststep-fadein" style={{ left: pTo.x, top: pTo.y }} />
+                  </div>
+                )}
+
+                {activeAnimation.cardId === 'working_shift_spirit' && pTo && (
+                  <div className="swap-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                    <div className="miststep-fadeout" style={{ left: pFrom.x, top: pFrom.y }} />
+                    <div className="miststep-fadein" style={{ left: pTo.x, top: pTo.y }} />
+                    <div className="miststep-fadein" style={{ left: pFrom.x, top: pFrom.y }} />
+                    <div className="miststep-fadeout" style={{ left: pTo.x, top: pTo.y }} />
                   </div>
                 )}
 
