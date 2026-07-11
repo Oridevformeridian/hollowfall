@@ -1996,9 +1996,9 @@ export default function App() {
             const bridges = getActiveRainbowBridges(gameState.placedTiles);
             if (bridges.length === 0) return null;
 
-            // Calculate precise board dimensions matching the grid tracks content area (no padding offset)
-            const boardWidth = (maxX - minX + 1) * cellWidth + (maxX - minX) * 16;
-            const boardHeight = (maxY - minY + 1) * cellWidth + (maxY - minY) * 16;
+            // Calculate precise board dimensions including 16px gaps and 24px padding (matching the absolute container padding box)
+            const boardWidth = (maxX - minX + 1) * cellWidth + (maxX - minX) * 16 + 48;
+            const boardHeight = (maxY - minY + 1) * cellWidth + (maxY - minY) * 16 + 48;
 
             return (
               <svg
@@ -2033,8 +2033,8 @@ export default function App() {
                 </defs>
                 {bridges.map((bridge, idx) => {
                   const getEdgeCoords = (t: { x: number; y: number; r: number; c: number }) => {
-                    let ex = (t.x - minX) * (cellWidth + 16);
-                    let ey = (maxY - t.y) * (cellWidth + 16);
+                    let ex = 24 + (t.x - minX) * (cellWidth + 16);
+                    let ey = 24 + (maxY - t.y) * (cellWidth + 16);
                     if (t.c === 4) {
                       ex += cellWidth;
                       ey += t.r * subCellSize + subCellSize / 2;
