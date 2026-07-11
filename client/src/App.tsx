@@ -2025,17 +2025,28 @@ export default function App() {
                   </filter>
                 </defs>
                 {bridges.map((bridge, idx) => {
-                  const p1 = {
-                    x: (bridge.tile1.x - minX) * cellWidth + bridge.tile1.c * subCellSize + subCellSize / 2,
-                    y: (maxY - bridge.tile1.y) * cellWidth + bridge.tile1.r * subCellSize + subCellSize / 2
-                  };
-                  const p2 = {
-                    x: (bridge.tile2.x - minX) * cellWidth + bridge.tile2.c * subCellSize + subCellSize / 2,
-                    y: (maxY - bridge.tile2.y) * cellWidth + bridge.tile2.r * subCellSize + subCellSize / 2
+                  const getEdgeCoords = (t: { x: number; y: number; r: number; c: number }) => {
+                    let ex = (t.x - minX) * cellWidth;
+                    let ey = (maxY - t.y) * cellWidth;
+                    if (t.c === 4) {
+                      ex += cellWidth;
+                      ey += t.r * subCellSize + subCellSize / 2;
+                    } else if (t.c === 0) {
+                      ey += t.r * subCellSize + subCellSize / 2;
+                    } else if (t.r === 0) {
+                      ex += t.c * subCellSize + subCellSize / 2;
+                    } else if (t.r === 4) {
+                      ex += t.c * subCellSize + subCellSize / 2;
+                      ey += cellWidth;
+                    }
+                    return { x: ex, y: ey };
                   };
 
+                  const p1 = getEdgeCoords(bridge.tile1);
+                  const p2 = getEdgeCoords(bridge.tile2);
+
                   const midX = (p1.x + p2.x) / 2;
-                  const midY = (p1.y + p2.y) / 2 - 35; // Arch up by 35px
+                  const midY = (p1.y + p2.y) / 2 - 60; // Proportional arch height
 
                   return (
                     <g key={`rainbow-bridge-${idx}`}>
@@ -2043,19 +2054,20 @@ export default function App() {
                       <path
                         d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
                         stroke="url(#rainbow-grad)"
-                        strokeWidth="10"
+                        strokeWidth={cellWidth * 0.7}
                         fill="none"
-                        opacity="0.3"
-                        strokeLinecap="round"
+                        opacity="0.25"
+                        strokeLinecap="butt"
                         filter="url(#rainbow-glow)"
                       />
                       {/* Main bridge path */}
                       <path
                         d={`M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`}
                         stroke="url(#rainbow-grad)"
-                        strokeWidth="5"
+                        strokeWidth={cellWidth * 0.7}
                         fill="none"
-                        strokeLinecap="round"
+                        opacity="0.35"
+                        strokeLinecap="butt"
                       />
                     </g>
                   );
