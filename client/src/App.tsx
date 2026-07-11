@@ -334,6 +334,14 @@ export default function App() {
     to?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' };
     countered?: 'turn_aside' | 'spirit_skin' | null;
   } | null>(null);
+  const [activeLashAnimation, setActiveLashAnimation] = useState<{
+    attackerId: string;
+    targetPlayerId: string;
+    from: { tileX: number; tileY: number; r: number; c: number };
+    to: { tileX: number; tileY: number; r: number; c: number };
+    damageDealt: number;
+    blockedBySpiritSkin: boolean;
+  } | null>(null);
   const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
@@ -455,6 +463,23 @@ export default function App() {
             setTimeout(() => {
               setActiveAnimation(null);
             }, 2500);
+          }
+        } else if (msg.event === 'LASH_ATTACK_ANIMATION') {
+          const { attackerId, targetPlayerId, damageDealt, blockedBySpiritSkin } = msg.payload;
+          const attackerPos = gameStateRef.current?.tokenPositions[attackerId];
+          const targetPos = gameStateRef.current?.tokenPositions[targetPlayerId];
+          if (attackerPos && targetPos) {
+            setActiveLashAnimation({
+              attackerId,
+              targetPlayerId,
+              from: { ...attackerPos },
+              to: { ...targetPos },
+              damageDealt,
+              blockedBySpiritSkin
+            });
+            setTimeout(() => {
+              setActiveLashAnimation(null);
+            }, 2000);
           }
         } else if (msg.event === 'ERROR') {
           setError(msg.payload.message);
@@ -1771,6 +1796,15 @@ export default function App() {
                             isDonWolfTarget = dist <= 4 && !occupiedPlayerId;
                           }
 
+                          // 3.7. Shift Spirit targeting
+                          let isShiftSpiritTarget = false;
+                          if (targetingCardId === 'working_shift_spirit' && isActiveTurn && myTokenPos) {
+                            const p = occupiedPlayerId ? gameState.players[occupiedPlayerId] : null;
+                            if (p && p.thread > 0 && occupiedPlayerId !== socket?.id) {
+                              isShiftSpiritTarget = hasLineOfSight(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
+                            }
+                          }
+
                           // 4. Raise Stone cell detection (player's current cell)
                           const isRaiseStoneCell = targetingCardId === 'working_raise_stone' && isActiveTurn && myTokenPos && myTokenPos.tileX === x && myTokenPos.tileY === y && myTokenPos.r === r && myTokenPos.c === c;
 
@@ -1793,6 +1827,9 @@ export default function App() {
                                   } else if (isDonWolfTarget) {
                                     e.stopPropagation();
                                     handlePlayCard('working_don_wolf', targetPos);
+                                  } else if (isShiftSpiritTarget) {
+                                    e.stopPropagation();
+                                    handlePlayCard('working_shift_spirit', targetPos);
                                   }
                               }}
                               onMouseEnter={() => {
@@ -1807,8 +1844,8 @@ export default function App() {
                               }}
                               style={{
                                 position: 'relative',
-                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || occupiedPlayerId) ? 'pointer' : 'default',
-                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isRaiseStoneCell || occupiedPlayerId) ? 'auto' : 'none',
+                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || occupiedPlayerId) ? 'pointer' : 'default',
+                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || isRaiseStoneCell || occupiedPlayerId) ? 'auto' : 'none',
                                 border: lashablePlayer
                                   ? '2px solid var(--accent-crimson)'
                                   : isValidMove
@@ -1817,6 +1854,8 @@ export default function App() {
                                   ? '2px solid var(--accent-crimson)'
                                   : (isMiststepTarget || isDonWolfTarget)
                                   ? '1.5px dashed var(--accent-cyan)'
+                                  : isShiftSpiritTarget
+                                  ? '2px solid var(--accent-cyan)'
                                   : 'none',
                                 backgroundColor: lashablePlayer
                                   ? 'rgba(239, 68, 68, 0.15)'
@@ -1826,6 +1865,8 @@ export default function App() {
                                   ? 'rgba(255, 23, 68, 0.15)'
                                   : (isMiststepTarget || isDonWolfTarget)
                                   ? 'rgba(0, 229, 255, 0.1)'
+                                  : isShiftSpiritTarget
+                                  ? 'rgba(0, 229, 255, 0.15)'
                                   : 'transparent',
                                 borderRadius: '4px',
                                 transition: 'all 0.15s ease'
@@ -1839,6 +1880,8 @@ export default function App() {
                                   ? 'Teleport here'
                                   : isDonWolfTarget
                                   ? 'Wolf Leap here'
+                                  : isShiftSpiritTarget
+                                  ? 'Swap positions with Shift Spirit'
                                   : ''
                               }
                             >
@@ -2187,9 +2230,73 @@ export default function App() {
                           true
                         )
                       )}
-                    </div>
-                  );
-                })()}
+                     </div>
+                   );
+                 })()}
+               </div>
+             );
+           })()}
+
+          {/* Lash Attack Animation Overlay */}
+          {activeLashAnimation && (() => {
+            const pFrom = getCellCoords(activeLashAnimation.from.tileX, activeLashAnimation.from.tileY, activeLashAnimation.from.r, activeLashAnimation.from.c);
+            const pTo = getCellCoords(activeLashAnimation.to.tileX, activeLashAnimation.to.tileY, activeLashAnimation.to.r, activeLashAnimation.to.c);
+
+            return (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  pointerEvents: 'none',
+                  zIndex: 100,
+                  gridColumn: '1 / -1',
+                  gridRow: '1 / -1'
+                }}
+              >
+                {/* SVG Lash Line / Whip Strike */}
+                <svg
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  <line
+                    x1={pFrom.x}
+                    y1={pFrom.y}
+                    x2={pTo.x}
+                    y2={pTo.y}
+                    stroke="#ff1744"
+                    strokeWidth="3"
+                    className="lash-whip-line"
+                  />
+                </svg>
+
+                {/* Slash Burst on Impact */}
+                <div
+                  className="lash-slash-effect"
+                  style={{
+                    left: `${pTo.x}px`,
+                    top: `${pTo.y}px`
+                  }}
+                />
+
+                {/* Bouncing Damage Number / Blocked Text */}
+                <div
+                  className={`lash-damage-number ${activeLashAnimation.blockedBySpiritSkin ? 'blocked' : ''}`}
+                  style={{
+                    left: `${pTo.x}px`,
+                    top: `${pTo.y}px`
+                  }}
+                >
+                  {activeLashAnimation.blockedBySpiritSkin ? '🛡️ Blocked!' : `-${activeLashAnimation.damageDealt}`}
+                </div>
               </div>
             );
           })()}

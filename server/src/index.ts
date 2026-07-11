@@ -1055,14 +1055,29 @@ io.on('connection', (socket) => {
           player.hasAttackedThisTurn = true;
           player.ap--;
 
+          let damageDealt = 0;
+          let blockedBySpiritSkin = false;
           const spiritSkinIndex = targetPlayer.hand.findIndex(c => c.id === 'ash_spirit_skin');
           if (spiritSkinIndex !== -1) {
             targetPlayer.hand.splice(spiritSkinIndex, 1);
+            blockedBySpiritSkin = true;
             broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} used Spirit-Skin to block the Lash damage!`);
           } else {
             targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
+            damageDealt = 1;
             broadcastSystemMessage(currentRoomCode, `${player.username} lashed ${targetPlayer.username} for 1 damage!`);
           }
+
+          const lashAnimMsg: ServerMessage = {
+            event: 'LASH_ATTACK_ANIMATION',
+            payload: {
+              attackerId: playerId,
+              targetPlayerId,
+              damageDealt,
+              blockedBySpiritSkin
+            }
+          };
+          io.to(currentRoomCode).emit('message', JSON.stringify(lashAnimMsg));
 
           if (targetPlayer.thread <= 0) {
             player.severPoints = (player.severPoints || 0) + 1;
