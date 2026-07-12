@@ -1132,7 +1132,8 @@ export default function App() {
 
   const isMobile = dimensions.width <= 768;
   const availableWidth = dimensions.width - (isMobile ? 0 : 320) - 80;
-  const availableHeight = dimensions.height - (isMobile ? 300 : 0) - 80;
+  const bottomHUDHeight = gameState?.phase === 'GAMEPLAY' ? 220 : 0;
+  const availableHeight = dimensions.height - (isMobile ? 300 : 0) - bottomHUDHeight - 80;
 
   const cols = maxX - minX + 1;
   const rows = maxY - minY + 1;
@@ -1482,6 +1483,52 @@ export default function App() {
           boxSizing: 'border-box'
         }}
       >
+        {/* Targeting Banner */}
+        {targetingCardId && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 110,
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              backdropFilter: 'blur(8px)',
+              border: '2px solid var(--accent-crimson)',
+              color: 'white',
+              padding: '10px 20px',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ display: 'inline-block', transform: 'scale(1.2)' }}>🎯</span>
+              Cast {self?.hand.find(c => c.id === targetingCardId)?.name}: Select target cell on map
+            </span>
+            <button
+              onClick={() => {
+                setTargetingCardId(null);
+                setSelectedCardId(null);
+              }}
+              className="btn-secondary"
+              style={{
+                padding: '4px 12px',
+                fontSize: '11px',
+                color: 'var(--accent-crimson)',
+                borderColor: 'var(--accent-crimson)',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
         {/* Turn Indicator Overlay (Top Right) */}
         {gameState.turnOrder.length > 0 && (
           <div
@@ -1645,6 +1692,7 @@ export default function App() {
             transform: `scale(${scaleFactor})`,
             transformOrigin: 'center center',
             transition: 'transform 0.15s ease-out',
+            margin: 'auto',
             marginBottom: '24px'
           }}
         >
@@ -2445,39 +2493,24 @@ export default function App() {
             bottom: '16px',
             left: '50%',
             transform: 'translateX(-50%)',
-            height: '210px',
+            height: '190px',
             backgroundColor: 'rgba(15, 23, 42, 0.65)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             borderRadius: '24px',
-            padding: '12px 32px',
+            padding: '12px 16px',
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'center',
             zIndex: 100,
             boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
             boxSizing: 'border-box',
-            maxWidth: '92vw',
+            maxWidth: '96vw',
             width: 'auto'
           }}
         >
-          {/* Left Summary label */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 125, minWidth: '100px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Your Hand
-            </span>
-            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-              ({self.hand.length}/7 Rites | Deck: {self.deck?.length || 0})
-            </span>
-            {targetingCardId && (
-              <span style={{ fontSize: '10px', color: 'var(--accent-crimson)', animation: 'pulse 1.5s infinite', fontWeight: 'bold', marginTop: '4px' }}>
-                🎯 Target Needed
-              </span>
-            )}
-          </div>
-
-          {/* Cards List (Centered horizontally, fully formed) */}
+          {/* Cards List (Centered horizontally, fully formed, extended all the way to the edge) */}
           <div
             style={{
               display: 'flex',
@@ -2486,12 +2519,11 @@ export default function App() {
               pointerEvents: 'auto',
               flexGrow: 1,
               justifyContent: 'center',
-              alignItems: 'center',
-              padding: '0 24px'
+              alignItems: 'center'
             }}
           >
             {self.hand.map((card, idx) => {
-              const cardKey = `${card.id}-${idx}`;
+              const cardKey = `hand-${card.id}-${idx}`;
               const isSelected = selectedCardId === cardKey;
               const isHovered = hoveredCardId === cardKey;
 
@@ -2574,7 +2606,7 @@ export default function App() {
                     <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
                       {card.type}
                     </span>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
                       <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
                         {card.name}
                       </span>
@@ -2620,22 +2652,6 @@ export default function App() {
                 </div>
               );
             })}
-          </div>
-
-          {/* Right helper buttons / controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', zIndex: 125, minWidth: '100px', justifyContent: 'flex-end' }}>
-            {targetingCardId && (
-              <button
-                onClick={() => {
-                  setTargetingCardId(null);
-                  setSelectedCardId(null);
-                }}
-                className="btn-secondary"
-                style={{ padding: '4px 10px', fontSize: '11px', color: 'var(--accent-crimson)', borderColor: 'var(--accent-crimson)' }}
-              >
-                Cancel Target
-              </button>
-            )}
           </div>
         </div>
       )}
