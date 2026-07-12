@@ -1950,68 +1950,82 @@ export default function App() {
                         })}
                       </div>
                     )}
-                    {/* Render dynamic uncarried treasures */}
-                    {gameState.treasures && Object.values(gameState.treasures).map((tr) => {
-                      if (tr.tileX === x && tr.tileY === y && tr.carrierId === null) {
-                        return (
-                          <div
-                            key={tr.id}
-                            style={{
-                              position: 'absolute',
-                              left: `${tr.c * subCellSize}px`,
-                              top: `${tr.r * subCellSize}px`,
-                              width: `${subCellSize}px`,
-                              height: `${subCellSize}px`,
-                              fontSize: `${Math.floor(tokenSize * 0.5)}px`,
-                              lineHeight: `${subCellSize}px`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              zIndex: 27,
-                              pointerEvents: 'none',
-                              userSelect: 'none'
-                            }}
-                          >
-                            💎
-                          </div>
-                        );
-                      }
-                      return null;
-                    })}
-
-                    {/* Render spawn Token (in gameplay phase) */}
-                    {Object.entries(gameState.tokenPositions).map(([pId, pos]) => {
-                      if (pos.tileX === x && pos.tileY === y) {
-                        const player = gameState.players[pId];
-                        const isCarrying = gameState.treasures && Object.values(gameState.treasures).some(t => t.carrierId === pId);
-                        return (
-                          <div
-                            key={pId}
-                            style={{
-                              position: 'absolute',
-                              left: `${pos.c * subCellSize}px`,
-                              top: `${pos.r * subCellSize}px`,
-                              width: `${subCellSize}px`,
-                              height: `${subCellSize}px`,
-                              fontSize: `${tokenSize}px`,
-                              lineHeight: `${subCellSize}px`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              filter: `drop-shadow(0 0 6px ${player?.color})`,
-                              zIndex: 30,
-                              pointerEvents: 'none',
-                              cursor: 'default'
-                            }}
-                            className="floating-emoji"
-                          >
-                            {player?.emoji}
-                            {isCarrying && (
-                              <span style={{ fontSize: '10px', position: 'absolute', bottom: '-4px', right: '-4px', filter: 'drop-shadow(0 0 2px #00E5FF)' }}>
-                                💎
-                              </span>
-                            )}
-                          </div>
+                     {/* Render dynamic uncarried treasures */}
+                     {gameState.treasures && Object.values(gameState.treasures).map((tr) => {
+                       if (tr.tileX === x && tr.tileY === y && tr.carrierId === null) {
+                         const owner = gameState.players[tr.ownerId];
+                         const ownerColor = owner?.color || '#00E5FF';
+                         return (
+                           <div
+                             key={tr.id}
+                             style={{
+                               position: 'absolute',
+                               left: `${tr.c * subCellSize}px`,
+                               top: `${tr.r * subCellSize}px`,
+                               width: `${subCellSize}px`,
+                               height: `${subCellSize}px`,
+                               fontSize: `${Math.floor(tokenSize * 0.5)}px`,
+                               lineHeight: `${subCellSize}px`,
+                               display: 'flex',
+                               alignItems: 'center',
+                               justifyContent: 'center',
+                               filter: `drop-shadow(0 0 6px ${ownerColor})`,
+                               zIndex: 27,
+                               pointerEvents: 'none',
+                               userSelect: 'none'
+                             }}
+                           >
+                             💎
+                           </div>
+                         );
+                       }
+                       return null;
+                     })}
+ 
+                     {/* Render spawn Token (in gameplay phase) */}
+                     {Object.entries(gameState.tokenPositions).map(([pId, pos]) => {
+                       if (pos.tileX === x && pos.tileY === y) {
+                         const player = gameState.players[pId];
+                         return (
+                           <div
+                             key={pId}
+                             style={{
+                               position: 'absolute',
+                               left: `${pos.c * subCellSize}px`,
+                               top: `${pos.r * subCellSize}px`,
+                               width: `${subCellSize}px`,
+                               height: `${subCellSize}px`,
+                               fontSize: `${tokenSize}px`,
+                               lineHeight: `${subCellSize}px`,
+                               display: 'flex',
+                               alignItems: 'center',
+                               justifyContent: 'center',
+                               filter: `drop-shadow(0 0 6px ${player?.color})`,
+                               zIndex: 30,
+                               pointerEvents: 'none',
+                               cursor: 'default'
+                             }}
+                             className="floating-emoji"
+                           >
+                             {player?.emoji}
+                             {(() => {
+                               const carriedTreasure = gameState.treasures && Object.values(gameState.treasures).find(t => t.carrierId === pId);
+                               if (!carriedTreasure) return null;
+                               const gemOwner = gameState.players[carriedTreasure.ownerId];
+                               const gemColor = gemOwner?.color || '#00E5FF';
+                               return (
+                                 <span style={{
+                                   fontSize: '10px',
+                                   position: 'absolute',
+                                   bottom: '-4px',
+                                   right: '-4px',
+                                   filter: `drop-shadow(0 0 4px ${gemColor})`
+                                 }}>
+                                   💎
+                                 </span>
+                               );
+                             })()}
+                           </div>
                         );
                       }
                       return null;
