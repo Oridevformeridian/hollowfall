@@ -120,16 +120,19 @@ export interface Hero {
 }
 
 export const HEROES: Hero[] = [
-  { emoji: '🧙‍♂️', color: '#00E5FF', name: 'Man Mage' },
-  { emoji: '🧙‍♀️', color: '#E0F7FA', name: 'Woman Mage' },
-  { emoji: '🧝‍♂️', color: '#00E676', name: 'Man Elf' },
-  { emoji: '🧝‍♀️', color: '#B9F6CA', name: 'Woman Elf' },
-  { emoji: '🤴', color: '#FFD600', name: 'Prince' },
-  { emoji: '👸', color: '#F50057', name: 'Princess' },
-  { emoji: '🧚‍♂️', color: '#FF6D00', name: 'Man Fairy' },
-  { emoji: '🧚‍♀️', color: '#FFAB40', name: 'Woman Fairy' },
-  { emoji: '🧞', color: '#D500F9', name: 'Genie' },
-  { emoji: '🦄', color: '#E2E8F0', name: 'Unicorn' }
+  // Row 1 (top selection of the 2x5 grid)
+  { emoji: '🧙‍♂️', color: '#00E5FF', name: 'Man Mage' },       // Col 1, Top
+  { emoji: '🧝‍♂️', color: '#00E676', name: 'Man Elf' },       // Col 2, Top
+  { emoji: '🤴', color: '#FFD600', name: 'Prince' },         // Col 3, Top
+  { emoji: '🧚‍♂️', color: '#FF6D00', name: 'Man Fairy' },      // Col 4, Top
+  { emoji: '🧞', color: '#D500F9', name: 'Genie' },          // Col 5, Top
+
+  // Row 2 (bottom selection of the 2x5 grid)
+  { emoji: '🧙‍♀️', color: '#E0F7FA', name: 'Woman Mage' },     // Col 1, Bottom
+  { emoji: '🧝‍♀️', color: '#B9F6CA', name: 'Woman Elf' },     // Col 2, Bottom
+  { emoji: '👸', color: '#F50057', name: 'Princess' },       // Col 3, Bottom
+  { emoji: '🧚‍♀️', color: '#FFAB40', name: 'Woman Fairy' },    // Col 4, Bottom
+  { emoji: '🦄', color: '#E2E8F0', name: 'Unicorn' }         // Col 5, Bottom
 ];
 
 export const BASIC_CARDS: Card[] = [
@@ -138,6 +141,18 @@ export const BASIC_CARDS: Card[] = [
     name: 'Kindle the Storm',
     type: 'bane',
     description: 'Deals 3 fire damage to target Walker in LOS.'
+  },
+  {
+    id: 'ash_fireball',
+    name: 'Fireball',
+    type: 'bane',
+    description: 'Deals 4 fire damage to target Walker in LOS.'
+  },
+  {
+    id: 'ash_immolate',
+    name: 'Immolate',
+    type: 'bane',
+    description: 'Deals 6 fire damage to target in LOS. Deals 1 recoil fire damage to caster.'
   },
   {
     id: 'ash_turn_aside',

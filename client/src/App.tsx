@@ -315,7 +315,7 @@ function generateLobbyName(): string {
 }
 
 const getCardTypeEmoji = (cardId: string) => {
-  if (cardId === 'ash_kindle_storm') return '⚔️';
+  if (cardId === 'ash_kindle_storm' || cardId === 'ash_fireball' || cardId === 'ash_immolate') return '⚔️';
   if (cardId === 'talisman_thorns') return '🌵';
   if (cardId === 'working_miststep' || cardId === 'working_don_wolf') return '🌀';
   if (cardId === 'working_shift_spirit') return '↔️';
@@ -1793,8 +1793,8 @@ export default function App() {
                             gameState.tokenPositions
                           ).valid;
 
-                          // 2. Kindle the Storm targeting
-                          const isKindleTarget = targetingCardId === 'ash_kindle_storm' && isActiveTurn && !!occupiedPlayerId && occupiedPlayerId !== socket?.id;
+                          // 2. Kindle the Storm, Fireball, and Immolate targeting
+                          const isKindleTarget = (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') && isActiveTurn && !!occupiedPlayerId && occupiedPlayerId !== socket?.id;
 
                           // 3. Miststep targeting
                           let isMiststepTarget = false;
@@ -1835,7 +1835,9 @@ export default function App() {
                                     handleMoveToken(targetPos);
                                   } else if (isKindleTarget) {
                                     e.stopPropagation();
-                                    handlePlayCard('ash_kindle_storm', targetPos);
+                                    if (targetingCardId) {
+                                      handlePlayCard(targetingCardId, targetPos);
+                                    }
                                   } else if (isMiststepTarget) {
                                     e.stopPropagation();
                                     handlePlayCard('working_miststep', targetPos);
@@ -2164,7 +2166,7 @@ export default function App() {
                   gridRow: '1 / -1'
                 }}
               >
-                {activeAnimation.cardId === 'ash_kindle_storm' && pTo && (
+                {(activeAnimation.cardId === 'ash_kindle_storm' || activeAnimation.cardId === 'ash_fireball' || activeAnimation.cardId === 'ash_immolate') && pTo && (
                   <div
                     className="kindle-spell-effect"
                     style={{
@@ -2466,7 +2468,7 @@ export default function App() {
               Your Hand
             </span>
             <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-              ({self.hand.length}/7 Rites)
+              ({self.hand.length}/7 Rites | Deck: {self.deck?.length || 0})
             </span>
             {targetingCardId && (
               <span style={{ fontSize: '10px', color: 'var(--accent-crimson)', animation: 'pulse 1.5s infinite', fontWeight: 'bold', marginTop: '4px' }}>

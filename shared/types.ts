@@ -13,6 +13,7 @@ export interface Player {
   thread: number;
   maxThread: number;
   hand: Card[];
+  deck: Card[];
   points: number;
   severPoints: number;
   hasAttackedThisTurn: boolean;

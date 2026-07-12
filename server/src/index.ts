@@ -3,9 +3,10 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
-import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, Card } from '../../shared/types';
+import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance } from '../../shared/validation';
-import { HEROES, BASIC_CARDS } from '../../shared/constants';
+import { HEROES } from '../../shared/constants';
+import { buildDeckForEmoji, shuffle, getRemainingDeckForReshuffle } from '../../shared/deck';
 
 const app = express();
 app.use(cors());
@@ -107,14 +108,7 @@ const getRandomColor = () => {
   return colors[Math.floor(random() * colors.length)];
 };
 
-function dealRandomHand(): Card[] {
-  const hand: Card[] = [];
-  for (let i = 0; i < 5; i++) {
-    const randomCard = BASIC_CARDS[Math.floor(Math.random() * BASIC_CARDS.length)];
-    hand.push(randomCard);
-  }
-  return hand;
-}
+
 
 function passTurn(room: GameState) {
   const currentPid = room.turnOrder[room.activePlayerIndex];
@@ -124,7 +118,19 @@ function passTurn(room: GameState) {
     endingPlayer.form = 'normal';
     endingPlayer.isFirstTurnOfMatch = false;
     while (endingPlayer.hand.length < 5) {
-      endingPlayer.hand.push(BASIC_CARDS[Math.floor(Math.random() * BASIC_CARDS.length)]);
+      if (endingPlayer.deck.length === 0) {
+        const remaining = getRemainingDeckForReshuffle(endingPlayer.hand, endingPlayer.emoji, {
+          thorns: endingPlayer.hasThorns,
+          turnAside: endingPlayer.hasTurnAside,
+          spiritSkin: endingPlayer.hasSpiritSkin
+        });
+        if (remaining.length === 0) break;
+        endingPlayer.deck = shuffle(remaining);
+      }
+      const card = endingPlayer.deck.pop();
+      if (card) {
+        endingPlayer.hand.push(card);
+      }
     }
     if (endingPlayer.hand.length > 7) {
       endingPlayer.hand.splice(7);
@@ -343,6 +349,7 @@ io.on('connection', (socket) => {
             thread: 15,
             maxThread: 15,
             hand: [],
+            deck: [],
             points: 0,
             severPoints: 0,
             hasAttackedThisTurn: false,
@@ -536,7 +543,12 @@ io.on('connection', (socket) => {
               p.ap = 0;
               p.thread = 15;
               p.maxThread = 15;
-              p.hand = dealRandomHand();
+              p.deck = shuffle(buildDeckForEmoji(p.emoji));
+              p.hand = [];
+              for (let i = 0; i < 5; i++) {
+                const card = p.deck.pop();
+                if (card) p.hand.push(card);
+              }
               p.points = 0;
               p.severPoints = 0;
               p.hasAttackedThisTurn = false;
@@ -722,7 +734,7 @@ io.on('connection', (socket) => {
           }
 
           // Resolve card benefits
-          if (card.id === 'ash_kindle_storm') {
+          if (card.id === 'ash_kindle_storm' || card.id === 'ash_fireball' || card.id === 'ash_immolate') {
             if (player.hasAttackedThisTurn) {
               sendError(socket, 'You have already attacked this turn.');
               return;
@@ -732,7 +744,7 @@ io.on('connection', (socket) => {
               return;
             }
             if (!target) {
-              sendError(socket, 'Kindle the Storm requires a target cell.');
+              sendError(socket, `${card.name} requires a target cell.`);
               return;
             }
             const fromPos = room.tokenPositions[playerId];
@@ -758,47 +770,76 @@ io.on('connection', (socket) => {
             // Mark attack used
             player.hasAttackedThisTurn = true;
 
-             // Aura protection checks
-             let countered: 'turn_aside' | 'spirit_skin' | null = null;
-             if (targetPlayer.hasTurnAside) {
-               targetPlayer.hasTurnAside = false;
-               countered = 'turn_aside';
-               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Turn Aside aura countered Kindle the Storm!`);
-             } else if (targetPlayer.hasSpiritSkin) {
-               targetPlayer.hasSpiritSkin = false;
-               countered = 'spirit_skin';
-               targetPlayer.thread = Math.max(0, targetPlayer.thread - 1); // 3 damage reduced by 2
-               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura reduced Kindle the Storm damage by 2 (took 1 damage).`);
-             } else {
-               targetPlayer.thread = Math.max(0, targetPlayer.thread - 3);
-               broadcastSystemMessage(currentRoomCode, `${player.username} cast Kindle the Storm on ${targetPlayer.username} for 3 damage!`);
-             }
+            // Determine damage amount
+            let damage = 3;
+            if (card.id === 'ash_fireball') {
+              damage = 4;
+            } else if (card.id === 'ash_immolate') {
+              damage = 6;
+            }
 
-             // Thorns retaliation
-             if (targetPlayer.hasThorns && countered !== 'turn_aside') {
-               player.thread = Math.max(0, player.thread - 1);
-               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
-               // Check if player died from thorns
-               if (player.thread <= 0) {
-                 targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
-                 targetPlayer.hand.push(...player.hand);
-                 player.hand = [];
-                 if (targetPlayer.hand.length > 7) {
-                   targetPlayer.hand.splice(7);
-                 }
-                 player.thread = 15;
-                 const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
-                 if (playerTile) {
-                   room.tokenPositions[playerId] = {
-                     tileX: playerTile.position.x,
-                     tileY: playerTile.position.y,
-                     r: 2,
-                     c: 2
-                   };
-                 }
-                 broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
-               }
-             }
+            // Aura protection checks
+            let countered: 'turn_aside' | 'spirit_skin' | null = null;
+            if (targetPlayer.hasTurnAside) {
+              targetPlayer.hasTurnAside = false;
+              countered = 'turn_aside';
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Turn Aside aura countered ${card.name}!`);
+            } else if (targetPlayer.hasSpiritSkin) {
+              targetPlayer.hasSpiritSkin = false;
+              countered = 'spirit_skin';
+              const reducedDmg = Math.max(0, damage - 2);
+              targetPlayer.thread = Math.max(0, targetPlayer.thread - reducedDmg);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura reduced ${card.name} damage by 2 (took ${reducedDmg} damage).`);
+            } else {
+              targetPlayer.thread = Math.max(0, targetPlayer.thread - damage);
+              broadcastSystemMessage(currentRoomCode, `${player.username} cast ${card.name} on ${targetPlayer.username} for ${damage} damage!`);
+            }
+
+            // Apply recoil for Immolate
+            if (card.id === 'ash_immolate') {
+              player.thread = Math.max(0, player.thread - 1);
+              broadcastSystemMessage(currentRoomCode, `${player.username} suffered 1 recoil damage from Immolate!`);
+              if (player.thread <= 0) {
+                targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
+                player.thread = 15;
+                const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
+                if (playerTile) {
+                  room.tokenPositions[playerId] = {
+                    tileX: playerTile.position.x,
+                    tileY: playerTile.position.y,
+                    r: 2,
+                    c: 2
+                  };
+                }
+                broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by recoil from their own Immolate and respawned!`);
+              }
+            }
+
+            // Thorns retaliation
+            if (targetPlayer.hasThorns && countered !== 'turn_aside') {
+              player.thread = Math.max(0, player.thread - 1);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+              // Check if player died from thorns
+              if (player.thread <= 0) {
+                targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
+                targetPlayer.hand.push(...player.hand);
+                player.hand = [];
+                if (targetPlayer.hand.length > 7) {
+                  targetPlayer.hand.splice(7);
+                }
+                player.thread = 15;
+                const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
+                if (playerTile) {
+                  room.tokenPositions[playerId] = {
+                    tileX: playerTile.position.x,
+                    tileY: playerTile.position.y,
+                    r: 2,
+                    c: 2
+                  };
+                }
+                broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
+              }
+            }
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
