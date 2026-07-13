@@ -12,11 +12,11 @@ describe('Deck Logic', () => {
       return acc;
     }, {});
 
-    expect(counts['ash_immolate']).toBe(12); // Mage specialty
-    expect(counts['ash_kindle_storm']).toBe(4);
-    expect(counts['ash_fireball']).toBe(4);
-    expect(counts['working_raise_stone']).toBe(4);
-    expect(counts['ash_turn_aside']).toBe(4);
+    expect(counts['ash_immolate']).toBe(8); // Mage specialty
+    expect(counts['ash_kindle_storm']).toBe(5);
+    expect(counts['ash_fireball']).toBe(5);
+    expect(counts['working_raise_stone']).toBe(5);
+    expect(counts['ash_turn_aside']).toBe(5);
     expect(counts['ash_spirit_skin']).toBe(4);
     expect(counts['working_miststep']).toBe(4);
     expect(counts['offering_deep_breath']).toBe(4);
@@ -31,11 +31,11 @@ describe('Deck Logic', () => {
       return acc;
     }, {});
 
-    // Elves get 12 class + 4 common = 16 Raise Stones
-    expect(counts['working_raise_stone']).toBe(16);
-    expect(counts['ash_kindle_storm']).toBe(4);
-    expect(counts['ash_fireball']).toBe(4);
-    expect(counts['ash_turn_aside']).toBe(4);
+    // Elves get 8 class + 5 common = 13 Raise Stones
+    expect(counts['working_raise_stone']).toBe(13);
+    expect(counts['ash_kindle_storm']).toBe(5);
+    expect(counts['ash_fireball']).toBe(5);
+    expect(counts['ash_turn_aside']).toBe(5);
     expect(counts['ash_spirit_skin']).toBe(4);
     expect(counts['working_miststep']).toBe(4);
     expect(counts['offering_deep_breath']).toBe(4);
@@ -50,7 +50,7 @@ describe('Deck Logic', () => {
       return acc;
     }, {});
 
-    expect(counts['talisman_thorns']).toBe(12);
+    expect(counts['talisman_thorns']).toBe(8);
   });
 
   it('should generate a 40-card deck with correct distribution for Fairies', () => {
@@ -62,7 +62,7 @@ describe('Deck Logic', () => {
       return acc;
     }, {});
 
-    expect(counts['working_shift_spirit']).toBe(12);
+    expect(counts['working_shift_spirit']).toBe(8);
   });
 
   it('should generate a 40-card deck with correct distribution for Magic Creatures', () => {
@@ -74,7 +74,7 @@ describe('Deck Logic', () => {
       return acc;
     }, {});
 
-    expect(counts['working_don_wolf']).toBe(12);
+    expect(counts['working_don_wolf']).toBe(8);
   });
 
   it('should correctly filter out cards in hand or active during deck rebuild', () => {
@@ -104,9 +104,9 @@ describe('Deck Logic', () => {
       return acc;
     }, {});
 
-    expect(counts['ash_immolate']).toBe(11); // 12 - 1 in hand
+    expect(counts['ash_immolate']).toBe(7);    // 8 - 1 in hand
     expect(counts['working_miststep']).toBe(3);  // 4 - 1 in hand
-    expect(counts['ash_turn_aside']).toBe(2);    // 4 - 1 in hand - 1 active
+    expect(counts['ash_turn_aside']).toBe(3);    // 5 - 1 in hand - 1 active
   });
 
   it('should shuffle decks with different orderings', () => {

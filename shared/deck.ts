@@ -48,34 +48,34 @@ export function buildDeckForEmoji(emoji: string): Card[] {
   };
 
   const deck: Card[] = [];
-  
-  // 12x class-specific card
+
+  // 8x class-specific card
   const classCard = findCard(classCardId);
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 8; i++) {
     deck.push({ ...classCard });
   }
 
-  // 4x Kindle the Storm
+  // 5x Kindle the Storm
   const kindle = findCard('ash_kindle_storm');
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     deck.push({ ...kindle });
   }
 
-  // 4x Fireball
+  // 5x Fireball
   const fireball = findCard('ash_fireball');
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     deck.push({ ...fireball });
   }
 
-  // 4x Raise Stone
+  // 5x Raise Stone
   const raiseStone = findCard('working_raise_stone');
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     deck.push({ ...raiseStone });
   }
 
-  // 4x Turn Aside
+  // 5x Turn Aside
   const turnAside = findCard('ash_turn_aside');
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     deck.push({ ...turnAside });
   }
 

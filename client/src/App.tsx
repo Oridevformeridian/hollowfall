@@ -330,6 +330,7 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetingCardId, setTargetingCardId] = useState<string | null>(null);
+  const [hoveredHeroIndex, setHoveredHeroIndex] = useState<number | null>(null);
   const [playedGameOverSound, setPlayedGameOverSound] = useState(false);
   const [activeAnimation, setActiveAnimation] = useState<{
     cardId: string;
@@ -976,46 +977,107 @@ export default function App() {
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(5, 80px)',
-                      gap: '12px',
+                      gridTemplateColumns: 'repeat(5, 90px)',
+                      gap: '16px',
                       justifyContent: 'center'
                     }}
                   >
-                    {HEROES.map(hero => {
+                    {HEROES.map((hero, idx) => {
                       const isTaken = takenEmojis.includes(hero.emoji);
                       const isSelected = self?.emoji === hero.emoji;
                       return (
-                        <button
-                          type="button"
+                        <div
                           key={hero.emoji}
-                          onClick={() => !isTaken && handleSelectHero(hero.emoji)}
-                          disabled={isTaken}
                           style={{
-                            fontSize: '48px',
-                            width: '80px',
-                            height: '80px',
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            border: isSelected
-                              ? `4px solid ${hero.color}`
-                              : isTaken
-                              ? '2px dashed #334155'
-                              : '2px solid var(--border-light)',
-                            borderRadius: '16px',
-                            backgroundColor: isSelected
-                              ? `${hero.color}22`
-                              : 'rgba(0, 0, 0, 0.2)',
-                            cursor: isTaken ? 'not-allowed' : 'pointer',
-                            opacity: isTaken ? 0.25 : 1,
-                            transition: 'all 0.2s',
-                            boxShadow: isSelected ? `0 0 15px ${hero.color}` : 'none'
+                            gap: '6px',
+                            position: 'relative'
                           }}
-                          className={isTaken ? '' : 'hover:scale-105'}
-                          title={isTaken ? `${hero.name} (Already Taken)` : hero.name}
+                          onMouseEnter={() => setHoveredHeroIndex(idx)}
+                          onMouseLeave={() => setHoveredHeroIndex(null)}
                         >
-                          {hero.emoji}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => !isTaken && handleSelectHero(hero.emoji)}
+                            disabled={isTaken}
+                            style={{
+                              fontSize: '48px',
+                              width: '80px',
+                              height: '80px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: isSelected
+                                ? `4px solid ${hero.color}`
+                                : isTaken
+                                ? '2px dashed #334155'
+                                : '2px solid var(--border-light)',
+                              borderRadius: '16px',
+                              backgroundColor: isSelected
+                                ? `${hero.color}22`
+                                : 'rgba(0, 0, 0, 0.2)',
+                              cursor: isTaken ? 'not-allowed' : 'pointer',
+                              opacity: isTaken ? 0.25 : 1,
+                              transition: 'all 0.2s',
+                              boxShadow: isSelected ? `0 0 15px ${hero.color}` : 'none'
+                            }}
+                            className={isTaken ? '' : 'hover:scale-105'}
+                            title={isTaken ? `${hero.name} (Already Taken)` : hero.name}
+                          >
+                            {hero.emoji}
+                          </button>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 'bold',
+                              color: isSelected ? hero.color : '#94a3b8',
+                              textAlign: 'center',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}
+                          >
+                            {hero.class}
+                          </span>
+
+                          {hoveredHeroIndex === idx && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: '110px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                zIndex: 300,
+                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                backdropFilter: 'blur(10px)',
+                                border: `1px solid ${hero.color}88`,
+                                borderRadius: '12px',
+                                padding: '10px 14px',
+                                width: '220px',
+                                boxShadow: `0 8px 30px rgba(0,0,0,0.8), 0 0 10px ${hero.color}33`,
+                                boxSizing: 'border-box',
+                                pointerEvents: 'none',
+                                textAlign: 'center'
+                              }}
+                            >
+                              <div style={{ fontWeight: '900', fontSize: '13px', color: 'white', letterSpacing: '0.5px' }}>
+                                {hero.name}
+                              </div>
+                              <div style={{ fontSize: '11px', color: hero.color, fontWeight: 'bold', marginTop: '2px', textTransform: 'uppercase' }}>
+                                {hero.class} Specialty
+                              </div>
+                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '8px', paddingTop: '8px' }}>
+                                <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+                                  Signature Cards (8x)
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 'bold', marginTop: '3px' }}>
+                                  {hero.signatureCards.join(', ')}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
