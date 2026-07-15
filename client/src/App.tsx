@@ -352,6 +352,7 @@ export default function App() {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const gameStateRef = React.useRef(gameState);
   useEffect(() => {
@@ -1307,12 +1308,6 @@ export default function App() {
 
           {gameState.phase === 'GAMEPLAY' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
-              <div style={{ backgroundColor: 'rgba(0,230,118,0.05)', borderColor: 'var(--accent-green)', borderWidth: '1px', borderStyle: 'solid', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent-green)', margin: '0 0 2px 0' }}>MAZE READY</h3>
-                <p style={{ fontSize: '11px', color: '#cbd5e1', margin: '0' }}>All 4 sectors aligned.</p>
-              </div>
-
-
               {/* Active Player Actions */}
               {isActiveTurn && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px', marginBottom: '8px' }}>
@@ -1478,22 +1473,6 @@ export default function App() {
                 </button>
               )}
 
-              {/* Concede Button */}
-              <button
-                onClick={handleConcede}
-                className="btn-secondary"
-                style={{
-                  width: '100%',
-                  marginTop: '16px',
-                  borderColor: 'rgba(239, 68, 68, 0.4)',
-                  color: '#ef4444',
-                  fontWeight: 'bold',
-                  fontSize: '12px',
-                  padding: '6px 0',
-                }}
-              >
-                🏳️ Concede
-              </button>
             </div>
           )}
 
@@ -1598,12 +1577,40 @@ export default function App() {
             </button>
           </div>
         )}
+        {/* Settings Wheel Button (Top Right) */}
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          style={{
+            position: 'absolute',
+            top: '24px',
+            right: '24px',
+            zIndex: 50,
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid var(--border-light)',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '20px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+            transition: 'all 0.2s',
+          }}
+          title="Settings"
+        >
+          ⚙️
+        </button>
+
         {/* Turn Indicator Overlay (Top Right) */}
         {gameState.turnOrder.length > 0 && (
           <div
             style={{
               position: 'absolute',
-              top: '24px',
+              top: '76px',
               right: '24px',
               zIndex: 40,
               display: 'flex',
@@ -1662,7 +1669,7 @@ export default function App() {
               className="player-inspector-card"
               style={{
                 position: 'absolute',
-                top: '150px',
+                top: '220px',
                 right: '24px',
                 zIndex: 45,
                 backgroundColor: 'rgba(15, 23, 42, 0.95)',
@@ -2839,6 +2846,146 @@ export default function App() {
             >
               🚪 Quit to Lobby
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setShowSettings(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#0f172a',
+              border: '1px solid var(--border-light)',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '320px',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, color: 'white', fontSize: '16px', fontWeight: 'bold' }}>Settings</h3>
+              <button
+                onClick={() => setShowSettings(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Audio Placeholders */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Audio Settings</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label htmlFor="bgm-volume" style={{ fontSize: '13px', color: '#cbd5e1' }}>Music Volume</label>
+                <input
+                  id="bgm-volume"
+                  type="range"
+                  min="0"
+                  max="100"
+                  defaultValue="50"
+                  disabled
+                  style={{ width: '120px', accentColor: 'var(--accent-cyan)', cursor: 'not-allowed' }}
+                  title="Audio settings placeholder"
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label htmlFor="sfx-volume" style={{ fontSize: '13px', color: '#cbd5e1' }}>SFX Volume</label>
+                <input
+                  id="sfx-volume"
+                  type="range"
+                  min="0"
+                  max="100"
+                  defaultValue="80"
+                  disabled
+                  style={{ width: '120px', accentColor: 'var(--accent-cyan)', cursor: 'not-allowed' }}
+                  title="Audio settings placeholder"
+                />
+              </div>
+            </div>
+
+            {/* Display Placeholders */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Display Settings</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label htmlFor="gfx-quality" style={{ fontSize: '13px', color: '#cbd5e1' }}>Graphics Quality</label>
+                <select
+                  id="gfx-quality"
+                  disabled
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: '6px',
+                    color: 'white',
+                    fontSize: '12px',
+                    padding: '4px 8px',
+                    cursor: 'not-allowed',
+                  }}
+                >
+                  <option>High (Default)</option>
+                  <option>Medium</option>
+                  <option>Low</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label htmlFor="toggle-animations" style={{ fontSize: '13px', color: '#cbd5e1' }}>Enable Animations</label>
+                <input
+                  id="toggle-animations"
+                  type="checkbox"
+                  defaultChecked
+                  disabled
+                  style={{ cursor: 'not-allowed' }}
+                />
+              </div>
+            </div>
+
+            {/* Concede Button */}
+            {gameState?.phase === 'GAMEPLAY' && (
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'flex', flexDirection: 'column' }}>
+                <button
+                  onClick={() => {
+                    setShowSettings(false);
+                    handleConcede();
+                  }}
+                  className="btn-secondary"
+                  style={{
+                    width: '100%',
+                    borderColor: 'rgba(239, 68, 68, 0.4)',
+                    color: '#ef4444',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    padding: '8px 0',
+                  }}
+                >
+                  🏳️ Concede Match
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
