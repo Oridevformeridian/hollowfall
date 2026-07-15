@@ -1249,10 +1249,30 @@ export default function App() {
   let maxY: number;
 
   if (gameState.phase === 'PLACEMENT') {
-    minX = xs.length > 0 ? Math.min(-1, ...xs) - 1 : -2;
-    maxX = xs.length > 0 ? Math.max(1, ...xs) + 1 : 2;
-    minY = ys.length > 0 ? Math.min(-1, ...ys) - 1 : -2;
-    maxY = ys.length > 0 ? Math.max(1, ...ys) + 1 : 2;
+    const targetXs = [...xs];
+    const targetYs = [...ys];
+
+    // Collect all adjacent coordinates that are potential placement slots
+    const adjacents = new Set<string>();
+    for (const t of placedList) {
+      adjacents.add(`${t.position.x + 1},${t.position.y}`);
+      adjacents.add(`${t.position.x - 1},${t.position.y}`);
+      adjacents.add(`${t.position.x},${t.position.y + 1}`);
+      adjacents.add(`${t.position.x},${t.position.y - 1}`);
+    }
+
+    for (const key of adjacents) {
+      if (!gameState.placedTiles[key]) {
+        const [xStr, yStr] = key.split(',');
+        targetXs.push(parseInt(xStr, 10));
+        targetYs.push(parseInt(yStr, 10));
+      }
+    }
+
+    minX = targetXs.length > 0 ? Math.min(...targetXs) : -1;
+    maxX = targetXs.length > 0 ? Math.max(...targetXs) : 1;
+    minY = targetYs.length > 0 ? Math.min(...targetYs) : -1;
+    maxY = targetYs.length > 0 ? Math.max(...targetYs) : 1;
   } else {
     minX = xs.length > 0 ? Math.min(...xs) : 0;
     maxX = xs.length > 0 ? Math.max(...xs) : 0;
