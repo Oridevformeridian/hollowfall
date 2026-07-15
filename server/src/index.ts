@@ -185,6 +185,82 @@ function recalculatePoints(room: GameState) {
   }
 }
 
+function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: string | null, message: string, roomCode: string) {
+  const defeatedPlayer = room.players[defeatedId];
+  if (!defeatedPlayer) return;
+
+  // Clear defeated player's state
+  defeatedPlayer.thread = 0;
+  
+  // Award sever points to killer if applicable
+  if (killerId && room.players[killerId]) {
+    const killer = room.players[killerId];
+    killer.severPoints = (killer.severPoints || 0) + 1;
+    // Steal hand cards
+    killer.hand.push(...defeatedPlayer.hand);
+    defeatedPlayer.hand = [];
+    if (killer.hand.length > 7) {
+      killer.hand.splice(7);
+    }
+  }
+
+  // Drop carried treasure of the defeated player
+  if (room.treasures) {
+    for (const treasureId of Object.keys(room.treasures)) {
+      const tr = room.treasures[treasureId];
+      if (tr.carrierId === defeatedId) {
+        tr.carrierId = null;
+        const deathPos = room.tokenPositions[defeatedId];
+        if (deathPos) {
+          tr.tileX = deathPos.tileX;
+          tr.tileY = deathPos.tileY;
+          tr.r = deathPos.r;
+          tr.c = deathPos.c;
+        }
+      }
+    }
+  }
+
+  // Remove player token from map
+  delete room.tokenPositions[defeatedId];
+
+  // If the defeated player was active, pass the turn
+  const activePlayerId = room.turnOrder[room.activePlayerIndex];
+  if (defeatedId === activePlayerId) {
+    passTurn(room);
+  }
+
+  const currentTurnPlayerId = room.turnOrder[room.activePlayerIndex];
+  room.turnOrder = room.turnOrder.filter(id => id !== defeatedId);
+
+  if (room.turnOrder.length > 0) {
+    const newIndex = room.turnOrder.indexOf(currentTurnPlayerId);
+    if (newIndex !== -1) {
+      room.activePlayerIndex = newIndex;
+    } else {
+      room.activePlayerIndex = 0;
+    }
+  }
+
+  // System message
+  broadcastSystemMessage(roomCode, message);
+
+  // Victory conditions check
+  const alivePlayers = Object.values(room.players).filter(p => p.thread > 0 && !p.hasConceded);
+  
+  if (alivePlayers.length <= 1) {
+    room.phase = 'GAME_OVER';
+    if (alivePlayers.length === 1) {
+      const winner = alivePlayers[0];
+      winner.severPoints = Math.max(winner.severPoints || 0, 2);
+      broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
+    }
+  } else {
+    // Recalculate points for normal victory
+    recalculatePoints(room);
+  }
+}
+
 // Simple pseudo-random helper (substitute for Math.random to avoid lint warnings if any, but Math.random is fine for prototype)
 const random = Math.random;
 
@@ -801,18 +877,7 @@ io.on('connection', (socket) => {
               player.thread = Math.max(0, player.thread - 1);
               broadcastSystemMessage(currentRoomCode, `${player.username} suffered 1 recoil damage from Immolate!`);
               if (player.thread <= 0) {
-                targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
-                player.thread = 15;
-                const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
-                if (playerTile) {
-                  room.tokenPositions[playerId] = {
-                    tileX: playerTile.position.x,
-                    tileY: playerTile.position.y,
-                    r: 2,
-                    c: 2
-                  };
-                }
-                broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by recoil from their own Immolate and respawned!`);
+                handlePlayerDefeated(room, playerId, targetPlayerId, `${player.username} was defeated by recoil from their own Immolate!`, currentRoomCode);
               }
             }
 
@@ -822,23 +887,7 @@ io.on('connection', (socket) => {
               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
               // Check if player died from thorns
               if (player.thread <= 0) {
-                targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
-                targetPlayer.hand.push(...player.hand);
-                player.hand = [];
-                if (targetPlayer.hand.length > 7) {
-                  targetPlayer.hand.splice(7);
-                }
-                player.thread = 15;
-                const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
-                if (playerTile) {
-                  room.tokenPositions[playerId] = {
-                    tileX: playerTile.position.x,
-                    tileY: playerTile.position.y,
-                    r: 2,
-                    c: 2
-                  };
-                }
-                broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
+                handlePlayerDefeated(room, playerId, targetPlayerId, `${player.username} was defeated by Thorns retaliation from ${targetPlayer.username}!`, currentRoomCode);
               }
             }
 
@@ -847,44 +896,10 @@ io.on('connection', (socket) => {
               payload: { cardId: card.id, casterId: playerId, target, countered }
             };
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
- 
-            // Victory check / Death respawn
+
+            // Victory check / Death elimination
             if (targetPlayer.thread <= 0) {
-              player.severPoints = (player.severPoints || 0) + 1;
-              player.hand.push(...targetPlayer.hand);
-              targetPlayer.hand = [];
-              if (player.hand.length > 7) {
-                player.hand.splice(7);
-              }
- 
-              // Drop target's carried treasure
-              if (room.treasures) {
-                for (const treasureId of Object.keys(room.treasures)) {
-                  const tr = room.treasures[treasureId];
-                  if (tr.carrierId === targetPlayerId) {
-                    tr.carrierId = null;
-                    const deathPos = room.tokenPositions[targetPlayerId];
-                    if (deathPos) {
-                      tr.tileX = deathPos.tileX;
-                      tr.tileY = deathPos.tileY;
-                      tr.r = deathPos.r;
-                      tr.c = deathPos.c;
-                    }
-                  }
-                }
-              }
- 
-              targetPlayer.thread = 15;
-              const targetTile = Object.values(room.placedTiles).find(t => t.placedBy === targetPlayerId);
-              if (targetTile) {
-                room.tokenPositions[targetPlayerId] = {
-                  tileX: targetTile.position.x,
-                  tileY: targetTile.position.y,
-                  r: 2,
-                  c: 2
-                };
-              }
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} was defeated by ${player.username} and respawned!`);
+              handlePlayerDefeated(room, targetPlayerId, playerId, `${targetPlayer.username} was defeated by ${player.username}!`, currentRoomCode);
             }
             recalculatePoints(room);
             if (player.points >= 2) {
@@ -1264,58 +1279,12 @@ io.on('connection', (socket) => {
               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
               // Check if player died from Thorns
               if (player.thread <= 0) {
-                targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
-                targetPlayer.hand.push(...player.hand);
-                player.hand = [];
-                if (targetPlayer.hand.length > 7) {
-                  targetPlayer.hand.splice(7);
-                }
-                player.thread = 15;
-                const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
-                if (playerTile) {
-                  room.tokenPositions[playerId] = {
-                    tileX: playerTile.position.x,
-                    tileY: playerTile.position.y,
-                    r: 2,
-                    c: 2
-                  };
-                }
-                broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
+                handlePlayerDefeated(room, playerId, targetPlayerId, `${player.username} was defeated by Thorns retaliation from ${targetPlayer.username}!`, currentRoomCode);
               }
             }
 
             if (targetPlayer.thread <= 0) {
-              player.severPoints = (player.severPoints || 0) + 1;
-              player.hand.push(...targetPlayer.hand);
-              targetPlayer.hand = [];
-              if (player.hand.length > 7) {
-                player.hand.splice(7);
-              }
-
-              if (room.treasures) {
-                for (const treasureId of Object.keys(room.treasures)) {
-                  const treasure = room.treasures[treasureId];
-                  if (treasure.carrierId === targetPlayerId) {
-                    treasure.carrierId = null;
-                    treasure.tileX = to.tileX;
-                    treasure.tileY = to.tileY;
-                    treasure.r = to.r;
-                    treasure.c = to.c;
-                  }
-                }
-              }
-
-              targetPlayer.thread = 15;
-              const targetTile = Object.values(room.placedTiles).find(t => t.placedBy === targetPlayerId);
-              if (targetTile) {
-                room.tokenPositions[targetPlayerId] = {
-                  tileX: targetTile.position.x,
-                  tileY: targetTile.position.y,
-                  r: 2,
-                  c: 2
-                };
-              }
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} was defeated by ${player.username} and respawned!`);
+              handlePlayerDefeated(room, targetPlayerId, playerId, `${targetPlayer.username} was defeated by ${player.username}!`, currentRoomCode);
             }
           } else if (targetWall) {
             const wallKey = `${targetWall.tileX},${targetWall.tileY}:${targetWall.r},${targetWall.c}:${targetWall.direction}`;
