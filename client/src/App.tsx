@@ -1206,7 +1206,7 @@ export default function App() {
   };
 
   const isMobile = dimensions.width <= 768;
-  const availableWidth = isMobile ? (dimensions.width - 24) : (dimensions.width - 320 - 80);
+  const availableWidth = isMobile ? (dimensions.width - 64) : (dimensions.width - 320 - 80);
   const bottomHUDHeight = gameState?.phase === 'GAMEPLAY' ? 220 : 0;
   const availableHeight = isMobile 
     ? (dimensions.height * 0.7 - (gameState?.phase === 'GAMEPLAY' ? 110 : 0) - 24)
@@ -1587,8 +1587,8 @@ export default function App() {
           onClick={() => setShowSettings(!showSettings)}
           style={{
             position: 'absolute',
-            top: '24px',
-            right: '24px',
+            top: isMobile ? '12px' : '24px',
+            right: isMobile ? '12px' : '24px',
             zIndex: 50,
             width: '40px',
             height: '40px',
@@ -1610,21 +1610,21 @@ export default function App() {
           ⚙️
         </button>
 
-        {/* Turn Indicator Overlay (Top Right) */}
+        {/* Turn Indicator Overlay (Top Right / Docked Right on Mobile) */}
         {gameState.turnOrder.length > 0 && (
           <div
             style={{
               position: 'absolute',
-              top: '76px',
-              right: '24px',
+              top: isMobile ? '56px' : '76px',
+              right: isMobile ? '12px' : '24px',
               zIndex: 40,
               display: 'flex',
               flexDirection: 'column',
-              gap: '8px',
+              gap: isMobile ? '4px' : '8px',
               backgroundColor: 'rgba(15, 23, 42, 0.85)',
               backdropFilter: 'blur(8px)',
               border: '1px solid var(--border-light)',
-              padding: '8px 12px',
+              padding: isMobile ? '4px' : '8px 12px',
               borderRadius: '12px',
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)'
             }}
@@ -1632,6 +1632,8 @@ export default function App() {
             {gameState.turnOrder.map((pId) => {
               const player = gameState.players[pId];
               const isActive = pId === activePlayerId;
+              const hasAura = (player as any).hasTurnAside || (player as any).hasSpiritSkin || (player as any).hasThorns;
+
               return (
                 <div
                   key={pId}
@@ -1640,20 +1642,42 @@ export default function App() {
                   style={{
                     cursor: 'pointer',
                     display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
+                    gap: isMobile ? '2px' : '6px',
+                    padding: isMobile ? '4px' : '6px 12px',
                     borderRadius: '8px',
                     border: isActive ? `2px solid ${player.color}` : '2px solid transparent',
                     boxShadow: isActive ? `0 0 10px ${player.color}44` : 'none',
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.03)' : 'transparent',
-                    transition: 'all 0.2s'
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                    transition: 'all 0.2s',
+                    width: isMobile ? '36px' : 'auto',
+                    boxSizing: 'border-box'
                   }}
                 >
-                  <span style={{ fontSize: '22px', lineHeight: '1' }}>{player.emoji}</span>
-                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
-                    {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && ' (Offline)'}
-                  </span>
+                  <span style={{ fontSize: isMobile ? '20px' : '22px', lineHeight: '1' }}>{player.emoji}</span>
+                  {!isMobile && (
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
+                      {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && ' (Offline)'}
+                    </span>
+                  )}
+                  {isMobile && isActive && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '4px', width: '100%' }}>
+                      <span style={{ fontSize: '10px', color: 'white', fontWeight: 'bold' }}>
+                        🧵{player.thread}
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--accent-cyan)', fontWeight: 'bold' }}>
+                        ⚡{player.ap}
+                      </span>
+                      {hasAura && (
+                        <div style={{ display: 'flex', gap: '1px', fontSize: '9px', marginTop: '2px' }}>
+                          {(player as any).hasTurnAside && <span>🛡️</span>}
+                          {(player as any).hasSpiritSkin && <span>🪨</span>}
+                          {(player as any).hasThorns && <span>🌵</span>}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1771,6 +1795,7 @@ export default function App() {
             width: `${boardW * scaleFactor}px`,
             height: `${boardH * scaleFactor}px`,
             position: 'relative',
+            left: isMobile ? '-22px' : '0',
             margin: 'auto',
             marginBottom: '24px',
             overflow: 'visible',
@@ -2763,12 +2788,12 @@ export default function App() {
                     }
                   }}
                   style={{
-                    width: isMobile ? '68px' : '110px',
-                    height: isMobile ? '92px' : '165px',
-                    minWidth: isMobile ? '68px' : '110px',
-                    maxWidth: isMobile ? '68px' : '110px',
-                    minHeight: isMobile ? '92px' : '165px',
-                    maxHeight: isMobile ? '92px' : '165px',
+                    width: isMobile ? '65px' : '110px',
+                    height: isMobile ? '88px' : '165px',
+                    minWidth: isMobile ? '65px' : '110px',
+                    maxWidth: isMobile ? '65px' : '110px',
+                    minHeight: isMobile ? '88px' : '165px',
+                    maxHeight: isMobile ? '88px' : '165px',
                     flexShrink: 0,
                     backgroundColor: 'rgba(15, 23, 42, 0.98)',
                     border: isSelected 
@@ -2795,13 +2820,13 @@ export default function App() {
                 >
                   {isMobile ? (
                     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', alignItems: 'center', width: '100%', overflow: 'hidden' }}>
-                      <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+                      <span style={{ fontSize: '8px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
                         {card.name}
                       </span>
-                      <span style={{ fontSize: '28px', margin: 'auto 0' }}>
+                      <span style={{ fontSize: '26px', margin: 'auto 0' }}>
                         {getCardTypeEmoji(card.id)}
                       </span>
-                      <span style={{ fontSize: '8.5px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor }}>
+                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor }}>
                         {card.type}
                       </span>
                     </div>

@@ -221,7 +221,7 @@ h1, h2, h3, h4 {
     border-right: none !important;
     border-bottom: none !important;
     background: rgba(15, 23, 42, 0.9) !important;
-    padding: 12px !important;
+    padding: 8px 4px !important;
     box-shadow: none !important;
   }
 }
