@@ -477,4 +477,33 @@ describe('hasLineOfSightToWall', () => {
     // Line of sight is clear from (0,0, 3,0) to (0,0, 3,1) on Tile 4
     expect(hasLineOfSightToWall(from, wall, placedTiles, {})).toBe(true);
   });
+
+  it('should not block inter-tile crossing when a Raised Stone wall is placed on the internal border of the boundary cell', () => {
+    const twoTilesHoriz: Record<string, PlacedTile> = {
+      '0,0': { tileId: 4, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '-1,0': { tileId: 4, position: { x: -1, y: 0 }, rotation: 0, placedBy: 'p2' }
+    };
+
+    // West crossing from (0,0) [2,0] to (-1,0) [2,4]
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    const to: TokenPosition = { tileX: -1, tileY: 0, r: 2, c: 4 };
+
+    // With NO Raised Stone wall, crossing is valid
+    const cleanCrossing = validateTokenMove(from, to, twoTilesHoriz, {});
+    expect(cleanCrossing.valid).toBe(true);
+
+    // Place a Raised Stone wall at the internal boundary of the cell: 0,0:2,0:V (between c=0 and c=1)
+    const wallsState = {
+      '0,0:2,0:V': true
+    };
+
+    // Crossing the outer tile boundary should still be valid!
+    const crossingWithWall = validateTokenMove(from, to, twoTilesHoriz, {}, wallsState);
+    expect(crossingWithWall.valid).toBe(true);
+
+    // But internal movement from (0,0) [2,0] to (0,0) [2,1] should be blocked!
+    const internalTo: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 1 };
+    const internalMove = validateTokenMove(from, internalTo, twoTilesHoriz, {}, wallsState);
+    expect(internalMove.valid).toBe(false);
+  });
 });

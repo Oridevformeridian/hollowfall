@@ -112,9 +112,19 @@ export function isBorderBlocked(
   const tile = placedTiles[`${tileX},${tileY}`];
   if (!tile) return { blocked: true, reason: 'No tile found.' };
 
+  const isGate = !!checkOuter && (
+                 (direction === 'V' && r === 2 && (c === 0 || c === 4)) ||
+                 (direction === 'H' && c === 2 && (r === 0 || r === 4))
+  );
+
+  const isConflatedBoundary = !!checkOuter && (
+    (direction === 'V' && c === 0) ||
+    (direction === 'H' && r === 0)
+  );
+
   // Check dynamic Raised Stone wall
   const wallKey = `${tileX},${tileY}:${r},${c}:${direction}`;
-  if (wallsState && wallsState[wallKey]) {
+  if (!isConflatedBoundary && wallsState && wallsState[wallKey]) {
     return { blocked: true, reason: 'Blocked by a raised stone wall.' };
   }
 
@@ -122,11 +132,6 @@ export function isBorderBlocked(
   const unrotation = ((360 - tile.rotation) % 360) as 0 | 90 | 180 | 270;
   const ur = rotateBorderCoordinate(r, c, direction, unrotation);
   const layout = FIXED_TILES[tile.tileId - 1];
-
-  const isGate = !!checkOuter && (
-                 (direction === 'V' && r === 2 && (c === 0 || c === 4)) ||
-                 (direction === 'H' && c === 2 && (r === 0 || r === 4))
-  );
 
   if (ur.direction === 'H') {
     if (!isGate && layout.hWalls.some(w => w.r === ur.r && w.c === ur.c)) {
