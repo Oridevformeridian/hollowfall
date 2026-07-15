@@ -341,7 +341,8 @@ export default function App() {
   } | null>(null);
   const [activeLashAnimation, setActiveLashAnimation] = useState<{
     attackerId: string;
-    targetPlayerId: string;
+    targetPlayerId?: string;
+    targetWall?: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' };
     from: { tileX: number; tileY: number; r: number; c: number };
     to: { tileX: number; tileY: number; r: number; c: number };
     damageDealt: number;
@@ -470,13 +471,19 @@ export default function App() {
             }, 2500);
           }
         } else if (msg.event === 'LASH_ATTACK_ANIMATION') {
-          const { attackerId, targetPlayerId, damageDealt, blockedBySpiritSkin } = msg.payload;
+          const { attackerId, targetPlayerId, targetWall, damageDealt, blockedBySpiritSkin } = msg.payload;
           const attackerPos = gameStateRef.current?.tokenPositions[attackerId];
-          const targetPos = gameStateRef.current?.tokenPositions[targetPlayerId];
+          let targetPos: { tileX: number; tileY: number; r: number; c: number } | undefined = undefined;
+          if (targetPlayerId) {
+            targetPos = gameStateRef.current?.tokenPositions[targetPlayerId];
+          } else if (targetWall) {
+            targetPos = { tileX: targetWall.tileX, tileY: targetWall.tileY, r: targetWall.r, c: targetWall.c };
+          }
           if (attackerPos && targetPos) {
             setActiveLashAnimation({
               attackerId,
               targetPlayerId,
+              targetWall,
               from: { ...attackerPos },
               to: { ...targetPos },
               damageDealt,
