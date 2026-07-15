@@ -353,6 +353,7 @@ export default function App() {
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [flingingCardId, setFlingingCardId] = useState<string | null>(null);
 
   const gameStateRef = React.useRef(gameState);
   useEffect(() => {
@@ -601,12 +602,16 @@ export default function App() {
   };
 
   const handlePlayCard = (cardId: string, target?: any) => {
-    sendEvent({
-      event: 'PLAY_CARD',
-      payload: { cardId, target }
-    });
-    setTargetingCardId(null);
-    setSelectedCardId(null);
+    setFlingingCardId(cardId);
+    setTimeout(() => {
+      sendEvent({
+        event: 'PLAY_CARD',
+        payload: { cardId, target }
+      });
+      setFlingingCardId(null);
+      setTargetingCardId(null);
+      setSelectedCardId(null);
+    }, 450);
   };
 
   const handleResetGame = () => {
@@ -2712,30 +2717,39 @@ export default function App() {
                   onMouseLeave={() => setHoveredCardId(null)}
                   onClick={() => {
                     if (!canCast) return;
-                    if (isSelected) {
-                      if (noTargetNeeded) {
-                        handlePlayCard(card.id);
+                    if (isMobile) {
+                      if (isSelected) {
                         setSelectedCardId(null);
-                      } else {
                         setTargetingCardId(null);
-                        setSelectedCardId(null);
+                      } else {
+                        setSelectedCardId(cardKey);
                       }
                     } else {
-                      setSelectedCardId(cardKey);
-                      if (!noTargetNeeded) {
-                        setTargetingCardId(card.id);
+                      if (isSelected) {
+                        if (noTargetNeeded) {
+                          handlePlayCard(card.id);
+                          setSelectedCardId(null);
+                        } else {
+                          setTargetingCardId(null);
+                          setSelectedCardId(null);
+                        }
                       } else {
-                        setTargetingCardId(null);
+                        setSelectedCardId(cardKey);
+                        if (!noTargetNeeded) {
+                          setTargetingCardId(card.id);
+                        } else {
+                          setTargetingCardId(null);
+                        }
                       }
                     }
                   }}
                   style={{
-                    width: '110px',
-                    height: '165px',
-                    minWidth: '110px',
-                    maxWidth: '110px',
-                    minHeight: '165px',
-                    maxHeight: '165px',
+                    width: isMobile ? '60px' : '110px',
+                    height: isMobile ? '80px' : '165px',
+                    minWidth: isMobile ? '60px' : '110px',
+                    maxWidth: isMobile ? '60px' : '110px',
+                    minHeight: isMobile ? '80px' : '165px',
+                    maxHeight: isMobile ? '80px' : '165px',
                     flexShrink: 0,
                     backgroundColor: 'rgba(15, 23, 42, 0.98)',
                     border: isSelected 
@@ -2749,7 +2763,7 @@ export default function App() {
                       : isHovered 
                       ? `0 0 12px ${typeColor}` 
                       : `0 0 6px ${typeColor}22`,
-                    padding: '10px',
+                    padding: isMobile ? '4px' : '10px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -2760,55 +2774,67 @@ export default function App() {
                     opacity: (targetingCardId && !isSelected) ? 0.5 : 1
                   }}
                 >
-
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
-                      {card.type}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
-                        {card.name}
+                  {isMobile ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', alignItems: 'center', width: '100%', overflow: 'hidden' }}>
+                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor, transform: 'scale(0.85)' }}>
+                        {card.type}
                       </span>
-                      <span style={{ fontSize: '13px', flexShrink: 0 }}>
+                      <span style={{ fontSize: '24px', margin: 'auto 0' }}>
                         {getCardTypeEmoji(card.id)}
                       </span>
+                      <span style={{ fontSize: '7px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+                        {card.name}
+                      </span>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                          {card.type}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
+                            {card.name}
+                          </span>
+                          <span style={{ fontSize: '13px', flexShrink: 0 }}>
+                            {getCardTypeEmoji(card.id)}
+                          </span>
+                        </div>
+                      </div>
 
-                  {/* Description */}
-                  <div style={{
-                    fontSize: '11px',
-                    color: '#94a3b8',
-                    lineHeight: '1.3',
-                    opacity: 1,
-                    flexGrow: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginTop: '4px'
-                  }}>
-                    {card.description}
-                  </div>
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#94a3b8',
+                        lineHeight: '1.3',
+                        opacity: 1,
+                        flexGrow: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        marginTop: '4px'
+                      }}>
+                        {card.description}
+                      </div>
 
-                  {/* CTA Label */}
-                  <div style={{
-                    fontSize: '8px',
-                    fontWeight: 'bold',
-                    color: isSelected ? 'var(--accent-cyan)' : '#64748b',
-                    textAlign: 'center',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    opacity: 1,
-                    marginTop: '2px'
-                  }}>
-                    {isWard
-                      ? '🛡️ Defense'
-                      : isSelected 
-                      ? (noTargetNeeded
-                        ? '➔ Click to Cast' 
-                        : '🎯 Target board') 
-                      : '⚡ Cast Rite'}
-                  </div>
+                      <div style={{
+                        fontSize: '8px',
+                        fontWeight: 'bold',
+                        color: isSelected ? 'var(--accent-cyan)' : '#64748b',
+                        textAlign: 'center',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        opacity: 1,
+                        marginTop: '2px'
+                      }}>
+                        {isWard
+                          ? '🛡️ Defense'
+                          : isSelected 
+                          ? (noTargetNeeded
+                            ? '➔ Click to Cast' 
+                            : '🎯 Target board') 
+                          : '⚡ Cast Rite'}
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -3114,6 +3140,210 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Zoomed Detailed Card Card (Mobile only) */}
+      {isMobile && selectedCardId && self && !targetingCardId && !flingingCardId && (() => {
+        const cardIndex = self.hand.findIndex((c, idx) => `hand-${c.id}-${idx}` === selectedCardId);
+        const card = self.hand[cardIndex];
+        if (!card) return null;
+
+        const isBane = card.type === 'bane';
+        const isWard = card.type === 'ward';
+        const isWorking = card.type === 'working';
+        const isOffering = card.type === 'offering';
+
+        const typeColor = isBane
+          ? '#ff1744'
+          : isWard
+          ? '#ffd600'
+          : isWorking
+          ? '#00e5ff'
+          : (isOffering || card.type === 'talisman')
+          ? '#00e676'
+          : '#94a3b8';
+
+        const canCast = isActiveTurn && self.ap > 0 && !isWard;
+        const noTargetNeeded = card.id === 'talisman_thorns' || card.id === 'ash_turn_aside' || card.id === 'ash_spirit_skin' || card.id === 'offering_deep_breath';
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(2px)',
+              zIndex: 110,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onClick={() => {
+              setSelectedCardId(null);
+              setTargetingCardId(null);
+            }}
+          >
+            <div
+              style={{
+                width: '200px',
+                height: '300px',
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(16px)',
+                border: `2px solid ${typeColor}`,
+                borderRadius: '16px',
+                boxShadow: `0 0 30px ${typeColor}66`,
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxSizing: 'border-box',
+                position: 'relative'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                  {card.type}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <span style={{ fontSize: '15px', fontWeight: 'bold', color: 'white' }}>
+                    {card.name}
+                  </span>
+                  <span style={{ fontSize: '18px' }}>
+                    {getCardTypeEmoji(card.id)}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.4', flexGrow: 1, display: 'flex', alignItems: 'center', margin: '16px 0' }}>
+                {card.description}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {canCast ? (
+                  noTargetNeeded ? (
+                    <button
+                      onClick={() => handlePlayCard(card.id)}
+                      className="btn-primary"
+                      style={{
+                        width: '100%',
+                        backgroundColor: 'var(--accent-cyan)',
+                        color: 'black',
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        padding: '8px 0',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cast Spell (1 AP)
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setTargetingCardId(card.id);
+                      }}
+                      className="btn-primary"
+                      style={{
+                        width: '100%',
+                        backgroundColor: 'var(--accent-gold)',
+                        color: 'black',
+                        fontWeight: 'bold',
+                        fontSize: '12px',
+                        padding: '8px 0',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Target Spell
+                    </button>
+                  )
+                ) : (
+                  <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', padding: '6px 0' }}>
+                    {!isActiveTurn ? 'Not your turn' : self.ap <= 0 ? 'Out of AP' : 'Cannot cast'}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setSelectedCardId(null);
+                    setTargetingCardId(null);
+                  }}
+                  className="btn-secondary"
+                  style={{
+                    width: '100%',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    fontSize: '11px',
+                    padding: '6px 0',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Flinging Card Animation Overlay */}
+      {flingingCardId && (() => {
+        const card = self?.hand?.find(c => c.id === flingingCardId);
+        if (!card) return null;
+
+        const isBane = card.type === 'bane';
+        const isWard = card.type === 'ward';
+        const isWorking = card.type === 'working';
+        const isOffering = card.type === 'offering';
+
+        const typeColor = isBane
+          ? '#ff1744'
+          : isWard
+          ? '#ffd600'
+          : isWorking
+          ? '#00e5ff'
+          : (isOffering || card.type === 'talisman')
+          ? '#00e676'
+          : '#94a3b8';
+
+        return (
+          <div
+            className="card-fling-effect"
+            style={{
+              width: '120px',
+              height: '180px',
+              backgroundColor: 'rgba(15, 23, 42, 0.98)',
+              border: `2px solid ${typeColor}`,
+              borderRadius: '12px',
+              boxShadow: `0 0 20px ${typeColor}`,
+              padding: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor }}>
+                {card.type}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+                  {card.name}
+                </span>
+                <span>{getCardTypeEmoji(card.id)}</span>
+              </div>
+            </div>
+            <div style={{ fontSize: '14px', textAlign: 'center' }}>✨</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

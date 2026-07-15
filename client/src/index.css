@@ -796,4 +796,25 @@ h1, h2, h3, h4 {
   }
 }
 
+@keyframes flingUp {
+  0% {
+    transform: translate(-50%, -50%) scale(1) translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.2) translateY(-400px) rotate(25deg);
+    opacity: 0;
+  }
+}
+
+.card-fling-effect {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  animation: flingUp 0.45s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  pointer-events: none;
+}
+
 
