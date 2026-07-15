@@ -1206,9 +1206,11 @@ export default function App() {
   };
 
   const isMobile = dimensions.width <= 768;
-  const availableWidth = dimensions.width - (isMobile ? 0 : 320) - 80;
+  const availableWidth = isMobile ? (dimensions.width - 24) : (dimensions.width - 320 - 80);
   const bottomHUDHeight = gameState?.phase === 'GAMEPLAY' ? 220 : 0;
-  const availableHeight = dimensions.height - (isMobile ? 300 : 0) - bottomHUDHeight - 80;
+  const availableHeight = isMobile 
+    ? (dimensions.height * 0.7 - (gameState?.phase === 'GAMEPLAY' ? 110 : 0) - 24)
+    : (dimensions.height - bottomHUDHeight - 80);
 
   const cols = maxX - minX + 1;
   const rows = maxY - minY + 1;
@@ -1763,18 +1765,34 @@ export default function App() {
           </div>
         )}
 
-        {/* 2D Board Rendering */}
+        {/* Board Scaler Wrapper to prevent CSS layout displacement */}
         <div
-          className="board-container"
           style={{
-            gridTemplateColumns: `repeat(${maxX - minX + 1}, ${cellWidth}px)`,
-            transform: `scale(${scaleFactor})`,
-            transformOrigin: 'center center',
-            transition: 'transform 0.15s ease-out',
+            width: `${boardW * scaleFactor}px`,
+            height: `${boardH * scaleFactor}px`,
+            position: 'relative',
             margin: 'auto',
-            marginBottom: '24px'
+            marginBottom: '24px',
+            overflow: 'visible',
+            flexShrink: 0
           }}
         >
+          {/* 2D Board Rendering */}
+          <div
+            className="board-container"
+            style={{
+              gridTemplateColumns: `repeat(${maxX - minX + 1}, ${cellWidth}px)`,
+              transform: `scale(${scaleFactor})`,
+              transformOrigin: 'top left',
+              transition: 'transform 0.15s ease-out',
+              margin: 0,
+              width: `${boardW}px`,
+              height: `${boardH}px`,
+              position: 'absolute',
+              top: 0,
+              left: 0
+            }}
+          >
           {macroGrid.map(({ x, y }) => {
             const key = `${x},${y}`;
             const tile = gameState.placedTiles[key];
@@ -2562,6 +2580,7 @@ export default function App() {
             );
           })()}
         </div>
+      </div>
 
         {/* Mobile-only Action Bar (visible below the board) */}
         {isMobile && isActiveTurn && (
@@ -2744,12 +2763,12 @@ export default function App() {
                     }
                   }}
                   style={{
-                    width: isMobile ? '60px' : '110px',
-                    height: isMobile ? '80px' : '165px',
-                    minWidth: isMobile ? '60px' : '110px',
-                    maxWidth: isMobile ? '60px' : '110px',
-                    minHeight: isMobile ? '80px' : '165px',
-                    maxHeight: isMobile ? '80px' : '165px',
+                    width: isMobile ? '68px' : '110px',
+                    height: isMobile ? '92px' : '165px',
+                    minWidth: isMobile ? '68px' : '110px',
+                    maxWidth: isMobile ? '68px' : '110px',
+                    minHeight: isMobile ? '92px' : '165px',
+                    maxHeight: isMobile ? '92px' : '165px',
                     flexShrink: 0,
                     backgroundColor: 'rgba(15, 23, 42, 0.98)',
                     border: isSelected 
@@ -2776,13 +2795,13 @@ export default function App() {
                 >
                   {isMobile ? (
                     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', alignItems: 'center', width: '100%', overflow: 'hidden' }}>
-                      <span style={{ fontSize: '7px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+                      <span style={{ fontSize: '9px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
                         {card.name}
                       </span>
-                      <span style={{ fontSize: '24px', margin: 'auto 0' }}>
+                      <span style={{ fontSize: '28px', margin: 'auto 0' }}>
                         {getCardTypeEmoji(card.id)}
                       </span>
-                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor, transform: 'scale(0.85)' }}>
+                      <span style={{ fontSize: '8.5px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor }}>
                         {card.type}
                       </span>
                     </div>
@@ -3187,8 +3206,8 @@ export default function App() {
           >
             <div
               style={{
-                width: '200px',
-                height: '300px',
+                width: '230px',
+                height: '340px',
                 backgroundColor: 'rgba(15, 23, 42, 0.95)',
                 backdropFilter: 'blur(16px)',
                 border: `2px solid ${typeColor}`,
@@ -3204,20 +3223,20 @@ export default function App() {
               onClick={(e) => e.stopPropagation()}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
                   {card.type}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                  <span style={{ fontSize: '15px', fontWeight: 'bold', color: 'white' }}>
+                  <span style={{ fontSize: '17px', fontWeight: 'bold', color: 'white' }}>
                     {card.name}
                   </span>
-                  <span style={{ fontSize: '18px' }}>
+                  <span style={{ fontSize: '22px' }}>
                     {getCardTypeEmoji(card.id)}
                   </span>
                 </div>
               </div>
 
-              <div style={{ fontSize: '12px', color: '#cbd5e1', lineHeight: '1.4', flexGrow: 1, display: 'flex', alignItems: 'center', margin: '16px 0' }}>
+              <div style={{ fontSize: '13.5px', color: '#cbd5e1', lineHeight: '1.4', flexGrow: 1, display: 'flex', alignItems: 'center', margin: '16px 0' }}>
                 {card.description}
               </div>
 
@@ -3232,7 +3251,7 @@ export default function App() {
                         backgroundColor: 'var(--accent-cyan)',
                         color: 'black',
                         fontWeight: 'bold',
-                        fontSize: '12px',
+                        fontSize: '13px',
                         padding: '8px 0',
                         border: 'none',
                         borderRadius: '8px',
@@ -3252,7 +3271,7 @@ export default function App() {
                         backgroundColor: 'var(--accent-gold)',
                         color: 'black',
                         fontWeight: 'bold',
-                        fontSize: '12px',
+                        fontSize: '13px',
                         padding: '8px 0',
                         border: 'none',
                         borderRadius: '8px',
@@ -3278,7 +3297,7 @@ export default function App() {
                     width: '100%',
                     borderColor: 'rgba(255, 255, 255, 0.2)',
                     color: 'white',
-                    fontSize: '11px',
+                    fontSize: '12.5px',
                     padding: '6px 0',
                     borderRadius: '8px',
                     cursor: 'pointer'
