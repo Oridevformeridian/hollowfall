@@ -1541,27 +1541,31 @@ export default function App() {
           <div
             style={{
               position: 'absolute',
-              top: '24px',
-              left: '50%',
-              transform: 'translateX(-50%)',
+              top: isMobile ? '12px' : '24px',
+              right: isMobile ? '64px' : 'auto',
+              left: isMobile ? 'auto' : '50%',
+              transform: isMobile ? 'none' : 'translateX(-50%)',
               zIndex: 110,
               backgroundColor: 'rgba(15, 23, 42, 0.95)',
               backdropFilter: 'blur(8px)',
               border: '2px solid var(--accent-crimson)',
               color: 'white',
-              padding: '10px 20px',
-              borderRadius: '16px',
+              padding: isMobile ? '6px 10px' : '10px 20px',
+              borderRadius: isMobile ? '8px' : '16px',
               display: 'flex',
               alignItems: 'center',
-              gap: '16px',
-              fontSize: '13px',
+              gap: isMobile ? '8px' : '16px',
+              fontSize: isMobile ? '11px' : '13px',
               fontWeight: 'bold',
               boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ display: 'inline-block', transform: 'scale(1.2)' }}>🎯</span>
-              Cast {self?.hand.find(c => c.id === targetingCardId)?.name}: Select target cell on map
+            <span style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px', whiteSpace: 'nowrap' }}>
+              <span style={{ display: 'inline-block', transform: isMobile ? 'scale(1)' : 'scale(1.2)' }}>🎯</span>
+              {isMobile 
+                ? `Cast: ${self?.hand.find(c => c.id === targetingCardId)?.name}`
+                : `Cast ${self?.hand.find(c => c.id === targetingCardId)?.name}: Select target cell on map`
+              }
             </span>
             <button
               onClick={() => {
@@ -1570,15 +1574,17 @@ export default function App() {
               }}
               className="btn-secondary"
               style={{
-                padding: '4px 12px',
-                fontSize: '11px',
+                padding: isMobile ? '2px 6px' : '4px 12px',
+                fontSize: isMobile ? '10px' : '11px',
                 color: 'var(--accent-crimson)',
                 borderColor: 'var(--accent-crimson)',
                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                borderRadius: '4px',
+                lineHeight: '1'
               }}
             >
-              Cancel
+              {isMobile ? '✕' : 'Cancel'}
             </button>
           </div>
         )}
