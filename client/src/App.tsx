@@ -1229,63 +1229,6 @@ export default function App() {
         {!isMobile ? (
           <>
             <div className="sidebar-section">
-              <div>
-                <h1 className="text-xl font-black text-[var(--accent-cyan)] m-0 tracking-wider">HOLLOWFALL</h1>
-            <p className="text-gray-400 text-xs m-0" style={{ marginBottom: '4px' }}>
-              {gameState.phase === 'PLACEMENT' ? 'Tile Setup' : 'Gameplay Phase'}
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 'bold' }}>
-                Room: {gameState.roomCode}
-              </span>
-              <button
-                onClick={handleCopyRoomCode}
-                title="Copy Room Code"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: copied ? 'var(--accent-green)' : '#64748b',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'color 0.2s',
-                  position: 'relative'
-                }}
-              >
-                {copied ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
-                )}
-                {copied && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '-20px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    backgroundColor: '#00E676',
-                    color: 'black',
-                    fontSize: '9px',
-                    fontWeight: 'bold',
-                    padding: '1px 4px',
-                    borderRadius: '3px',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
-                    zIndex: 10
-                  }}>
-                    Copied!
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
 
           {gameState.phase === 'PLACEMENT' && activeTileLayout && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', backgroundColor: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid #1a1f26' }}>
@@ -1519,9 +1462,6 @@ export default function App() {
           )}
         </div>
 
-        <div style={{ marginTop: '24px', borderTop: '1px solid var(--border-light)', paddingTop: '16px', textAlign: 'center' }}>
-          <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>Room: {gameState.roomCode}</span>
-        </div>
           </>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
@@ -3107,6 +3047,47 @@ export default function App() {
                 />
               </div>
             </div>
+
+            {/* Room Info / Clickable Link */}
+            {gameState && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Match Info</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#cbd5e1' }}>Room Link</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <a
+                      href={`${window.location.origin}/?room=${gameState.roomCode}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        color: 'var(--accent-cyan)',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      {gameState.roomCode}
+                    </a>
+                    <button
+                      onClick={handleCopyRoomCode}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: copied ? 'var(--accent-green)' : '#64748b',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        padding: '2px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      title="Copy Join Link"
+                    >
+                      {copied ? '✓' : '📋'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Concede Button */}
             {gameState?.phase === 'GAMEPLAY' && (
