@@ -1644,14 +1644,14 @@ export default function App() {
                     display: 'flex',
                     flexDirection: isMobile ? 'column' : 'row',
                     alignItems: 'center',
-                    gap: isMobile ? '2px' : '6px',
-                    padding: isMobile ? '4px' : '6px 12px',
+                    gap: isMobile ? '4px' : '6px 12px',
+                    padding: isMobile ? '6px 4px' : '6px 12px',
                     borderRadius: '8px',
                     border: isActive ? `2px solid ${player.color}` : '2px solid transparent',
                     boxShadow: isActive ? `0 0 10px ${player.color}44` : 'none',
                     backgroundColor: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
                     transition: 'all 0.2s',
-                    width: isMobile ? '36px' : 'auto',
+                    width: isMobile ? '46px' : 'auto',
                     boxSizing: 'border-box'
                   }}
                 >
@@ -1661,16 +1661,24 @@ export default function App() {
                       {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && ' (Offline)'}
                     </span>
                   )}
-                  {isMobile && isActive && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '4px', width: '100%' }}>
-                      <span style={{ fontSize: '10px', color: 'white', fontWeight: 'bold' }}>
-                        🧵{player.thread}
-                      </span>
-                      <span style={{ fontSize: '10px', color: 'var(--accent-cyan)', fontWeight: 'bold' }}>
-                        ⚡{player.ap}
-                      </span>
+                  {isMobile && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', marginTop: '2px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '3px', width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-around', width: '100%', gap: '2px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: '9px' }}>🧵</span>
+                          <span style={{ fontSize: '9px', color: 'white', fontWeight: 'bold', marginTop: '1px' }}>
+                            {player.thread}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: '9px' }}>⚡</span>
+                          <span style={{ fontSize: '9px', color: 'var(--accent-cyan)', fontWeight: 'bold', marginTop: '1px' }}>
+                            {player.ap}
+                          </span>
+                        </div>
+                      </div>
                       {hasAura && (
-                        <div style={{ display: 'flex', gap: '1px', fontSize: '9px', marginTop: '2px' }}>
+                        <div style={{ display: 'flex', gap: '2px', fontSize: '9px', marginTop: '2px', justifyContent: 'center', width: '100%' }}>
                           {(player as any).hasTurnAside && <span>🛡️</span>}
                           {(player as any).hasSpiritSkin && <span>🪨</span>}
                           {(player as any).hasThorns && <span>🌵</span>}
