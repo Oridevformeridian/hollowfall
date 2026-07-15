@@ -392,6 +392,7 @@ export default function App() {
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
     height: typeof window !== 'undefined' ? window.innerHeight : 800
   });
+  const isMobile = dimensions.width <= 768;
 
   useEffect(() => {
     const handleResize = () => {
@@ -866,10 +867,10 @@ export default function App() {
           style={{
             width: '100%',
             maxWidth: '768px',
-            padding: '32px',
+            padding: isMobile ? '16px' : '32px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '24px',
+            gap: isMobile ? '16px' : '24px',
             boxSizing: 'border-box'
           }}
         >
@@ -947,8 +948,8 @@ export default function App() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '32px',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+              gap: isMobile ? '16px' : '32px',
               alignItems: 'center',
               width: '100%'
             }}
@@ -962,16 +963,16 @@ export default function App() {
                 {playersList.map(player => (
                   <div
                     key={player.id}
-                    className="flex justify-between items-center bg-[rgba(255,255,255,0.03)] p-4 rounded-xl border border-gray-800"
+                    className={`flex justify-between items-center bg-[rgba(255,255,255,0.03)] ${isMobile ? 'p-2 rounded-lg' : 'p-4 rounded-xl'} border border-gray-800`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
-                      <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '48px', lineHeight: '1' }}>{player.emoji}</span>
-                        <span>{player.username} {player.id === socket?.id && '(You)'}</span>
+                      <div className={isMobile ? 'w-2 h-2 rounded-full' : 'w-3.5 h-3.5 rounded-full'} style={{ backgroundColor: player.color }} />
+                      <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '12px' }}>
+                        <span style={{ fontSize: isMobile ? '24px' : '48px', lineHeight: '1' }}>{player.emoji}</span>
+                        <span style={{ fontSize: isMobile ? '12px' : '14px' }}>{player.username} {player.id === socket?.id && '(You)'}</span>
                       </span>
                     </div>
-                    <span className={`text-xs px-3 py-1.5 rounded-full font-bold ${player.isReady ? 'bg-[rgba(0,230,118,0.15)] text-[var(--accent-green)]' : 'bg-gray-800 text-gray-400'}`}>
+                    <span className={`${isMobile ? 'text-[10px] px-2 py-1' : 'text-xs px-3 py-1.5'} rounded-full font-bold ${player.isReady ? 'bg-[rgba(0,230,118,0.15)] text-[var(--accent-green)]' : 'bg-gray-800 text-gray-400'}`}>
                       {player.isReady ? 'READY' : 'NOT READY'}
                     </span>
                   </div>
@@ -985,13 +986,13 @@ export default function App() {
                 .filter(p => p.id !== socket?.id)
                 .map(p => p.emoji);
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '6px' : '12px' }}>
                   <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider font-bold text-center">Choose Your Hero</h3>
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(5, 90px)',
-                      gap: '16px',
+                      gridTemplateColumns: isMobile ? 'repeat(5, 58px)' : 'repeat(5, 90px)',
+                      gap: isMobile ? '6px' : '16px',
                       justifyContent: 'center'
                     }}
                   >
@@ -1005,7 +1006,7 @@ export default function App() {
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            gap: '6px',
+                            gap: '4px',
                             position: 'relative'
                           }}
                           onMouseEnter={() => setHoveredHeroIndex(idx)}
@@ -1016,18 +1017,18 @@ export default function App() {
                             onClick={() => !isTaken && handleSelectHero(hero.emoji)}
                             disabled={isTaken}
                             style={{
-                              fontSize: '48px',
-                              width: '80px',
-                              height: '80px',
+                              fontSize: isMobile ? '30px' : '48px',
+                              width: isMobile ? '50px' : '80px',
+                              height: isMobile ? '50px' : '80px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               border: isSelected
-                                ? `4px solid ${hero.color}`
+                                ? `${isMobile ? '3px' : '4px'} solid ${hero.color}`
                                 : isTaken
-                                ? '2px dashed #334155'
+                                ? '1.5px dashed #334155'
                                 : '2px solid var(--border-light)',
-                              borderRadius: '16px',
+                              borderRadius: isMobile ? '10px' : '16px',
                               backgroundColor: isSelected
                                 ? `${hero.color}22`
                                 : 'rgba(0, 0, 0, 0.2)',
@@ -1043,7 +1044,7 @@ export default function App() {
                           </button>
                           <span
                             style={{
-                              fontSize: '10px',
+                              fontSize: isMobile ? '8px' : '10px',
                               fontWeight: 'bold',
                               color: isSelected ? hero.color : '#94a3b8',
                               textAlign: 'center',
@@ -1103,10 +1104,10 @@ export default function App() {
           <div
             style={{
               display: 'flex',
-              gap: '16px',
-              marginTop: '24px',
+              gap: isMobile ? '10px' : '16px',
+              marginTop: isMobile ? '16px' : '24px',
               borderTop: '1px solid var(--border-light)',
-              paddingTop: '24px',
+              paddingTop: isMobile ? '16px' : '24px',
               justifyContent: 'center',
               width: '100%',
               maxWidth: '440px',
@@ -1205,7 +1206,7 @@ export default function App() {
     }
   };
 
-  const isMobile = dimensions.width <= 768;
+  // isMobile is defined at top of component
   const availableWidth = isMobile ? (dimensions.width - 64) : (dimensions.width - 320 - 80);
   const bottomHUDHeight = gameState?.phase === 'GAMEPLAY' ? 220 : 0;
   const availableHeight = isMobile 
