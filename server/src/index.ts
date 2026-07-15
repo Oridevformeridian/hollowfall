@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance } from '../../shared/validation';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance } from '../../shared/validation';
 import { HEROES } from '../../shared/constants';
 import { buildDeckForEmoji, shuffle, getRemainingDeckForReshuffle } from '../../shared/deck';
 
@@ -220,6 +220,7 @@ io.on('connection', (socket) => {
               placedTiles: {},
               doorsState: {},
               wallsState: {},
+              wallHp: {},
               tokenPositions: {},
               treasures: {},
               gameLogs: []
@@ -960,8 +961,10 @@ io.on('connection', (socket) => {
             }
             const wallKey = `${target.tileX},${target.tileY}:${target.r},${target.c}:${target.direction}`;
             room.wallsState[wallKey] = true;
+            if (!room.wallHp) room.wallHp = {};
+            room.wallHp[wallKey] = 5;
 
-            broadcastSystemMessage(currentRoomCode, `${player.username} cast Raise Stone, creating a wall on the ${target.direction === 'H' ? 'horizontal' : 'vertical'} border of Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Raise Stone, creating a wall (5 HP) on the ${target.direction === 'H' ? 'horizontal' : 'vertical'} border of Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -1174,138 +1177,206 @@ io.on('connection', (socket) => {
             return;
           }
 
-          const { targetPlayerId } = message.payload;
-          if (targetPlayerId === playerId) {
-            sendError(socket, 'You cannot target yourself.');
+          const { targetPlayerId, targetWall } = message.payload;
+
+          if (!targetPlayerId && !targetWall) {
+            sendError(socket, 'Lash attack requires a target player or wall.');
             return;
           }
 
-          const targetPlayer = room.players[targetPlayerId];
-          if (!targetPlayer) {
-            sendError(socket, 'Target player not found.');
-            return;
-          }
-
-          const from = room.tokenPositions[playerId];
-          const to = room.tokenPositions[targetPlayerId];
-          if (!from || !to) {
-            sendError(socket, 'Positions not initialized.');
-            return;
-          }
-
-          const dr = Math.abs(to.r - from.r);
-          const dc = Math.abs(to.c - from.c);
-          const dx = to.tileX - from.tileX;
-          const dy = to.tileY - from.tileY;
-          const dtX = Math.abs(dx);
-          const dtY = Math.abs(dy);
-
-          const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
-          const isAdjacent = (dtX <= 1 && dtY <= 1) && (
-            (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
-            (dx === 1 && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) ||
-            (dx === -1 && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) ||
-            (dx === 0 && dy === 1 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) ||
-            (dx === 0 && dy === -1 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2)
-          );
-
-          if (!isSameCell && !isAdjacent) {
-            sendError(socket, 'Target is out of range.');
-            return;
-          }
-
-          if (!hasLineOfSight(from, to, room.placedTiles, room.doorsState, room.wallsState)) {
-            sendError(socket, 'Target is blocked by a wall or door.');
-            return;
-          }
-
-          player.hasAttackedThisTurn = true;
-          player.ap--;
-
-          // Aura protection check
-          let tookDamage = false;
-          let damageDealt = 0;
-          let blockedBySpiritSkin = false;
-          if (targetPlayer.hasSpiritSkin) {
-            targetPlayer.hasSpiritSkin = false;
-            blockedBySpiritSkin = true;
-            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura blocked the Lash damage!`);
-          } else {
-            targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
-            tookDamage = true;
-            damageDealt = 1;
-            broadcastSystemMessage(currentRoomCode, `${player.username} lashed ${targetPlayer.username} for 1 damage!`);
-          }
-
-          const lashAnimMsg: ServerMessage = {
-            event: 'LASH_ATTACK_ANIMATION',
-            payload: {
-              attackerId: playerId,
-              targetPlayerId,
-              damageDealt,
-              blockedBySpiritSkin
+          if (targetPlayerId) {
+            if (targetPlayerId === playerId) {
+              sendError(socket, 'You cannot target yourself.');
+              return;
             }
-          };
-          io.to(currentRoomCode).emit('message', JSON.stringify(lashAnimMsg));
 
-          // Thorns retaliation
-          if (targetPlayer.hasThorns && tookDamage) {
-            player.thread = Math.max(0, player.thread - 1);
-            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
-            // Check if player died from Thorns
-            if (player.thread <= 0) {
-              targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
-              targetPlayer.hand.push(...player.hand);
-              player.hand = [];
-              if (targetPlayer.hand.length > 7) {
-                targetPlayer.hand.splice(7);
+            const targetPlayer = room.players[targetPlayerId];
+            if (!targetPlayer) {
+              sendError(socket, 'Target player not found.');
+              return;
+            }
+
+            const from = room.tokenPositions[playerId];
+            const to = room.tokenPositions[targetPlayerId];
+            if (!from || !to) {
+              sendError(socket, 'Positions not initialized.');
+              return;
+            }
+
+            const dr = Math.abs(to.r - from.r);
+            const dc = Math.abs(to.c - from.c);
+            const dx = to.tileX - from.tileX;
+            const dy = to.tileY - from.tileY;
+            const dtX = Math.abs(dx);
+            const dtY = Math.abs(dy);
+
+            const isSameCell = dtX === 0 && dtY === 0 && dr === 0 && dc === 0;
+            const isAdjacent = (dtX <= 1 && dtY <= 1) && (
+              (dtX === 0 && dtY === 0 && dr <= 1 && dc <= 1) ||
+              (dx === 1 && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0) ||
+              (dx === -1 && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4) ||
+              (dx === 0 && dy === 1 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) ||
+              (dx === 0 && dy === -1 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2)
+            );
+
+            if (!isSameCell && !isAdjacent) {
+              sendError(socket, 'Target is out of range.');
+              return;
+            }
+
+            if (!hasLineOfSight(from, to, room.placedTiles, room.doorsState, room.wallsState)) {
+              sendError(socket, 'Target is blocked by a wall or door.');
+              return;
+            }
+
+            player.hasAttackedThisTurn = true;
+            player.ap--;
+
+            // Aura protection check
+            let tookDamage = false;
+            let damageDealt = 0;
+            let blockedBySpiritSkin = false;
+            if (targetPlayer.hasSpiritSkin) {
+              targetPlayer.hasSpiritSkin = false;
+              blockedBySpiritSkin = true;
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura blocked the Lash damage!`);
+            } else {
+              targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
+              tookDamage = true;
+              damageDealt = 1;
+              broadcastSystemMessage(currentRoomCode, `${player.username} lashed ${targetPlayer.username} for 1 damage!`);
+            }
+
+            const lashAnimMsg: ServerMessage = {
+              event: 'LASH_ATTACK_ANIMATION',
+              payload: {
+                attackerId: playerId,
+                targetPlayerId,
+                damageDealt,
+                blockedBySpiritSkin
               }
-              player.thread = 15;
-              const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
-              if (playerTile) {
-                room.tokenPositions[playerId] = {
-                  tileX: playerTile.position.x,
-                  tileY: playerTile.position.y,
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(lashAnimMsg));
+
+            // Thorns retaliation
+            if (targetPlayer.hasThorns && tookDamage) {
+              player.thread = Math.max(0, player.thread - 1);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+              // Check if player died from Thorns
+              if (player.thread <= 0) {
+                targetPlayer.severPoints = (targetPlayer.severPoints || 0) + 1;
+                targetPlayer.hand.push(...player.hand);
+                player.hand = [];
+                if (targetPlayer.hand.length > 7) {
+                  targetPlayer.hand.splice(7);
+                }
+                player.thread = 15;
+                const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === playerId);
+                if (playerTile) {
+                  room.tokenPositions[playerId] = {
+                    tileX: playerTile.position.x,
+                    tileY: playerTile.position.y,
+                    r: 2,
+                    c: 2
+                  };
+                }
+                broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
+              }
+            }
+
+            if (targetPlayer.thread <= 0) {
+              player.severPoints = (player.severPoints || 0) + 1;
+              player.hand.push(...targetPlayer.hand);
+              targetPlayer.hand = [];
+              if (player.hand.length > 7) {
+                player.hand.splice(7);
+              }
+
+              if (room.treasures) {
+                for (const treasureId of Object.keys(room.treasures)) {
+                  const treasure = room.treasures[treasureId];
+                  if (treasure.carrierId === targetPlayerId) {
+                    treasure.carrierId = null;
+                    treasure.tileX = to.tileX;
+                    treasure.tileY = to.tileY;
+                    treasure.r = to.r;
+                    treasure.c = to.c;
+                  }
+                }
+              }
+
+              targetPlayer.thread = 15;
+              const targetTile = Object.values(room.placedTiles).find(t => t.placedBy === targetPlayerId);
+              if (targetTile) {
+                room.tokenPositions[targetPlayerId] = {
+                  tileX: targetTile.position.x,
+                  tileY: targetTile.position.y,
                   r: 2,
                   c: 2
                 };
               }
-              broadcastSystemMessage(currentRoomCode, `${player.username} was defeated by Thorns retaliation and respawned!`);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} was defeated by ${player.username} and respawned!`);
             }
-          }
-
-          if (targetPlayer.thread <= 0) {
-            player.severPoints = (player.severPoints || 0) + 1;
-            player.hand.push(...targetPlayer.hand);
-            targetPlayer.hand = [];
-            if (player.hand.length > 7) {
-              player.hand.splice(7);
+          } else if (targetWall) {
+            const wallKey = `${targetWall.tileX},${targetWall.tileY}:${targetWall.r},${targetWall.c}:${targetWall.direction}`;
+            if (!room.wallsState || !room.wallsState[wallKey]) {
+              sendError(socket, 'No raised stone wall exists at target.');
+              return;
             }
 
-            if (room.treasures) {
-              for (const treasureId of Object.keys(room.treasures)) {
-                const treasure = room.treasures[treasureId];
-                if (treasure.carrierId === targetPlayerId) {
-                  treasure.carrierId = null;
-                  treasure.tileX = to.tileX;
-                  treasure.tileY = to.tileY;
-                  treasure.r = to.r;
-                  treasure.c = to.c;
-                }
+            const from = room.tokenPositions[playerId];
+            if (!from) {
+              sendError(socket, 'Positions not initialized.');
+              return;
+            }
+
+            // Verify player is adjacent to the target wall border
+            const cellA = { tileX: targetWall.tileX, tileY: targetWall.tileY, r: targetWall.r, c: targetWall.c };
+            const cellB = targetWall.direction === 'H'
+              ? { tileX: targetWall.tileX, tileY: targetWall.tileY, r: targetWall.r + 1, c: targetWall.c }
+              : { tileX: targetWall.tileX, tileY: targetWall.tileY, r: targetWall.r, c: targetWall.c + 1 };
+
+            const isPlayerAtCellA = from.tileX === cellA.tileX && from.tileY === cellA.tileY && from.r === cellA.r && from.c === cellA.c;
+            const isPlayerAtCellB = from.tileX === cellB.tileX && from.tileY === cellB.tileY && from.r === cellB.r && from.c === cellB.c;
+
+            if (!isPlayerAtCellA && !isPlayerAtCellB) {
+              sendError(socket, 'You must be adjacent to the target wall to lash it.');
+              return;
+            }
+
+            if (!hasLineOfSightToWall(from, targetWall, room.placedTiles, room.doorsState, room.wallsState)) {
+              sendError(socket, 'Target wall is not in your Line of Sight (LOS).');
+              return;
+            }
+
+            player.hasAttackedThisTurn = true;
+            player.ap--;
+
+            if (!room.wallHp) room.wallHp = {};
+            const currentHp = room.wallHp[wallKey] !== undefined ? room.wallHp[wallKey] : 5;
+            const newHp = currentHp - 1;
+            room.wallHp[wallKey] = newHp;
+
+            if (newHp <= 0) {
+              delete room.wallsState[wallKey];
+              if (room.wallHp) {
+                delete room.wallHp[wallKey];
               }
+              broadcastSystemMessage(currentRoomCode, `${player.username} destroyed the Raised Stone wall!`);
+            } else {
+              broadcastSystemMessage(currentRoomCode, `${player.username} damaged the Raised Stone wall (HP: ${newHp}/5)!`);
             }
 
-            targetPlayer.thread = 15;
-            const targetTile = Object.values(room.placedTiles).find(t => t.placedBy === targetPlayerId);
-            if (targetTile) {
-              room.tokenPositions[targetPlayerId] = {
-                tileX: targetTile.position.x,
-                tileY: targetTile.position.y,
-                r: 2,
-                c: 2
-              };
-            }
-            broadcastSystemMessage(currentRoomCode, `${targetPlayer.username} was defeated by ${player.username} and respawned!`);
+            const lashAnimMsg: ServerMessage = {
+              event: 'LASH_ATTACK_ANIMATION',
+              payload: {
+                attackerId: playerId,
+                targetWall,
+                damageDealt: 1,
+                blockedBySpiritSkin: false
+              }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(lashAnimMsg));
           }
 
           recalculatePoints(room);
@@ -1445,6 +1516,7 @@ io.on('connection', (socket) => {
           room.placedTiles = {};
           room.doorsState = {};
           room.wallsState = {};
+          room.wallHp = {};
           room.tokenPositions = {};
           room.treasures = {};
           room.turnOrder = [];

@@ -72,6 +72,7 @@ export interface GameState {
   placedTiles: Record<string, PlacedTile>; // Key format: "x,y"
   doorsState: Record<string, 'OPEN' | 'CLOSED'>; // Key format: "x,y:r,c:direction"
   wallsState: Record<string, boolean>; // Key format: "x,y:r,c:direction"
+  wallHp?: Record<string, number>; // Key format: "x,y:r,c:direction"
   tokenPositions: Record<PlayerId, TokenPosition>;
   treasures: Record<string, Treasure>;
   gameLogs?: string[];
@@ -88,7 +89,7 @@ export type ClientMessage =
   | { event: 'END_TURN' }
   | { event: 'PLAY_CARD'; payload: { cardId: string; target?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' } } }
   | { event: 'RESET_GAME' }
-  | { event: 'LASH_ATTACK'; payload: { targetPlayerId: string } }
+  | { event: 'LASH_ATTACK'; payload: { targetPlayerId?: string; targetWall?: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' } } }
   | { event: 'PICKUP_TREASURE'; payload: { treasureId: string } }
   | { event: 'DROP_TREASURE'; payload: { treasureId: string } }
   | { event: 'CONCEDE' };
@@ -96,5 +97,5 @@ export type ClientMessage =
 export type ServerMessage =
   | { event: 'STATE_UPDATE'; payload: GameState }
   | { event: 'PLAY_CARD_ANIMATION'; payload: { cardId: string; casterId: string; target?: any; countered?: 'turn_aside' | 'spirit_skin' | null } }
-  | { event: 'LASH_ATTACK_ANIMATION'; payload: { attackerId: string; targetPlayerId: string; damageDealt: number; blockedBySpiritSkin: boolean } }
+  | { event: 'LASH_ATTACK_ANIMATION'; payload: { attackerId: string; targetPlayerId?: string; targetWall?: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' }; damageDealt: number; blockedBySpiritSkin: boolean } }
   | { event: 'ERROR'; payload: { message: string } };

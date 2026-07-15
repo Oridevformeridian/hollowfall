@@ -238,6 +238,26 @@ export function getNextCell(
   return curr;
 }
 
+export function hasLineOfSightToWall(
+  from: TokenPosition,
+  wall: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' },
+  placedTiles: Record<string, PlacedTile>,
+  doorsState: Record<string, 'OPEN' | 'CLOSED'>,
+  wallsState?: Record<string, boolean>
+): boolean {
+  const cellA: TokenPosition = { tileX: wall.tileX, tileY: wall.tileY, r: wall.r, c: wall.c };
+  let cellB: TokenPosition;
+  if (wall.direction === 'H') {
+    cellB = { tileX: wall.tileX, tileY: wall.tileY, r: wall.r + 1, c: wall.c };
+  } else {
+    cellB = { tileX: wall.tileX, tileY: wall.tileY, r: wall.r, c: wall.c + 1 };
+  }
+  return (
+    hasLineOfSight(from, cellA, placedTiles, doorsState, wallsState) ||
+    hasLineOfSight(from, cellB, placedTiles, doorsState, wallsState)
+  );
+}
+
 export function hasLineOfSight(
   from: TokenPosition,
   to: TokenPosition,

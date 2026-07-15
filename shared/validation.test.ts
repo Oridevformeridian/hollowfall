@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance, getActiveRainbowBridges } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -443,3 +443,38 @@ describe('getActiveRainbowBridges', () => {
   });
 });
 
+describe('hasLineOfSightToWall', () => {
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 4, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' }
+  };
+
+  it('should return true if player is at cellA or cellB of the wall', () => {
+    const fromA: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const wall = {
+      tileX: 0,
+      tileY: 0,
+      r: 2,
+      c: 2,
+      direction: 'H' as const
+    };
+    // cellB will be { tileX: 0, tileY: 0, r: 3, c: 2 }
+    const fromB: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 2 };
+
+    expect(hasLineOfSightToWall(fromA, wall, placedTiles, {})).toBe(true);
+    expect(hasLineOfSightToWall(fromB, wall, placedTiles, {})).toBe(true);
+  });
+
+  it('should return true if player has line of sight to cellA or cellB from elsewhere', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 0 };
+    const wall = {
+      tileX: 0,
+      tileY: 0,
+      r: 3,
+      c: 1,
+      direction: 'V' as const
+    };
+    // cellA is { tileX: 0, tileY: 0, r: 3, c: 1 }
+    // Line of sight is clear from (0,0, 3,0) to (0,0, 3,1) on Tile 4
+    expect(hasLineOfSightToWall(from, wall, placedTiles, {})).toBe(true);
+  });
+});
