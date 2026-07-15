@@ -1755,9 +1755,26 @@ export default function App() {
                 >
                   <span style={{ fontSize: isMobile ? '20px' : '22px', lineHeight: '1' }}>{player.emoji}</span>
                   {!isMobile && (
-                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
-                      {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && ' (Offline)'}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
+                        {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && ' (Offline)'}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#94a3b8' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          🧵 <span style={{ color: 'white', fontWeight: 'bold' }}>{player.thread}</span>
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          ⚡ <span style={{ color: 'var(--accent-cyan)', fontWeight: 'bold' }}>{player.ap}</span>
+                        </span>
+                        {hasAura && (
+                          <span style={{ display: 'flex', gap: '3px', marginLeft: '4px' }}>
+                            {(player as any).hasTurnAside && <span title="Turn Aside Aura">🛡️</span>}
+                            {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura">🪨</span>}
+                            {(player as any).hasThorns && <span title="Thorns Talisman">🌵</span>}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   )}
                   {isMobile && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', marginTop: '2px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '3px', width: '100%' }}>
