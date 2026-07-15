@@ -1226,9 +1226,11 @@ export default function App() {
     <div className="app-layout">
       {/* Sidebar - Players & Game Phase Info */}
       <div className="sidebar">
-        <div className="sidebar-section">
-          <div>
-            <h1 className="text-xl font-black text-[var(--accent-cyan)] m-0 tracking-wider">HOLLOWFALL</h1>
+        {!isMobile ? (
+          <>
+            <div className="sidebar-section">
+              <div>
+                <h1 className="text-xl font-black text-[var(--accent-cyan)] m-0 tracking-wider">HOLLOWFALL</h1>
             <p className="text-gray-400 text-xs m-0" style={{ marginBottom: '4px' }}>
               {gameState.phase === 'PLACEMENT' ? 'Tile Setup' : 'Gameplay Phase'}
             </p>
@@ -1520,6 +1522,62 @@ export default function App() {
         <div style={{ marginTop: '24px', borderTop: '1px solid var(--border-light)', paddingTop: '16px', textAlign: 'center' }}>
           <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>Room: {gameState.roomCode}</span>
         </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+            {/* Small Ritual Feed without a title */}
+            {gameState && gameState.gameLogs && gameState.gameLogs.length > 0 && (
+              <div
+                style={{
+                  flexGrow: 1,
+                  overflowY: 'auto',
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  border: '1px solid rgba(255,255,255,0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                  color: '#94a3b8',
+                  lineHeight: '1.4'
+                }}
+              >
+                {gameState.gameLogs.map((log, idx) => (
+                  <div key={`log-${idx}`} style={{ wordBreak: 'break-all' }}>
+                    {log}
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* End Turn button at the very bottom */}
+            {isActiveTurn && gameState.phase === 'GAMEPLAY' && (
+              <button
+                onClick={handleEndTurn}
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  backgroundColor: 'var(--accent-cyan)',
+                  color: 'black',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  padding: '10px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                End Turn ➔
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Board Space */}
@@ -1527,7 +1585,7 @@ export default function App() {
         className="main-content"
         style={{
           overflow: 'auto',
-          paddingBottom: gameState.phase === 'GAMEPLAY' ? '220px' : '24px',
+          paddingBottom: (isMobile || gameState.phase !== 'GAMEPLAY') ? '24px' : '220px',
           boxSizing: 'border-box'
         }}
       >
@@ -2559,11 +2617,97 @@ export default function App() {
             );
           })()}
         </div>
+
+        {/* Mobile-only Action Bar (visible below the board) */}
+        {isMobile && isActiveTurn && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '360px', margin: '16px auto 0 auto', padding: '0 16px', boxSizing: 'border-box' }}>
+            {/* Rotate Tile button in PLACEMENT phase */}
+            {gameState.phase === 'PLACEMENT' && activeTileLayout && (
+              <button
+                onClick={handleRotate}
+                className="btn-secondary"
+                style={{ width: '100%', padding: '10px 0', fontWeight: 'bold' }}
+              >
+                Rotate Tile (90° CW)
+              </button>
+            )}
+
+            {/* Pick Up / Drop Mask buttons in GAMEPLAY phase */}
+            {gameState.phase === 'GAMEPLAY' && (
+              <>
+                {/* Pick Up Treasure Button */}
+                {(() => {
+                  const sameCellTreasures = gameState.treasures && myTokenPos
+                    ? Object.values(gameState.treasures).filter(
+                        t => t.tileX === myTokenPos.tileX &&
+                             t.tileY === myTokenPos.tileY &&
+                             t.r === myTokenPos.r &&
+                             t.c === myTokenPos.c &&
+                             t.carrierId === null
+                      )
+                    : [];
+                  if (sameCellTreasures.length > 0 && self && self.ap > 0) {
+                    return sameCellTreasures.map(t => {
+                      const owner = gameState.players[t.ownerId];
+                      const label = owner
+                        ? `📥 Pick Up ${owner.username}'s Mask`
+                        : `📥 Pick Up Mask`;
+
+                      return (
+                        <button
+                          key={`pickup-mobile-${t.id}`}
+                          onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: t.id } })}
+                          className="btn-primary"
+                          style={{
+                            width: '100%',
+                            backgroundColor: 'var(--accent-green)',
+                            color: 'black',
+                            fontWeight: 'bold',
+                            padding: '10px 0'
+                          }}
+                        >
+                          {label} (1 AP)
+                        </button>
+                      );
+                    });
+                  }
+                  return null;
+                })()}
+
+                {/* Drop Treasure Button */}
+                {(() => {
+                  const carriedTr = gameState.treasures
+                    ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
+                    : null;
+                  if (carriedTr) {
+                    return (
+                      <button
+                        onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: carriedTr.id } })}
+                        className="btn-secondary"
+                        style={{
+                          width: '100%',
+                          borderColor: 'var(--accent-gold)',
+                          color: 'var(--accent-gold)',
+                          fontWeight: 'bold',
+                          padding: '10px 0'
+                        }}
+                      >
+                        📤 Drop Mask (Free Action)
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Card Hand / Inventory HUD */}
       {gameState.phase === 'GAMEPLAY' && self && (
         <div
+          className="cards-hud"
           style={{
             position: 'fixed',
             bottom: '16px',
