@@ -1311,7 +1311,7 @@ export default function App() {
 
   const scaleX = availableWidth / boardW;
   const scaleY = availableHeight / boardH;
-  const scaleFactor = Math.max(0.3, Math.min(1.5, scaleX, scaleY));
+  const scaleFactor = Math.max(0.05, Math.min(1.5, scaleX, scaleY));
 
   // Validate if a coordinates placement is allowed
   const isPlacementValid = (x: number, y: number) => {
