@@ -2776,14 +2776,14 @@ export default function App() {
                 >
                   {isMobile ? (
                     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', alignItems: 'center', width: '100%', overflow: 'hidden' }}>
-                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor, transform: 'scale(0.85)' }}>
-                        {card.type}
+                      <span style={{ fontSize: '7px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+                        {card.name}
                       </span>
                       <span style={{ fontSize: '24px', margin: 'auto 0' }}>
                         {getCardTypeEmoji(card.id)}
                       </span>
-                      <span style={{ fontSize: '7px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
-                        {card.name}
+                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor, transform: 'scale(0.85)' }}>
+                        {card.type}
                       </span>
                     </div>
                   ) : (
