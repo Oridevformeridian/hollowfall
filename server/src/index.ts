@@ -826,6 +826,69 @@ io.on('connection', (socket) => {
             }
             const fromPos = room.tokenPositions[playerId];
             if (!fromPos) return;
+            if (target.direction !== undefined) {
+              const wallKey = `${target.tileX},${target.tileY}:${target.r},${target.c}:${target.direction}`;
+              if (!room.wallsState || !room.wallsState[wallKey]) {
+                sendError(socket, 'No raised stone wall exists at target.');
+                return;
+              }
+              if (!hasLineOfSightToWall(fromPos, target as any, room.placedTiles, room.doorsState, room.wallsState)) {
+                sendError(socket, 'Target wall is not in your Line of Sight (LOS).');
+                return;
+              }
+
+              // Mark attack used
+              player.hasAttackedThisTurn = true;
+              player.ap--;
+
+              // Determine damage amount
+              let damage = 3;
+              if (card.id === 'ash_fireball') {
+                damage = 4;
+              } else if (card.id === 'ash_immolate') {
+                damage = 6;
+              }
+
+              if (!room.wallHp) room.wallHp = {};
+              const currentHp = room.wallHp[wallKey] !== undefined ? room.wallHp[wallKey] : 5;
+              const newHp = currentHp - damage;
+              room.wallHp[wallKey] = newHp;
+
+              if (newHp <= 0) {
+                delete room.wallsState[wallKey];
+                if (room.wallHp) {
+                  delete room.wallHp[wallKey];
+                }
+                broadcastSystemMessage(currentRoomCode, `${player.username} destroyed the Raised Stone wall with ${card.name}!`);
+              } else {
+                broadcastSystemMessage(currentRoomCode, `${player.username} damaged the Raised Stone wall with ${card.name} (HP: ${newHp}/5)!`);
+              }
+
+              // Apply recoil for Immolate
+              if (card.id === 'ash_immolate') {
+                player.thread = Math.max(0, player.thread - 1);
+                broadcastSystemMessage(currentRoomCode, `${player.username} suffered 1 recoil damage from Immolate!`);
+                if (player.thread <= 0) {
+                  handlePlayerDefeated(room, playerId, null, `${player.username} was defeated by recoil from their own Immolate!`, currentRoomCode);
+                }
+              }
+
+              const animMsg: ServerMessage = {
+                event: 'PLAY_CARD_ANIMATION',
+                payload: { cardId: card.id, casterId: playerId, target }
+              };
+              io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
+              // Remove card from hand
+              player.hand.splice(cardIndex, 1);
+              recalculatePoints(room);
+              if (player.ap === 0) {
+                passTurn(room);
+              }
+              broadcastState(currentRoomCode, room);
+              return;
+            }
+
             if (!hasLineOfSight(fromPos, target, room.placedTiles, room.doorsState, room.wallsState)) {
               sendError(socket, 'Target cell is not in your Line of Sight (LOS).');
               return;

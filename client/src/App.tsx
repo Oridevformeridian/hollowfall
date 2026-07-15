@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, getWrappingManhattanDistance, getActiveRainbowBridges } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges } from './shared/validation.ts';
 
 const renderTileSvgContent = (
   layout: TileLayout,
@@ -16,7 +16,9 @@ const renderTileSvgContent = (
   selfAp?: number,
   placedTiles?: any,
   wallsState?: Record<string, boolean>,
-  isGameplay?: boolean
+  isGameplay?: boolean,
+  targetingCardId?: string | null,
+  onClickWall?: (wall: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' }) => void
 ) => {
   const rot = rotation || 0;
   const cells = [];
@@ -87,18 +89,57 @@ const renderTileSvgContent = (
               const placed = rotateBorderCoordinate(r, c, 'V', rot);
               const wallKey = `${tilePos.x},${tilePos.y}:${placed.r},${placed.c}:${placed.direction}`;
               if (wallsState[wallKey]) {
+                // Check if wall is targetable
+                let isTargetable = false;
+                if (isActiveTurn && myTokenPos && placedTiles) {
+                  const hasLos = hasLineOfSightToWall(myTokenPos, { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c, direction: placed.direction }, placedTiles, doorsState || {}, wallsState || {});
+                  if (hasLos) {
+                    if (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') {
+                      isTargetable = true;
+                    } else if (!targetingCardId && selfAp && selfAp > 0) {
+                      // Lash adjacent wall: check if player is at cellA or cellB of the wall
+                      const cellA = { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c };
+                      const cellB = { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c + 1 };
+                      const isAdjacent = (myTokenPos.tileX === cellA.tileX && myTokenPos.tileY === cellA.tileY && myTokenPos.r === cellA.r && myTokenPos.c === cellA.c) ||
+                                         (myTokenPos.tileX === cellB.tileX && myTokenPos.tileY === cellB.tileY && myTokenPos.r === cellB.r && myTokenPos.c === cellB.c);
+                      if (isAdjacent) {
+                        isTargetable = true;
+                      }
+                    }
+                  }
+                }
+
                 dynamicWalls.push(
-                  <line
-                    key={`dyn-vwall-${r}-${c}`}
-                    x1={(c + 1) * 20}
-                    y1={r * 20}
-                    x2={(c + 1) * 20}
-                    y2={(r + 1) * 20}
-                    stroke="#FF6D00"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    style={{ filter: 'drop-shadow(0 0 3px #FF6D00)' }}
-                  />
+                  <g key={`dyn-vwall-g-${r}-${c}`}>
+                    <line
+                      x1={(c + 1) * 20}
+                      y1={r * 20}
+                      x2={(c + 1) * 20}
+                      y2={(r + 1) * 20}
+                      stroke={isTargetable ? "#00E5FF" : "#FF6D00"}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      style={{ 
+                        filter: isTargetable ? 'drop-shadow(0 0 4px #00E5FF)' : 'drop-shadow(0 0 3px #FF6D00)',
+                        transition: 'stroke 0.2s, filter 0.2s'
+                      }}
+                    />
+                    {isTargetable && onClickWall && (
+                      <line
+                        x1={(c + 1) * 20}
+                        y1={r * 20}
+                        x2={(c + 1) * 20}
+                        y2={(r + 1) * 20}
+                        stroke="transparent"
+                        strokeWidth="12"
+                        style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClickWall({ tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c, direction: placed.direction });
+                        }}
+                      />
+                    )}
+                  </g>
                 );
               }
             }
@@ -108,18 +149,57 @@ const renderTileSvgContent = (
               const placed = rotateBorderCoordinate(r, c, 'H', rot);
               const wallKey = `${tilePos.x},${tilePos.y}:${placed.r},${placed.c}:${placed.direction}`;
               if (wallsState[wallKey]) {
+                // Check if wall is targetable
+                let isTargetable = false;
+                if (isActiveTurn && myTokenPos && placedTiles) {
+                  const hasLos = hasLineOfSightToWall(myTokenPos, { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c, direction: placed.direction }, placedTiles, doorsState || {}, wallsState || {});
+                  if (hasLos) {
+                    if (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') {
+                      isTargetable = true;
+                    } else if (!targetingCardId && selfAp && selfAp > 0) {
+                      // Lash adjacent wall: check if player is at cellA or cellB of the wall
+                      const cellA = { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c };
+                      const cellB = { tileX: tilePos.x, tileY: tilePos.y, r: placed.r + 1, c: placed.c };
+                      const isAdjacent = (myTokenPos.tileX === cellA.tileX && myTokenPos.tileY === cellA.tileY && myTokenPos.r === cellA.r && myTokenPos.c === cellA.c) ||
+                                         (myTokenPos.tileX === cellB.tileX && myTokenPos.tileY === cellB.tileY && myTokenPos.r === cellB.r && myTokenPos.c === cellB.c);
+                      if (isAdjacent) {
+                        isTargetable = true;
+                      }
+                    }
+                  }
+                }
+
                 dynamicWalls.push(
-                  <line
-                    key={`dyn-hwall-${r}-${c}`}
-                    x1={c * 20}
-                    y1={(r + 1) * 20}
-                    x2={(c + 1) * 20}
-                    y2={(r + 1) * 20}
-                    stroke="#FF6D00"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    style={{ filter: 'drop-shadow(0 0 3px #FF6D00)' }}
-                  />
+                  <g key={`dyn-hwall-g-${r}-${c}`}>
+                    <line
+                      x1={c * 20}
+                      y1={(r + 1) * 20}
+                      x2={(c + 1) * 20}
+                      y2={(r + 1) * 20}
+                      stroke={isTargetable ? "#00E5FF" : "#FF6D00"}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      style={{ 
+                        filter: isTargetable ? 'drop-shadow(0 0 4px #00E5FF)' : 'drop-shadow(0 0 3px #FF6D00)',
+                        transition: 'stroke 0.2s, filter 0.2s'
+                      }}
+                    />
+                    {isTargetable && onClickWall && (
+                      <line
+                        x1={c * 20}
+                        y1={(r + 1) * 20}
+                        x2={(c + 1) * 20}
+                        y2={(r + 1) * 20}
+                        stroke="transparent"
+                        strokeWidth="12"
+                        style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClickWall({ tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c, direction: placed.direction });
+                        }}
+                      />
+                    )}
+                  </g>
                 );
               }
             }
@@ -596,6 +676,17 @@ export default function App() {
       event: 'INTERACT_DOOR',
       payload: { tileX, tileY, r, c, direction }
     });
+  };
+
+  const handleInteractWall = (wall: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' }) => {
+    if (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') {
+      handlePlayCard(targetingCardId, wall);
+    } else {
+      sendEvent({
+        event: 'LASH_ATTACK',
+        payload: { targetWall: wall }
+      });
+    }
   };
 
   const handleEndTurn = () => {
@@ -1873,7 +1964,9 @@ export default function App() {
                           self?.ap,
                           gameState.placedTiles,
                           gameState.wallsState,
-                          gameState.phase === 'GAMEPLAY'
+                          gameState.phase === 'GAMEPLAY',
+                          targetingCardId,
+                          handleInteractWall
                         )}
                       </g>
                     </svg>
