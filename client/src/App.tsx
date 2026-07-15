@@ -2057,6 +2057,8 @@ export default function App() {
                                   ? '1.5px dashed var(--accent-cyan)'
                                   : isShiftSpiritTarget
                                   ? '2px solid var(--accent-cyan)'
+                                  : occupiedPlayerId
+                                  ? `1.5px solid ${gameState.players[occupiedPlayerId]?.color || '#ffffff'}`
                                   : 'none',
                                 backgroundColor: lashablePlayer
                                   ? 'rgba(239, 68, 68, 0.15)'
@@ -2068,6 +2070,8 @@ export default function App() {
                                   ? 'rgba(0, 229, 255, 0.1)'
                                   : isShiftSpiritTarget
                                   ? 'rgba(0, 229, 255, 0.15)'
+                                  : occupiedPlayerId
+                                  ? `${gameState.players[occupiedPlayerId]?.color || '#ffffff'}1a`
                                   : 'transparent',
                                 borderRadius: '4px',
                                 transition: 'all 0.15s ease'
