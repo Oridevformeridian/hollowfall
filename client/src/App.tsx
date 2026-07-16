@@ -1397,7 +1397,7 @@ export default function App() {
 
   const getCellCoords = (tileX: number, tileY: number, r: number, c: number) => {
     const colIdx = tileX - minX;
-    const rowIdx = tileY - minY;
+    const rowIdx = maxY - tileY;
     const x = 24 + colIdx * (cellWidth + 16) + c * subCellSize + subCellSize / 2;
     const y = 24 + rowIdx * (cellWidth + 16) + r * subCellSize + subCellSize / 2;
     return { x, y };
@@ -1405,7 +1405,7 @@ export default function App() {
 
   const getBorderCoords = (tileX: number, tileY: number, r: number, c: number, direction: 'H' | 'V') => {
     const colIdx = tileX - minX;
-    const rowIdx = tileY - minY;
+    const rowIdx = maxY - tileY;
     const tileLeft = 24 + colIdx * (cellWidth + 16);
     const tileTop = 24 + rowIdx * (cellWidth + 16);
     if (direction === 'H') {
