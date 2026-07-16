@@ -435,6 +435,36 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [flingingCardId, setFlingingCardId] = useState<string | null>(null);
 
+  const [combatPopups, setCombatPopups] = useState<{
+    id: string;
+    tileX: number;
+    tileY: number;
+    r: number;
+    c: number;
+    direction?: 'H' | 'V';
+    text: string;
+    type: 'damage' | 'heal' | 'blocked' | 'countered' | 'effect';
+  }[]>([]);
+
+  const spawnPopup = (
+    tileX: number,
+    tileY: number,
+    r: number,
+    c: number,
+    direction: 'H' | 'V' | undefined,
+    text: string,
+    type: 'damage' | 'heal' | 'blocked' | 'countered' | 'effect',
+    delay = 0
+  ) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setTimeout(() => {
+      setCombatPopups(prev => [...prev, { id, tileX, tileY, r, c, direction, text, type }]);
+      setTimeout(() => {
+        setCombatPopups(prev => prev.filter(p => p.id !== id));
+      }, 1400);
+    }, delay);
+  };
+
   const gameStateRef = React.useRef(gameState);
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -552,6 +582,66 @@ export default function App() {
             setTimeout(() => {
               setActiveAnimation(null);
             }, 2500);
+
+            // Spawn unified combat popups for spells
+            if (cardId === 'ash_kindle_storm' || cardId === 'ash_fireball' || cardId === 'ash_immolate') {
+              if (target) {
+                let damage = 3;
+                if (cardId === 'ash_fireball') damage = 4;
+                else if (cardId === 'ash_immolate') damage = 6;
+
+                // Target damage popup
+                if (countered === 'turn_aside') {
+                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, '🛡️ Turn Aside', 'countered', 800);
+                } else if (countered === 'spirit_skin') {
+                  const finalDmg = Math.max(0, damage - 2);
+                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, `-${finalDmg}`, 'damage', 800);
+                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, '🛡️ Spirit Skin -2', 'blocked', 800);
+                } else {
+                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, `-${damage}`, 'damage', 800);
+                }
+              }
+
+              // Recoil damage for Immolate
+              if (cardId === 'ash_immolate') {
+                spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '-1 Recoil', 'damage', 800);
+              }
+
+              // Thorns retaliation check
+              if (target) {
+                const targetPlayerId = Object.keys(gameStateRef.current?.tokenPositions || {}).find(pId => {
+                  const pos = gameStateRef.current?.tokenPositions[pId];
+                  return pos && pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
+                });
+                if (targetPlayerId) {
+                  const targetPlayer = gameStateRef.current?.players[targetPlayerId];
+                  if (targetPlayer && targetPlayer.hasThorns && countered !== 'turn_aside') {
+                    spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '-1 Thorns', 'damage', 950);
+                  }
+                }
+              }
+            } else if (cardId === 'working_miststep') {
+              if (target) {
+                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '✨ Miststep', 'effect', 200);
+              }
+            } else if (cardId === 'working_don_wolf') {
+              if (target) {
+                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '🐺 Wolf Leap', 'effect', 200);
+              }
+            } else if (cardId === 'working_shift_spirit') {
+              if (target) {
+                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '🔄 Swap Spirit', 'effect', 200);
+                spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🔄 Swap Spirit', 'effect', 200);
+              }
+            } else if (cardId === 'talisman_thorns') {
+              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🌿 Thorns Aura', 'effect', 100);
+            } else if (cardId === 'offering_deep_breath') {
+              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '💨 Deep Breath', 'effect', 100);
+            } else if (cardId === 'ash_spirit_skin') {
+              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🛡️ Spirit Skin', 'effect', 100);
+            } else if (cardId === 'working_turn_aside') {
+              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🛡️ Turn Aside', 'effect', 100);
+            }
           }
         } else if (msg.event === 'LASH_ATTACK_ANIMATION') {
           const { attackerId, targetPlayerId, targetWall, damageDealt, blockedBySpiritSkin } = msg.payload;
@@ -575,6 +665,20 @@ export default function App() {
             setTimeout(() => {
               setActiveLashAnimation(null);
             }, 2000);
+
+            // Unified lash popup
+            const text = blockedBySpiritSkin ? '🛡️ Blocked!' : `-${damageDealt}`;
+            const type = blockedBySpiritSkin ? 'blocked' : 'damage';
+            spawnPopup(
+              targetPos.tileX,
+              targetPos.tileY,
+              targetPos.r,
+              targetPos.c,
+              targetWall?.direction,
+              text,
+              type,
+              150
+            );
           }
         } else if (msg.event === 'ERROR') {
           setError(msg.payload.message);
@@ -2693,7 +2797,20 @@ export default function App() {
           {/* Lash Attack Animation Overlay */}
           {activeLashAnimation && (() => {
             const pFrom = getCellCoords(activeLashAnimation.from.tileX, activeLashAnimation.from.tileY, activeLashAnimation.from.r, activeLashAnimation.from.c);
-            const pTo = getCellCoords(activeLashAnimation.to.tileX, activeLashAnimation.to.tileY, activeLashAnimation.to.r, activeLashAnimation.to.c);
+            const pTo = activeLashAnimation.targetWall
+              ? getBorderCoords(
+                  activeLashAnimation.targetWall.tileX,
+                  activeLashAnimation.targetWall.tileY,
+                  activeLashAnimation.targetWall.r,
+                  activeLashAnimation.targetWall.c,
+                  activeLashAnimation.targetWall.direction
+                )
+              : getCellCoords(
+                  activeLashAnimation.to.tileX,
+                  activeLashAnimation.to.tileY,
+                  activeLashAnimation.to.r,
+                  activeLashAnimation.to.c
+                );
 
             return (
               <div
@@ -2739,20 +2856,31 @@ export default function App() {
                     top: `${pTo.y}px`
                   }}
                 />
-
-                {/* Bouncing Damage Number / Blocked Text */}
-                <div
-                  className={`lash-damage-number ${activeLashAnimation.blockedBySpiritSkin ? 'blocked' : ''}`}
-                  style={{
-                    left: `${pTo.x}px`,
-                    top: `${pTo.y}px`
-                  }}
-                >
-                  {activeLashAnimation.blockedBySpiritSkin ? '🛡️ Blocked!' : `-${activeLashAnimation.damageDealt}`}
-                </div>
               </div>
             );
           })()}
+
+          {/* Unified Combat Popups Overlay */}
+          {combatPopups.map(popup => {
+            const p = popup.direction
+              ? getBorderCoords(popup.tileX, popup.tileY, popup.r, popup.c, popup.direction)
+              : getCellCoords(popup.tileX, popup.tileY, popup.r, popup.c);
+            return (
+              <div
+                key={popup.id}
+                className={`combat-popup ${popup.type}`}
+                style={{
+                  position: 'absolute',
+                  left: `${p.x}px`,
+                  top: `${p.y}px`,
+                  pointerEvents: 'none',
+                  zIndex: 150
+                }}
+              >
+                {popup.text}
+              </div>
+            );
+          })}
         </div>
       </div>
 

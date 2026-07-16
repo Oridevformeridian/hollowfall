@@ -700,23 +700,24 @@ h1, h2, h3, h4 {
 
 /* Lash Attack Animation Styles */
 .lash-whip-line {
-  stroke-dasharray: 20, 10;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
   animation: lash-whip-stroke 0.8s cubic-bezier(0.19, 1, 0.22, 1) forwards;
 }
 
 @keyframes lash-whip-stroke {
   0% {
-    stroke-dashoffset: 80;
+    stroke-dashoffset: 1000;
     opacity: 0;
   }
-  20% {
+  15% {
     opacity: 1;
   }
-  60% {
+  50% {
     stroke-dashoffset: 0;
     opacity: 1;
   }
-  80% {
+  85% {
     opacity: 0.8;
   }
   100% {
@@ -753,27 +754,49 @@ h1, h2, h3, h4 {
   }
 }
 
-.lash-damage-number {
+/* Unified Combat Popups Styles */
+.combat-popup {
   position: absolute;
   font-family: 'Outfit', 'Inter', sans-serif;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 900;
-  color: #ff1744;
-  text-shadow: 0 0 4px #000000, 0 0 10px #ff1744;
+  text-align: center;
   transform: translate(-50%, -50%) scale(0.5);
   pointer-events: none;
-  z-index: 101;
+  z-index: 150;
   opacity: 0;
-  animation: lash-damage-bounce 1.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.3s forwards;
+  animation: combat-popup-bounce 1.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-.lash-damage-number.blocked {
+.combat-popup.damage {
+  color: #ff1744;
+  text-shadow: 0 0 4px #000000, 0 0 10px #ff1744, 0 0 20px rgba(255, 23, 68, 0.5);
+}
+
+.combat-popup.blocked {
   color: #00e5ff;
-  text-shadow: 0 0 4px #000000, 0 0 10px #00e5ff;
+  text-shadow: 0 0 4px #000000, 0 0 10px #00e5ff, 0 0 20px rgba(0, 229, 255, 0.5);
   font-size: 20px;
 }
 
-@keyframes lash-damage-bounce {
+.combat-popup.countered {
+  color: #ffd600;
+  text-shadow: 0 0 4px #000000, 0 0 10px #ffd600, 0 0 20px rgba(255, 214, 0, 0.5);
+  font-size: 20px;
+}
+
+.combat-popup.effect {
+  color: #00b0ff;
+  text-shadow: 0 0 4px #000000, 0 0 10px #00b0ff, 0 0 20px rgba(0, 176, 255, 0.5);
+  font-size: 22px;
+}
+
+.combat-popup.heal {
+  color: #00e676;
+  text-shadow: 0 0 4px #000000, 0 0 10px #00e676, 0 0 20px rgba(0, 230, 118, 0.5);
+}
+
+@keyframes combat-popup-bounce {
   0% {
     transform: translate(-50%, -10px) scale(0.5);
     opacity: 0;
@@ -791,7 +814,7 @@ h1, h2, h3, h4 {
     opacity: 1;
   }
   100% {
-    transform: translate(-50%, -60px) scale(0.85);
+    transform: translate(-50%, -75px) scale(0.85);
     opacity: 0;
   }
 }
