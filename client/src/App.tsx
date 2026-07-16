@@ -2883,15 +2883,34 @@ export default function App() {
         </div>
       </div>
 
-        {/* Mobile-only Action Bar (visible below the board) */}
+        {/* Mobile-only Action Bar (visible below the board, pinned to bottom right of viewport) */}
         {isMobile && isActiveTurn && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '360px', margin: '16px auto 0 auto', padding: '0 16px', boxSizing: 'border-box' }}>
+          <div
+            style={{
+              position: 'fixed',
+              bottom: gameState.phase === 'GAMEPLAY' ? '220px' : '16px',
+              right: '16px',
+              zIndex: 110,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              width: '160px',
+              pointerEvents: 'auto',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '16px',
+              padding: '12px',
+              boxSizing: 'border-box'
+            }}
+          >
             {/* Rotate Tile button in PLACEMENT phase */}
             {gameState.phase === 'PLACEMENT' && activeTileLayout && (
               <button
                 onClick={handleRotate}
                 className="btn-secondary"
-                style={{ width: '100%', padding: '10px 0', fontWeight: 'bold' }}
+                style={{ width: '100%', padding: '8px 0', fontSize: '11px', fontWeight: 'bold' }}
               >
                 Rotate Tile (90° CW)
               </button>
@@ -2928,7 +2947,8 @@ export default function App() {
                             backgroundColor: 'var(--accent-green)',
                             color: 'black',
                             fontWeight: 'bold',
-                            padding: '10px 0'
+                            fontSize: '11px',
+                            padding: '8px 0'
                           }}
                         >
                           {label} (1 AP)
@@ -2954,7 +2974,8 @@ export default function App() {
                           borderColor: 'var(--accent-gold)',
                           color: 'var(--accent-gold)',
                           fontWeight: 'bold',
-                          padding: '10px 0'
+                          fontSize: '11px',
+                          padding: '8px 0'
                         }}
                       >
                         📤 Drop Mask (Free Action)
