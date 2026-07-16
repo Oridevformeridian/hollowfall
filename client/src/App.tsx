@@ -2884,110 +2884,122 @@ export default function App() {
       </div>
 
         {/* Mobile-only Action Bar (visible below the board, pinned to bottom right of viewport) */}
-        {isMobile && isActiveTurn && (
-          <div
-            style={{
-              position: 'fixed',
-              bottom: gameState.phase === 'GAMEPLAY' ? '220px' : '16px',
-              right: '16px',
-              zIndex: 110,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px',
-              width: '160px',
-              pointerEvents: 'auto',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-              backgroundColor: 'rgba(15, 23, 42, 0.85)',
-              backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '16px',
-              padding: '12px',
-              boxSizing: 'border-box'
-            }}
-          >
-            {/* Rotate Tile button in PLACEMENT phase */}
-            {gameState.phase === 'PLACEMENT' && activeTileLayout && (
-              <button
-                onClick={handleRotate}
-                className="btn-secondary"
-                style={{ width: '100%', padding: '8px 0', fontSize: '11px', fontWeight: 'bold' }}
-              >
-                Rotate Tile (90° CW)
-              </button>
-            )}
+        {(() => {
+          if (!isMobile || !isActiveTurn) return null;
 
-            {/* Pick Up / Drop Mask buttons in GAMEPLAY phase */}
-            {gameState.phase === 'GAMEPLAY' && (
-              <>
-                {/* Pick Up Treasure Button */}
-                {(() => {
-                  const sameCellTreasures = gameState.treasures && myTokenPos
-                    ? Object.values(gameState.treasures).filter(
-                        t => t.tileX === myTokenPos.tileX &&
-                             t.tileY === myTokenPos.tileY &&
-                             t.r === myTokenPos.r &&
-                             t.c === myTokenPos.c &&
-                             t.carrierId === null
-                      )
-                    : [];
-                  if (sameCellTreasures.length > 0 && self && self.ap > 0) {
-                    return sameCellTreasures.map(t => {
-                      const owner = gameState.players[t.ownerId];
-                      const label = owner
-                        ? `📥 Pick Up ${owner.username}'s Mask`
-                        : `📥 Pick Up Mask`;
+          let hasContent = false;
+          let sameCellTreasures: any[] = [];
+          let carriedTr: any = null;
 
-                      return (
-                        <button
-                          key={`pickup-mobile-${t.id}`}
-                          onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: t.id } })}
-                          className="btn-primary"
-                          style={{
-                            width: '100%',
-                            backgroundColor: 'var(--accent-green)',
-                            color: 'black',
-                            fontWeight: 'bold',
-                            fontSize: '11px',
-                            padding: '8px 0'
-                          }}
-                        >
-                          {label} (1 AP)
-                        </button>
-                      );
-                    });
-                  }
-                  return null;
-                })()}
+          if (gameState.phase === 'PLACEMENT' && activeTileLayout) {
+            hasContent = true;
+          } else if (gameState.phase === 'GAMEPLAY') {
+            sameCellTreasures = gameState.treasures && myTokenPos
+              ? Object.values(gameState.treasures).filter(
+                  t => t.tileX === myTokenPos.tileX &&
+                       t.tileY === myTokenPos.tileY &&
+                       t.r === myTokenPos.r &&
+                       t.c === myTokenPos.c &&
+                       t.carrierId === null
+                )
+              : [];
+            const hasPickup = sameCellTreasures.length > 0 && self && self.ap > 0;
 
-                {/* Drop Treasure Button */}
-                {(() => {
-                  const carriedTr = gameState.treasures
-                    ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
-                    : null;
-                  if (carriedTr) {
+            carriedTr = gameState.treasures
+              ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
+              : null;
+            const hasDrop = !!carriedTr;
+
+            if (hasPickup || hasDrop) {
+              hasContent = true;
+            }
+          }
+
+          if (!hasContent) return null;
+
+          return (
+            <div
+              style={{
+                position: 'fixed',
+                bottom: gameState.phase === 'GAMEPLAY' ? '220px' : '16px',
+                right: '16px',
+                zIndex: 110,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                width: '160px',
+                pointerEvents: 'auto',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '16px',
+                padding: '12px',
+                boxSizing: 'border-box'
+              }}
+            >
+              {/* Rotate Tile button in PLACEMENT phase */}
+              {gameState.phase === 'PLACEMENT' && activeTileLayout && (
+                <button
+                  onClick={handleRotate}
+                  className="btn-secondary"
+                  style={{ width: '100%', padding: '8px 0', fontSize: '11px', fontWeight: 'bold' }}
+                >
+                  Rotate Tile (90° CW)
+                </button>
+              )}
+
+              {/* Pick Up / Drop Mask buttons in GAMEPLAY phase */}
+              {gameState.phase === 'GAMEPLAY' && (
+                <>
+                  {/* Pick Up Treasure Button */}
+                  {sameCellTreasures.map(t => {
+                    const owner = gameState.players[t.ownerId];
+                    const label = owner
+                      ? `📥 Pick Up ${owner.username}'s Mask`
+                      : `📥 Pick Up Mask`;
+
                     return (
                       <button
-                        onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: carriedTr.id } })}
-                        className="btn-secondary"
+                        key={`pickup-mobile-${t.id}`}
+                        onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: t.id } })}
+                        className="btn-primary"
                         style={{
                           width: '100%',
-                          borderColor: 'var(--accent-gold)',
-                          color: 'var(--accent-gold)',
+                          backgroundColor: 'var(--accent-green)',
+                          color: 'black',
                           fontWeight: 'bold',
                           fontSize: '11px',
                           padding: '8px 0'
                         }}
                       >
-                        📤 Drop Mask (Free Action)
+                        {label} (1 AP)
                       </button>
                     );
-                  }
-                  return null;
-                })()}
-              </>
-            )}
-          </div>
-        )}
+                  })}
+
+                  {/* Drop Treasure Button */}
+                  {carriedTr && (
+                    <button
+                      onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: carriedTr.id } })}
+                      className="btn-secondary"
+                      style={{
+                        width: '100%',
+                        borderColor: 'var(--accent-gold)',
+                        color: 'var(--accent-gold)',
+                        fontWeight: 'bold',
+                        fontSize: '11px',
+                        padding: '8px 0'
+                      }}
+                    >
+                      📤 Drop Mask (Free Action)
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Card Hand / Inventory HUD */}
