@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance } from '../../shared/validation';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations } from '../../shared/validation';
 import { HEROES } from '../../shared/constants';
 import { buildDeckForEmoji, shuffle, getRemainingDeckForReshuffle } from '../../shared/deck';
 
@@ -154,6 +154,23 @@ function passTurn(room: GameState) {
 }
 
 function recalculatePoints(room: GameState) {
+  // Check for Bound Fate eliminations
+  const toEliminate = checkBoundFateEliminations(room);
+  if (toEliminate.length > 0) {
+    const pId = toEliminate[0];
+    const player = room.players[pId];
+    if (player) {
+      handlePlayerDefeated(
+        room,
+        pId,
+        null,
+        `${player.username} has both Masks in enemy Hearths and was eliminated by Bound Fate!`,
+        room.roomCode
+      );
+    }
+    return;
+  }
+
   for (const pId of Object.keys(room.players)) {
     const p = room.players[pId];
     p.points = p.severPoints || 0;

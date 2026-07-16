@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, checkBoundFateEliminations } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -505,5 +505,140 @@ describe('hasLineOfSightToWall', () => {
     const internalTo: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 1 };
     const internalMove = validateTokenMove(from, internalTo, twoTilesHoriz, {}, wallsState);
     expect(internalMove.valid).toBe(false);
+  });
+});
+
+describe('checkBoundFateEliminations', () => {
+  const createMockRoom = (): any => ({
+    roomCode: 'TEST',
+    phase: 'GAMEPLAY',
+    players: {
+      p1: {
+        id: 'p1',
+        username: 'Player 1',
+        color: '#00E5FF',
+        emoji: '🧙',
+        isReady: true,
+        isHost: true,
+        assignedTileIndex: null,
+        ap: 0,
+        thread: 15,
+        maxThread: 15,
+        hand: [],
+        deck: [],
+        points: 0,
+        severPoints: 0,
+        hasAttackedThisTurn: false,
+        isFirstTurnOfMatch: false,
+        form: 'normal',
+      },
+      p2: {
+        id: 'p2',
+        username: 'Player 2',
+        color: '#FFD600',
+        emoji: '🧝',
+        isReady: true,
+        isHost: false,
+        assignedTileIndex: null,
+        ap: 0,
+        thread: 15,
+        maxThread: 15,
+        hand: [],
+        deck: [],
+        points: 0,
+        severPoints: 0,
+        hasAttackedThisTurn: false,
+        isFirstTurnOfMatch: false,
+        form: 'normal',
+      }
+    },
+    turnOrder: ['p1', 'p2'],
+    activePlayerIndex: 0,
+    placedTiles: {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+    },
+    doorsState: {},
+    wallsState: {},
+    tokenPositions: {
+      p1: { tileX: 0, tileY: 0, r: 2, c: 2 },
+      p2: { tileX: 1, tileY: 0, r: 2, c: 2 }
+    },
+    treasures: {
+      t1_1: { id: 't1_1', tileX: 0, tileY: 0, r: 0, c: 0, ownerId: 'p1', carrierId: null },
+      t1_2: { id: 't1_2', tileX: 0, tileY: 0, r: 4, c: 4, ownerId: 'p1', carrierId: null },
+      t2_1: { id: 't2_1', tileX: 1, tileY: 0, r: 0, c: 0, ownerId: 'p2', carrierId: null },
+      t2_2: { id: 't2_2', tileX: 1, tileY: 0, r: 4, c: 4, ownerId: 'p2', carrierId: null }
+    }
+  });
+
+  it('should not eliminate anyone if all masks are at their initial positions', () => {
+    const room = createMockRoom();
+    const eliminated = checkBoundFateEliminations(room);
+    expect(eliminated).toEqual([]);
+  });
+
+  it('should not eliminate a player if only one of their masks is in an enemy base', () => {
+    const room = createMockRoom();
+    // Move one of p1's masks to p2's Hearth (1,0 at 2,2)
+    room.treasures.t1_1.tileX = 1;
+    room.treasures.t1_1.tileY = 0;
+    room.treasures.t1_1.r = 2;
+    room.treasures.t1_1.c = 2;
+
+    const eliminated = checkBoundFateEliminations(room);
+    expect(eliminated).toEqual([]);
+  });
+
+  it('should eliminate a player if both of their masks are in enemy bases', () => {
+    const room = createMockRoom();
+    // Move both of p1's masks to p2's Hearth (1,0 at 2,2)
+    room.treasures.t1_1.tileX = 1;
+    room.treasures.t1_1.tileY = 0;
+    room.treasures.t1_1.r = 2;
+    room.treasures.t1_1.c = 2;
+
+    room.treasures.t1_2.tileX = 1;
+    room.treasures.t1_2.tileY = 0;
+    room.treasures.t1_2.r = 2;
+    room.treasures.t1_2.c = 2;
+
+    const eliminated = checkBoundFateEliminations(room);
+    expect(eliminated).toEqual(['p1']);
+  });
+
+  it('should not eliminate a player if both of their masks are on the enemy tile but one is carried', () => {
+    const room = createMockRoom();
+    // Move both of p1's masks to p2's tile, but make one carried by p2
+    room.treasures.t1_1.tileX = 1;
+    room.treasures.t1_1.tileY = 0;
+    room.treasures.t1_1.r = 2;
+    room.treasures.t1_1.c = 2; // on enemy hearth, not carried
+
+    room.treasures.t1_2.tileX = 1;
+    room.treasures.t1_2.tileY = 0;
+    room.treasures.t1_2.r = 2;
+    room.treasures.t1_2.c = 2;
+    room.treasures.t1_2.carrierId = 'p2'; // carried!
+
+    const eliminated = checkBoundFateEliminations(room);
+    expect(eliminated).toEqual([]);
+  });
+
+  it('should not eliminate a player if both of their masks are at r: 2, c: 2 but on their own tile', () => {
+    const room = createMockRoom();
+    // Both of p1's masks are on p1's own Hearth
+    room.treasures.t1_1.tileX = 0;
+    room.treasures.t1_1.tileY = 0;
+    room.treasures.t1_1.r = 2;
+    room.treasures.t1_1.c = 2;
+
+    room.treasures.t1_2.tileX = 0;
+    room.treasures.t1_2.tileY = 0;
+    room.treasures.t1_2.r = 2;
+    room.treasures.t1_2.c = 2;
+
+    const eliminated = checkBoundFateEliminations(room);
+    expect(eliminated).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { PlacedTile, TokenPosition } from './types';
+import { PlacedTile, TokenPosition, GameState, PlayerId } from './types';
 import { FIXED_TILES } from './constants';
 
 /**
@@ -762,4 +762,41 @@ export function getActiveRainbowBridges(placedTiles: Record<string, PlacedTile>)
     }
   }
   return bridges;
+}
+
+/**
+ * Checks if any player has both of their masks/treasures sitting in enemy Hearths.
+ * Returns an array of PlayerIds who are eliminated under this rule.
+ */
+export function checkBoundFateEliminations(room: GameState): PlayerId[] {
+  const eliminated: PlayerId[] = [];
+  const alivePlayers = Object.values(room.players).filter(p => p.thread > 0 && !p.hasConceded);
+
+  for (const player of alivePlayers) {
+    const pId = player.id;
+    // Find all treasures (masks) owned by this player
+    const playerTreasures = Object.values(room.treasures || {}).filter(t => t.ownerId === pId);
+
+    // Bound Fate: if both of a Walker's Masks sit in enemies' Hearths at once, that Walker is eliminated
+    if (playerTreasures.length === 2) {
+      const bothInEnemyHearths = playerTreasures.every(t => {
+        // Must not be carried
+        if (t.carrierId !== null) return false;
+        // Must be on a Hearth cell (r: 2, c: 2)
+        if (t.r !== 2 || t.c !== 2) return false;
+        // Must be on an enemy's tile
+        const tileKey = `${t.tileX},${t.tileY}`;
+        const tile = room.placedTiles[tileKey];
+        if (!tile) return false;
+        // The tile's owner must not be the player themselves
+        return tile.placedBy !== pId;
+      });
+
+      if (bothInEnemyHearths) {
+        eliminated.push(pId);
+      }
+    }
+  }
+
+  return eliminated;
 }
