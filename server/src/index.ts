@@ -998,16 +998,12 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
-            // Check distance <= 3 Manhattan (with wrap-around)
+            // Check distance <= 4 Manhattan (with wrap-around)
             const from = room.tokenPositions[playerId];
             if (!from) return;
             const dist = getWrappingManhattanDistance(from, target, room.placedTiles);
-            if (dist > 3) {
-              sendError(socket, 'Target is too far (max distance 3 cells).');
-              return;
-            }
-            if (!hasLineOfSight(from, target, room.placedTiles, room.doorsState, room.wallsState)) {
-              sendError(socket, 'Target cell is not in your Line of Sight (LOS).');
+            if (dist > 4) {
+              sendError(socket, 'Target is too far (max distance 4 cells).');
               return;
             }
             room.tokenPositions[playerId] = {
@@ -1109,12 +1105,12 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
-            // Check distance <= 4 Manhattan (with wrap-around)
+            // Check distance <= 3 Manhattan (with wrap-around)
             const from = room.tokenPositions[playerId];
             if (!from) return;
             const dist = getWrappingManhattanDistance(from, target, room.placedTiles);
-            if (dist > 4) {
-              sendError(socket, 'Target is too far (max distance 4 cells).');
+            if (dist > 3) {
+              sendError(socket, 'Target is too far (max distance 3 cells).');
               return;
             }
 

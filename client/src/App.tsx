@@ -2219,15 +2219,14 @@ export default function App() {
                           let isMiststepTarget = false;
                           if (targetingCardId === 'working_miststep' && isActiveTurn && myTokenPos) {
                             const dist = getWrappingManhattanDistance(myTokenPos, targetPos, gameState.placedTiles);
-                            const hasLos = hasLineOfSight(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
-                            isMiststepTarget = dist <= 3 && !occupiedPlayerId && hasLos;
+                            isMiststepTarget = dist <= 4 && !occupiedPlayerId;
                           }
 
                           // 3.5. Don the Wolf targeting
                           let isDonWolfTarget = false;
                           if (targetingCardId === 'working_don_wolf' && isActiveTurn && myTokenPos) {
                             const dist = getWrappingManhattanDistance(myTokenPos, targetPos, gameState.placedTiles);
-                            isDonWolfTarget = dist <= 4 && !occupiedPlayerId;
+                            isDonWolfTarget = dist <= 3 && !occupiedPlayerId;
                           }
 
                           // 3.7. Shift Spirit targeting

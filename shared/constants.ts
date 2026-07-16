@@ -172,7 +172,7 @@ export const BASIC_CARDS: Card[] = [
     id: 'working_miststep',
     name: 'Miststep',
     type: 'working',
-    description: 'Teleport to any cell up to 3 distance in LOS.'
+    description: 'Teleport to any cell up to 4 distance, ignoring LOS.'
   },
   {
     id: 'working_raise_stone',
@@ -190,7 +190,7 @@ export const BASIC_CARDS: Card[] = [
     id: 'working_don_wolf',
     name: 'Don the Wolf',
     type: 'working',
-    description: 'Leap: Teleport up to 4 cells Manhattan distance, even around corners.'
+    description: 'Leap: Teleport up to 3 cells Manhattan distance, even around corners.'
   },
   {
     id: 'working_shift_spirit',
