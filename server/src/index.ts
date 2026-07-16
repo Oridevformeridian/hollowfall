@@ -32,6 +32,9 @@ const io = new Server(server, {
 // In-memory store for game rooms
 const rooms = new Map<string, GameState>();
 
+// In-memory store for player disconnection timeout timers (keyed by "roomCode:username")
+const disconnectTimers = new Map<string, any>();
+
 function concedePlayer(roomCode: string, pId: string) {
   const room = rooms.get(roomCode);
   if (!room || room.phase !== 'GAMEPLAY' && room.phase !== 'PLACEMENT') return;
@@ -366,6 +369,14 @@ io.on('connection', (socket) => {
             // Map this connection's playerId variable to the new ID
             playerId = newPlayerId;
             existingReconnectingPlayer.isDisconnected = false;
+
+            // Clear any active disconnect timer for this player
+            const timerKey = `${targetRoomCode}:${existingReconnectingPlayer.username}`;
+            if (disconnectTimers.has(timerKey)) {
+              clearTimeout(disconnectTimers.get(timerKey));
+              disconnectTimers.delete(timerKey);
+              console.log(`Cleared disconnect timer for reconnecting player: ${existingReconnectingPlayer.username}`);
+            }
 
             currentRoomCode = targetRoomCode;
             socket.join(targetRoomCode);
@@ -1594,14 +1605,41 @@ io.on('connection', (socket) => {
         const player = room.players[playerId];
 
         if (room.phase === 'PLACEMENT' || room.phase === 'GAMEPLAY') {
-          // Game is active: mark player as disconnected. Wait indefinitely for reconnection or concession.
+          // Game is active: mark player as disconnected. Wait 10 minutes for reconnection before auto-conceding.
           if (player) {
             player.isDisconnected = true;
             broadcastSystemMessage(currentRoomCode, `${player.username} disconnected.`);
+
+            const roomCode = currentRoomCode;
+            const timerKey = `${roomCode}:${player.username}`;
+            if (disconnectTimers.has(timerKey)) {
+              clearTimeout(disconnectTimers.get(timerKey));
+            }
+            const timer = setTimeout(() => {
+              disconnectTimers.delete(timerKey);
+              const r = rooms.get(roomCode);
+              if (r) {
+                const p = Object.values(r.players).find(pl => pl.username === player.username);
+                if (p && p.isDisconnected) {
+                  broadcastSystemMessage(roomCode, `${p.username} has been auto-conceded due to 10 minutes of inactivity.`);
+                  concedePlayer(roomCode, p.id);
+                  broadcastState(roomCode, r);
+                }
+              }
+            }, 10 * 60 * 1000); // 10 minutes
+            disconnectTimers.set(timerKey, timer);
             
             // Check if all players in the room are now disconnected
             const allDisconnected = Object.values(room.players).every(p => p.isDisconnected || p.hasConceded);
             if (allDisconnected) {
+              // Clear any disconnect timers for players in this room
+              for (const p of Object.values(room.players)) {
+                const key = `${currentRoomCode}:${p.username}`;
+                if (disconnectTimers.has(key)) {
+                  clearTimeout(disconnectTimers.get(key));
+                  disconnectTimers.delete(key);
+                }
+              }
               rooms.delete(currentRoomCode);
               roomMetadata.delete(currentRoomCode);
               console.log(`Room ${currentRoomCode} deleted because all players disconnected.`);
