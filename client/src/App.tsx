@@ -1295,6 +1295,95 @@ export default function App() {
             })()}
           </div>
 
+          {/* Match Settings Panel */}
+          <div
+            style={{
+              marginTop: isMobile ? '16px' : '24px',
+              borderTop: '1px solid var(--border-light)',
+              paddingTop: isMobile ? '16px' : '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                width: '100%',
+                maxWidth: '440px',
+                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '16px',
+                padding: '16px',
+                boxSizing: 'border-box'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#94a3b8', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                  🎯 Match Victory Target
+                </span>
+                {isHost && (
+                  <span style={{ fontSize: '9px', color: 'var(--accent-gold)', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Host Control
+                  </span>
+                )}
+              </div>
+
+              {isHost ? (
+                <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                  {[2, 3, 4, 5].map((pts) => {
+                    const isSelected = (gameState.victoryPointsTarget || 2) === pts;
+                    return (
+                      <button
+                        key={pts}
+                        type="button"
+                        onClick={() => {
+                          sendEvent({
+                            event: 'SET_VICTORY_POINTS_TARGET',
+                            payload: { victoryPointsTarget: pts }
+                          });
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '10px',
+                          borderRadius: '10px',
+                          border: isSelected ? '2px solid var(--accent-cyan)' : '1px solid var(--border-light)',
+                          backgroundColor: isSelected ? 'rgba(0, 229, 255, 0.15)' : 'rgba(0,0,0,0.3)',
+                          color: isSelected ? 'var(--accent-cyan)' : '#cbd5e1',
+                          fontWeight: 'bold',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          boxSizing: 'border-box',
+                          boxShadow: isSelected ? '0 0 12px rgba(0, 229, 255, 0.25)' : 'none'
+                        }}
+                        className="hover:scale-[1.03]"
+                      >
+                        {pts} pts
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 0' }}>
+                  <span style={{ fontSize: '20px' }}>🏆</span>
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: '13px', color: 'white', fontWeight: 'bold' }}>
+                      First to {gameState.victoryPointsTarget || 2} points wins
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#64748b' }}>
+                      Only the lobby host can adjust this setting.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Centered Ready/Start buttons below both elements */}
           <div
             style={{
@@ -1985,7 +2074,7 @@ export default function App() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '11px', color: '#94a3b8' }}>🏆 Score:</span>
                   <span style={{ fontSize: '11px', color: 'var(--accent-gold)', fontWeight: 'bold' }}>
-                    {player.points} / 2 pts
+                    {player.points} / {gameState.victoryPointsTarget || 2} pts
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -3259,13 +3348,14 @@ export default function App() {
             <h2 style={{ color: 'var(--accent-gold)', fontSize: '32px', fontWeight: '900', margin: '0 0 8px 0', letterSpacing: '3px', textTransform: 'uppercase', textShadow: '0 0 10px rgba(255,214,0,0.3)' }}>MATCH COMPLETE</h2>
             
             {(() => {
-              const winner = Object.values(gameState.players).find(p => p.points >= 2);
+              const target = gameState.victoryPointsTarget || 2;
+              const winner = Object.values(gameState.players).find(p => p.points >= target);
               if (winner) {
                 return (
                   <div style={{ margin: '24px 0' }}>
                     <span style={{ fontSize: '64px', display: 'block', margin: '8px 0', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.4))' }}>{winner.emoji}</span>
                     <h3 style={{ fontSize: '24px', color: 'white', margin: '0', fontWeight: 'bold' }}>{winner.username} Wins!</h3>
-                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>Successfully reached 2 victory points!</p>
+                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>Successfully reached {target} victory points!</p>
                   </div>
                 );
               }
@@ -3280,16 +3370,19 @@ export default function App() {
                 <span style={{ textAlign: 'center' }}>Kills</span>
                 <span style={{ textAlign: 'center' }}>Points</span>
               </div>
-              {Object.values(gameState.players).map(p => (
-                <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', gap: '8px', fontSize: '13px', color: 'white', padding: '4px 0' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>{p.emoji}</span>
-                    <span style={{ fontWeight: p.points >= 2 ? 'bold' : 'normal', color: p.points >= 2 ? 'var(--accent-gold)' : 'white' }}>{p.username}</span>
-                  </span>
-                  <span style={{ textAlign: 'center' }}>{p.severPoints || 0}</span>
-                  <span style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--accent-gold)' }}>{p.points} / 2</span>
-                </div>
-              ))}
+              {(() => {
+                const target = gameState.victoryPointsTarget || 2;
+                return Object.values(gameState.players).map(p => (
+                  <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', gap: '8px', fontSize: '13px', color: 'white', padding: '4px 0' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>{p.emoji}</span>
+                      <span style={{ fontWeight: p.points >= target ? 'bold' : 'normal', color: p.points >= target ? 'var(--accent-gold)' : 'white' }}>{p.username}</span>
+                    </span>
+                    <span style={{ textAlign: 'center' }}>{p.severPoints || 0}</span>
+                    <span style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--accent-gold)' }}>{p.points} / {target}</span>
+                  </div>
+                ));
+              })()}
             </div>
 
             <button

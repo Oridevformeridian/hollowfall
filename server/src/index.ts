@@ -72,7 +72,7 @@ function concedePlayer(roomCode: string, pId: string) {
     // Give victory points to the remaining player if there is one
     if (nonConcededPlayers.length === 1) {
       const winner = nonConcededPlayers[0];
-      winner.severPoints = Math.max(winner.severPoints || 0, 2);
+      winner.severPoints = Math.max(winner.severPoints || 0, room.victoryPointsTarget || 2);
       recalculatePoints(room);
       broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
     }
@@ -182,7 +182,7 @@ function recalculatePoints(room: GameState) {
 
   for (const pId of Object.keys(room.players)) {
     const p = room.players[pId];
-    if (p.points >= 2) {
+    if (p.points >= (room.victoryPointsTarget || 2)) {
       room.phase = 'GAME_OVER';
     }
   }
@@ -255,7 +255,7 @@ function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: str
     room.phase = 'GAME_OVER';
     if (alivePlayers.length === 1) {
       const winner = alivePlayers[0];
-      winner.severPoints = Math.max(winner.severPoints || 0, 2);
+      winner.severPoints = Math.max(winner.severPoints || 0, room.victoryPointsTarget || 2);
       broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
     }
   } else {
@@ -302,7 +302,8 @@ io.on('connection', (socket) => {
               wallHp: {},
               tokenPositions: {},
               treasures: {},
-              gameLogs: []
+              gameLogs: [],
+              victoryPointsTarget: 2
             };
             rooms.set(targetRoomCode, room);
           }
@@ -512,6 +513,29 @@ io.on('connection', (socket) => {
             room.players[pId].assignedTileIndex = tileIndices[i % 4];
           }
 
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'SET_VICTORY_POINTS_TARGET': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'LOBBY') return;
+
+          const player = room.players[playerId];
+          if (!player || !player.isHost) {
+            sendError(socket, 'Only the host can set the victory points target.');
+            return;
+          }
+
+          const { victoryPointsTarget } = message.payload;
+          if (typeof victoryPointsTarget !== 'number' || victoryPointsTarget < 2 || victoryPointsTarget > 5) {
+            sendError(socket, 'Victory points target must be a number between 2 and 5.');
+            return;
+          }
+
+          room.victoryPointsTarget = victoryPointsTarget;
+          broadcastSystemMessage(currentRoomCode, `Host updated the match target to ${victoryPointsTarget} victory points.`);
           broadcastState(currentRoomCode, room);
           break;
         }
@@ -976,7 +1000,7 @@ io.on('connection', (socket) => {
               handlePlayerDefeated(room, targetPlayerId, playerId, `${targetPlayer.username} was defeated by ${player.username}!`, currentRoomCode);
             }
             recalculatePoints(room);
-            if (player.points >= 2) {
+            if (player.points >= (room.victoryPointsTarget || 2)) {
               room.phase = 'GAME_OVER';
             }
 
