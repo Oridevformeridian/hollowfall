@@ -112,9 +112,19 @@ export function isBorderBlocked(
   const tile = placedTiles[`${tileX},${tileY}`];
   if (!tile) return { blocked: true, reason: 'No tile found.' };
 
+  const isGate = !!checkOuter && (
+                 (direction === 'V' && r === 2 && (c === 0 || c === 4)) ||
+                 (direction === 'H' && c === 2 && (r === 0 || r === 4))
+  );
+
+  const isConflatedBoundary = !!checkOuter && (
+    (direction === 'V' && c === 0) ||
+    (direction === 'H' && r === 0)
+  );
+
   // Check dynamic Raised Stone wall
   const wallKey = `${tileX},${tileY}:${r},${c}:${direction}`;
-  if (wallsState && wallsState[wallKey]) {
+  if (!isConflatedBoundary && wallsState && wallsState[wallKey]) {
     return { blocked: true, reason: 'Blocked by a raised stone wall.' };
   }
 
@@ -122,11 +132,6 @@ export function isBorderBlocked(
   const unrotation = ((360 - tile.rotation) % 360) as 0 | 90 | 180 | 270;
   const ur = rotateBorderCoordinate(r, c, direction, unrotation);
   const layout = FIXED_TILES[tile.tileId - 1];
-
-  const isGate = !!checkOuter && (
-                 (direction === 'V' && r === 2 && (c === 0 || c === 4)) ||
-                 (direction === 'H' && c === 2 && (r === 0 || r === 4))
-  );
 
   if (ur.direction === 'H') {
     if (!isGate && layout.hWalls.some(w => w.r === ur.r && w.c === ur.c)) {
@@ -238,6 +243,26 @@ export function getNextCell(
   return curr;
 }
 
+export function hasLineOfSightToWall(
+  from: TokenPosition,
+  wall: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' },
+  placedTiles: Record<string, PlacedTile>,
+  doorsState: Record<string, 'OPEN' | 'CLOSED'>,
+  wallsState?: Record<string, boolean>
+): boolean {
+  const cellA: TokenPosition = { tileX: wall.tileX, tileY: wall.tileY, r: wall.r, c: wall.c };
+  let cellB: TokenPosition;
+  if (wall.direction === 'H') {
+    cellB = { tileX: wall.tileX, tileY: wall.tileY, r: wall.r + 1, c: wall.c };
+  } else {
+    cellB = { tileX: wall.tileX, tileY: wall.tileY, r: wall.r, c: wall.c + 1 };
+  }
+  return (
+    hasLineOfSight(from, cellA, placedTiles, doorsState, wallsState) ||
+    hasLineOfSight(from, cellB, placedTiles, doorsState, wallsState)
+  );
+}
+
 export function hasLineOfSight(
   from: TokenPosition,
   to: TokenPosition,
@@ -249,6 +274,20 @@ export function hasLineOfSight(
 
   // If same cell, LOS is clear
   if (from.tileX === to.tileX && from.tileY === to.tileY && from.r === to.r && from.c === to.c) {
+    return true;
+  }
+
+  // Check if there is an active Rainbow Bridge connecting these cells
+  const bridges = getActiveRainbowBridges(placedTiles);
+  const hasBridge = bridges.some(b => {
+    return (
+      (b.tile1.x === from.tileX && b.tile1.y === from.tileY && b.tile1.r === from.r && b.tile1.c === from.c &&
+       b.tile2.x === to.tileX && b.tile2.y === to.tileY && b.tile2.r === to.r && b.tile2.c === to.c) ||
+      (b.tile2.x === from.tileX && b.tile2.y === from.tileY && b.tile2.r === from.r && b.tile2.c === from.c &&
+       b.tile1.x === to.tileX && b.tile1.y === to.tileY && b.tile1.r === to.r && b.tile1.c === to.c)
+    );
+  });
+  if (hasBridge) {
     return true;
   }
 
@@ -512,6 +551,20 @@ export function validateTokenMove(
     }
   }
 
+  // Check if there is an active Rainbow Bridge connecting these cells
+  const bridges = getActiveRainbowBridges(placedTiles);
+  const hasBridge = bridges.some(b => {
+    return (
+      (b.tile1.x === from.tileX && b.tile1.y === from.tileY && b.tile1.r === from.r && b.tile1.c === from.c &&
+       b.tile2.x === to.tileX && b.tile2.y === to.tileY && b.tile2.r === to.r && b.tile2.c === to.c) ||
+      (b.tile2.x === from.tileX && b.tile2.y === from.tileY && b.tile2.r === from.r && b.tile2.c === from.c &&
+       b.tile1.x === to.tileX && b.tile1.y === to.tileY && b.tile1.r === to.r && b.tile1.c === to.c)
+    );
+  });
+  if (hasBridge) {
+    return { valid: true };
+  }
+
 
   const dx = to.tileX - from.tileX;
   const dy = to.tileY - from.tileY;
@@ -652,4 +705,61 @@ export function validateDoorInteract(
   }
 
   return { valid: true };
+}
+
+export interface RainbowBridge {
+  tile1: { x: number; y: number; r: number; c: number };
+  tile2: { x: number; y: number; r: number; c: number };
+}
+
+export function getActiveRainbowBridges(placedTiles: Record<string, PlacedTile>): RainbowBridge[] {
+  const bridges: RainbowBridge[] = [];
+  const keys = Object.keys(placedTiles);
+
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const [x1, y1] = keys[i].split(',').map(Number);
+      const [x2, y2] = keys[j].split(',').map(Number);
+
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+
+      if (Math.abs(dx) === 1 && Math.abs(dy) === 1) {
+        const corner1Key = `${x1},${y2}`;
+        const corner2Key = `${x2},${y1}`;
+
+        const c1Placed = !!placedTiles[corner1Key];
+        const c2Placed = !!placedTiles[corner2Key];
+
+        // L-shape exists if exactly one intermediate corner tile is placed
+        if (c1Placed !== c2Placed) {
+          let r1 = 2, c1 = 2, r2 = 2, c2 = 2;
+
+          if (c1Placed && !c2Placed) {
+            // Empty corner is corner 2: (x2, y1) which is (x1 + dx, y1)
+            // T1(x1,y1) exit pointing to corner 2: horizontal move dx
+            c1 = dx === 1 ? 4 : 0;
+            r1 = 2;
+            // T2(x2,y2) exit pointing to corner 2: vertical move -dy
+            c2 = 2;
+            r2 = dy === 1 ? 4 : 0;
+          } else {
+            // Empty corner is corner 1: (x1, y2) which is (x1, y1 + dy)
+            // T1(x1,y1) exit pointing to corner 1: vertical move dy
+            c1 = 2;
+            r1 = dy === 1 ? 0 : 4;
+            // T2(x2,y2) exit pointing to corner 1: horizontal move -dx
+            c2 = dx === 1 ? 0 : 4;
+            r2 = 2;
+          }
+
+          bridges.push({
+            tile1: { x: x1, y: y1, r: r1, c: c1 },
+            tile2: { x: x2, y: y2, r: r2, c: c2 }
+          });
+        }
+      }
+    }
+  }
+  return bridges;
 }

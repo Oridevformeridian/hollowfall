@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, getWrappingManhattanDistance } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -74,6 +74,18 @@ describe('rotateBorderCoordinate', () => {
     expect(res.direction).toBe('H');
     expect(res.r).toBe(2);
     expect(res.c).toBe(3);
+  });
+
+  it('should return the original coordinates when applying a rotation followed by its complementary unrotation', () => {
+    const rotation: 0 | 90 | 180 | 270 = 90;
+    const unrotation = ((360 - rotation) % 360) as 0 | 90 | 180 | 270;
+    
+    // Rotate V(1, 2) by 90 deg clockwise
+    const rotated = rotateBorderCoordinate(1, 2, 'V', rotation);
+    // Unrotate the result by 270 deg clockwise
+    const unrotated = rotateBorderCoordinate(rotated.r, rotated.c, rotated.direction, unrotation);
+    
+    expect(unrotated).toEqual({ r: 1, c: 2, direction: 'V' });
   });
 });
 
@@ -400,3 +412,98 @@ describe('getWrappingManhattanDistance', () => {
   });
 });
 
+describe('getActiveRainbowBridges', () => {
+  it('should detect active Rainbow Bridge on L-shaped tile placements', () => {
+    const lShapedTiles: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' },
+      '1,1': { tileId: 3, position: { x: 1, y: 1 }, rotation: 0, placedBy: 'p3' }
+    };
+
+    const bridges = getActiveRainbowBridges(lShapedTiles);
+    expect(bridges.length).toBe(1);
+
+    // Diagonal tiles (0,0) and (1,1) should be connected at their exits pointing to empty corner (0,1)
+    expect(bridges[0].tile1).toEqual({ x: 0, y: 0, r: 0, c: 2 });
+    expect(bridges[0].tile2).toEqual({ x: 1, y: 1, r: 2, c: 0 });
+  });
+
+  it('should allow movement across an active Rainbow Bridge', () => {
+    const lShapedTiles: Record<string, PlacedTile> = {
+      '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' },
+      '1,1': { tileId: 3, position: { x: 1, y: 1 }, rotation: 0, placedBy: 'p3' }
+    };
+
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 0, c: 2 };
+    const to: TokenPosition = { tileX: 1, tileY: 1, r: 2, c: 0 };
+
+    const moveRes = validateTokenMove(from, to, lShapedTiles, {});
+    expect(moveRes.valid).toBe(true);
+  });
+});
+
+describe('hasLineOfSightToWall', () => {
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 4, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' }
+  };
+
+  it('should return true if player is at cellA or cellB of the wall', () => {
+    const fromA: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const wall = {
+      tileX: 0,
+      tileY: 0,
+      r: 2,
+      c: 2,
+      direction: 'H' as const
+    };
+    // cellB will be { tileX: 0, tileY: 0, r: 3, c: 2 }
+    const fromB: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 2 };
+
+    expect(hasLineOfSightToWall(fromA, wall, placedTiles, {})).toBe(true);
+    expect(hasLineOfSightToWall(fromB, wall, placedTiles, {})).toBe(true);
+  });
+
+  it('should return true if player has line of sight to cellA or cellB from elsewhere', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 0 };
+    const wall = {
+      tileX: 0,
+      tileY: 0,
+      r: 3,
+      c: 1,
+      direction: 'V' as const
+    };
+    // cellA is { tileX: 0, tileY: 0, r: 3, c: 1 }
+    // Line of sight is clear from (0,0, 3,0) to (0,0, 3,1) on Tile 4
+    expect(hasLineOfSightToWall(from, wall, placedTiles, {})).toBe(true);
+  });
+
+  it('should not block inter-tile crossing when a Raised Stone wall is placed on the internal border of the boundary cell', () => {
+    const twoTilesHoriz: Record<string, PlacedTile> = {
+      '0,0': { tileId: 4, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+      '-1,0': { tileId: 4, position: { x: -1, y: 0 }, rotation: 0, placedBy: 'p2' }
+    };
+
+    // West crossing from (0,0) [2,0] to (-1,0) [2,4]
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 0 };
+    const to: TokenPosition = { tileX: -1, tileY: 0, r: 2, c: 4 };
+
+    // With NO Raised Stone wall, crossing is valid
+    const cleanCrossing = validateTokenMove(from, to, twoTilesHoriz, {});
+    expect(cleanCrossing.valid).toBe(true);
+
+    // Place a Raised Stone wall at the internal boundary of the cell: 0,0:2,0:V (between c=0 and c=1)
+    const wallsState = {
+      '0,0:2,0:V': true
+    };
+
+    // Crossing the outer tile boundary should still be valid!
+    const crossingWithWall = validateTokenMove(from, to, twoTilesHoriz, {}, wallsState);
+    expect(crossingWithWall.valid).toBe(true);
+
+    // But internal movement from (0,0) [2,0] to (0,0) [2,1] should be blocked!
+    const internalTo: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 1 };
+    const internalMove = validateTokenMove(from, internalTo, twoTilesHoriz, {}, wallsState);
+    expect(internalMove.valid).toBe(false);
+  });
+});

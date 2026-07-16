@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, getWrappingManhattanDistance } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges } from './shared/validation.ts';
 
 const renderTileSvgContent = (
   layout: TileLayout,
@@ -16,7 +16,9 @@ const renderTileSvgContent = (
   selfAp?: number,
   placedTiles?: any,
   wallsState?: Record<string, boolean>,
-  isGameplay?: boolean
+  isGameplay?: boolean,
+  targetingCardId?: string | null,
+  onClickWall?: (wall: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' }) => void
 ) => {
   const rot = rotation || 0;
   const cells = [];
@@ -81,43 +83,123 @@ const renderTileSvgContent = (
       {/* Render Dynamic Raised Stone Walls */}
       {(() => {
         const dynamicWalls = [];
-        if (tilePos && wallsState) {
+        if (tilePos && wallsState && rotation !== undefined) {
           for (let r = 0; r < 5; r++) {
             for (let c = 0; c < 4; c++) {
-              const wallKey = `${tilePos.x},${tilePos.y}:${r},${c}:V`;
+              const placed = rotateBorderCoordinate(r, c, 'V', rot);
+              const wallKey = `${tilePos.x},${tilePos.y}:${placed.r},${placed.c}:${placed.direction}`;
               if (wallsState[wallKey]) {
+                // Check if wall is targetable
+                let isTargetable = false;
+                if (isActiveTurn && myTokenPos && placedTiles) {
+                  const hasLos = hasLineOfSightToWall(myTokenPos, { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c, direction: placed.direction }, placedTiles, doorsState || {}, wallsState || {});
+                  if (hasLos) {
+                    if (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') {
+                      isTargetable = true;
+                    } else if (!targetingCardId && selfAp && selfAp > 0) {
+                      // Lash adjacent wall: check if player is at cellA or cellB of the wall
+                      const cellA = { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c };
+                      const cellB = { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c + 1 };
+                      const isAdjacent = (myTokenPos.tileX === cellA.tileX && myTokenPos.tileY === cellA.tileY && myTokenPos.r === cellA.r && myTokenPos.c === cellA.c) ||
+                                         (myTokenPos.tileX === cellB.tileX && myTokenPos.tileY === cellB.tileY && myTokenPos.r === cellB.r && myTokenPos.c === cellB.c);
+                      if (isAdjacent) {
+                        isTargetable = true;
+                      }
+                    }
+                  }
+                }
+
                 dynamicWalls.push(
-                  <line
-                    key={`dyn-vwall-${r}-${c}`}
-                    x1={(c + 1) * 20}
-                    y1={r * 20}
-                    x2={(c + 1) * 20}
-                    y2={(r + 1) * 20}
-                    stroke="#FF6D00"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    style={{ filter: 'drop-shadow(0 0 3px #FF6D00)' }}
-                  />
+                  <g key={`dyn-vwall-g-${r}-${c}`}>
+                    <line
+                      x1={(c + 1) * 20}
+                      y1={r * 20}
+                      x2={(c + 1) * 20}
+                      y2={(r + 1) * 20}
+                      stroke={isTargetable ? "#00E5FF" : "#FF6D00"}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      style={{ 
+                        filter: isTargetable ? 'drop-shadow(0 0 4px #00E5FF)' : 'drop-shadow(0 0 3px #FF6D00)',
+                        transition: 'stroke 0.2s, filter 0.2s'
+                      }}
+                    />
+                    {isTargetable && onClickWall && (
+                      <line
+                        x1={(c + 1) * 20}
+                        y1={r * 20}
+                        x2={(c + 1) * 20}
+                        y2={(r + 1) * 20}
+                        stroke="transparent"
+                        strokeWidth="12"
+                        style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClickWall({ tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c, direction: placed.direction });
+                        }}
+                      />
+                    )}
+                  </g>
                 );
               }
             }
           }
           for (let r = 0; r < 4; r++) {
             for (let c = 0; c < 5; c++) {
-              const wallKey = `${tilePos.x},${tilePos.y}:${r},${c}:H`;
+              const placed = rotateBorderCoordinate(r, c, 'H', rot);
+              const wallKey = `${tilePos.x},${tilePos.y}:${placed.r},${placed.c}:${placed.direction}`;
               if (wallsState[wallKey]) {
+                // Check if wall is targetable
+                let isTargetable = false;
+                if (isActiveTurn && myTokenPos && placedTiles) {
+                  const hasLos = hasLineOfSightToWall(myTokenPos, { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c, direction: placed.direction }, placedTiles, doorsState || {}, wallsState || {});
+                  if (hasLos) {
+                    if (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') {
+                      isTargetable = true;
+                    } else if (!targetingCardId && selfAp && selfAp > 0) {
+                      // Lash adjacent wall: check if player is at cellA or cellB of the wall
+                      const cellA = { tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c };
+                      const cellB = { tileX: tilePos.x, tileY: tilePos.y, r: placed.r + 1, c: placed.c };
+                      const isAdjacent = (myTokenPos.tileX === cellA.tileX && myTokenPos.tileY === cellA.tileY && myTokenPos.r === cellA.r && myTokenPos.c === cellA.c) ||
+                                         (myTokenPos.tileX === cellB.tileX && myTokenPos.tileY === cellB.tileY && myTokenPos.r === cellB.r && myTokenPos.c === cellB.c);
+                      if (isAdjacent) {
+                        isTargetable = true;
+                      }
+                    }
+                  }
+                }
+
                 dynamicWalls.push(
-                  <line
-                    key={`dyn-hwall-${r}-${c}`}
-                    x1={c * 20}
-                    y1={(r + 1) * 20}
-                    x2={(c + 1) * 20}
-                    y2={(r + 1) * 20}
-                    stroke="#FF6D00"
-                    strokeWidth="3.5"
-                    strokeLinecap="round"
-                    style={{ filter: 'drop-shadow(0 0 3px #FF6D00)' }}
-                  />
+                  <g key={`dyn-hwall-g-${r}-${c}`}>
+                    <line
+                      x1={c * 20}
+                      y1={(r + 1) * 20}
+                      x2={(c + 1) * 20}
+                      y2={(r + 1) * 20}
+                      stroke={isTargetable ? "#00E5FF" : "#FF6D00"}
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      style={{ 
+                        filter: isTargetable ? 'drop-shadow(0 0 4px #00E5FF)' : 'drop-shadow(0 0 3px #FF6D00)',
+                        transition: 'stroke 0.2s, filter 0.2s'
+                      }}
+                    />
+                    {isTargetable && onClickWall && (
+                      <line
+                        x1={c * 20}
+                        y1={(r + 1) * 20}
+                        x2={(c + 1) * 20}
+                        y2={(r + 1) * 20}
+                        stroke="transparent"
+                        strokeWidth="12"
+                        style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClickWall({ tileX: tilePos.x, tileY: tilePos.y, r: placed.r, c: placed.c, direction: placed.direction });
+                        }}
+                      />
+                    )}
+                  </g>
                 );
               }
             }
@@ -313,8 +395,10 @@ function generateLobbyName(): string {
 }
 
 const getCardTypeEmoji = (cardId: string) => {
-  if (cardId === 'ash_kindle_storm' || cardId === 'talisman_bear_charm') return '⚔️';
+  if (cardId === 'ash_kindle_storm' || cardId === 'ash_fireball' || cardId === 'ash_immolate') return '⚔️';
+  if (cardId === 'talisman_thorns') return '🌵';
   if (cardId === 'working_miststep' || cardId === 'working_don_wolf') return '🌀';
+  if (cardId === 'working_shift_spirit') return '↔️';
   if (cardId === 'offering_deep_breath') return '🏥';
   if (cardId === 'ash_turn_aside' || cardId === 'ash_spirit_skin') return '🛡️';
   if (cardId === 'working_raise_stone') return '🧱';
@@ -326,6 +410,7 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetingCardId, setTargetingCardId] = useState<string | null>(null);
+  const [hoveredHeroIndex, setHoveredHeroIndex] = useState<number | null>(null);
   const [playedGameOverSound, setPlayedGameOverSound] = useState(false);
   const [activeAnimation, setActiveAnimation] = useState<{
     cardId: string;
@@ -334,10 +419,51 @@ export default function App() {
     to?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' };
     countered?: 'turn_aside' | 'spirit_skin' | null;
   } | null>(null);
+  const [activeLashAnimation, setActiveLashAnimation] = useState<{
+    attackerId: string;
+    targetPlayerId?: string;
+    targetWall?: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' };
+    from: { tileX: number; tileY: number; r: number; c: number };
+    to: { tileX: number; tileY: number; r: number; c: number };
+    damageDealt: number;
+    blockedBySpiritSkin: boolean;
+  } | null>(null);
   const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [flingingCardId, setFlingingCardId] = useState<string | null>(null);
+
+  const [combatPopups, setCombatPopups] = useState<{
+    id: string;
+    tileX: number;
+    tileY: number;
+    r: number;
+    c: number;
+    direction?: 'H' | 'V';
+    text: string;
+    type: 'damage' | 'heal' | 'blocked' | 'countered' | 'effect';
+  }[]>([]);
+
+  const spawnPopup = (
+    tileX: number,
+    tileY: number,
+    r: number,
+    c: number,
+    direction: 'H' | 'V' | undefined,
+    text: string,
+    type: 'damage' | 'heal' | 'blocked' | 'countered' | 'effect',
+    delay = 0
+  ) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setTimeout(() => {
+      setCombatPopups(prev => [...prev, { id, tileX, tileY, r, c, direction, text, type }]);
+      setTimeout(() => {
+        setCombatPopups(prev => prev.filter(p => p.id !== id));
+      }, 1400);
+    }, delay);
+  };
 
   const gameStateRef = React.useRef(gameState);
   useEffect(() => {
@@ -376,6 +502,7 @@ export default function App() {
     width: typeof window !== 'undefined' ? window.innerWidth : 1200,
     height: typeof window !== 'undefined' ? window.innerHeight : 800
   });
+  const isMobile = dimensions.width <= 768;
 
   useEffect(() => {
     const handleResize = () => {
@@ -455,6 +582,103 @@ export default function App() {
             setTimeout(() => {
               setActiveAnimation(null);
             }, 2500);
+
+            // Spawn unified combat popups for spells
+            if (cardId === 'ash_kindle_storm' || cardId === 'ash_fireball' || cardId === 'ash_immolate') {
+              if (target) {
+                let damage = 3;
+                if (cardId === 'ash_fireball') damage = 4;
+                else if (cardId === 'ash_immolate') damage = 6;
+
+                // Target damage popup
+                if (countered === 'turn_aside') {
+                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, '🛡️ Turn Aside', 'countered', 800);
+                } else if (countered === 'spirit_skin') {
+                  const finalDmg = Math.max(0, damage - 2);
+                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, `-${finalDmg}`, 'damage', 800);
+                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, '🛡️ Spirit Skin -2', 'blocked', 800);
+                } else {
+                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, `-${damage}`, 'damage', 800);
+                }
+              }
+
+              // Recoil damage for Immolate
+              if (cardId === 'ash_immolate') {
+                spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '-1 Recoil', 'damage', 800);
+              }
+
+              // Thorns retaliation check
+              if (target) {
+                const targetPlayerId = Object.keys(gameStateRef.current?.tokenPositions || {}).find(pId => {
+                  const pos = gameStateRef.current?.tokenPositions[pId];
+                  return pos && pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
+                });
+                if (targetPlayerId) {
+                  const targetPlayer = gameStateRef.current?.players[targetPlayerId];
+                  if (targetPlayer && targetPlayer.hasThorns && countered !== 'turn_aside') {
+                    spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '-1 Thorns', 'damage', 950);
+                  }
+                }
+              }
+            } else if (cardId === 'working_miststep') {
+              if (target) {
+                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '✨ Miststep', 'effect', 200);
+              }
+            } else if (cardId === 'working_don_wolf') {
+              if (target) {
+                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '🐺 Wolf Leap', 'effect', 200);
+              }
+            } else if (cardId === 'working_shift_spirit') {
+              if (target) {
+                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '🔄 Swap Spirit', 'effect', 200);
+                spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🔄 Swap Spirit', 'effect', 200);
+              }
+            } else if (cardId === 'talisman_thorns') {
+              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🌿 Thorns Aura', 'effect', 100);
+            } else if (cardId === 'offering_deep_breath') {
+              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '💨 Deep Breath', 'effect', 100);
+            } else if (cardId === 'ash_spirit_skin') {
+              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🛡️ Spirit Skin', 'effect', 100);
+            } else if (cardId === 'working_turn_aside') {
+              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🛡️ Turn Aside', 'effect', 100);
+            }
+          }
+        } else if (msg.event === 'LASH_ATTACK_ANIMATION') {
+          const { attackerId, targetPlayerId, targetWall, damageDealt, blockedBySpiritSkin } = msg.payload;
+          const attackerPos = gameStateRef.current?.tokenPositions[attackerId];
+          let targetPos: { tileX: number; tileY: number; r: number; c: number } | undefined = undefined;
+          if (targetPlayerId) {
+            targetPos = gameStateRef.current?.tokenPositions[targetPlayerId];
+          } else if (targetWall) {
+            targetPos = { tileX: targetWall.tileX, tileY: targetWall.tileY, r: targetWall.r, c: targetWall.c };
+          }
+          if (attackerPos && targetPos) {
+            setActiveLashAnimation({
+              attackerId,
+              targetPlayerId,
+              targetWall,
+              from: { ...attackerPos },
+              to: { ...targetPos },
+              damageDealt,
+              blockedBySpiritSkin
+            });
+            setTimeout(() => {
+              setActiveLashAnimation(null);
+            }, 2000);
+
+            // Unified lash popup
+            const text = blockedBySpiritSkin ? '🛡️ Blocked!' : `-${damageDealt}`;
+            const type = blockedBySpiritSkin ? 'blocked' : 'damage';
+            spawnPopup(
+              targetPos.tileX,
+              targetPos.tileY,
+              targetPos.r,
+              targetPos.c,
+              targetWall?.direction,
+              text,
+              type,
+              150
+            );
           }
         } else if (msg.event === 'ERROR') {
           setError(msg.payload.message);
@@ -558,17 +782,32 @@ export default function App() {
     });
   };
 
+  const handleInteractWall = (wall: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' }) => {
+    if (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') {
+      handlePlayCard(targetingCardId, wall);
+    } else {
+      sendEvent({
+        event: 'LASH_ATTACK',
+        payload: { targetWall: wall }
+      });
+    }
+  };
+
   const handleEndTurn = () => {
     sendEvent({ event: 'END_TURN' });
   };
 
   const handlePlayCard = (cardId: string, target?: any) => {
-    sendEvent({
-      event: 'PLAY_CARD',
-      payload: { cardId, target }
-    });
-    setTargetingCardId(null);
-    setSelectedCardId(null);
+    setFlingingCardId(cardId);
+    setTimeout(() => {
+      sendEvent({
+        event: 'PLAY_CARD',
+        payload: { cardId, target }
+      });
+      setFlingingCardId(null);
+      setTargetingCardId(null);
+      setSelectedCardId(null);
+    }, 450);
   };
 
   const handleResetGame = () => {
@@ -823,10 +1062,10 @@ export default function App() {
           style={{
             width: '100%',
             maxWidth: '768px',
-            padding: '32px',
+            padding: isMobile ? '16px' : '32px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '24px',
+            gap: isMobile ? '16px' : '24px',
             boxSizing: 'border-box'
           }}
         >
@@ -904,8 +1143,8 @@ export default function App() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '32px',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+              gap: isMobile ? '16px' : '32px',
               alignItems: 'center',
               width: '100%'
             }}
@@ -919,16 +1158,16 @@ export default function App() {
                 {playersList.map(player => (
                   <div
                     key={player.id}
-                    className="flex justify-between items-center bg-[rgba(255,255,255,0.03)] p-4 rounded-xl border border-gray-800"
+                    className={`flex justify-between items-center bg-[rgba(255,255,255,0.03)] ${isMobile ? 'p-2 rounded-lg' : 'p-4 rounded-xl'} border border-gray-800`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: player.color }} />
-                      <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontSize: '48px', lineHeight: '1' }}>{player.emoji}</span>
-                        <span>{player.username} {player.id === socket?.id && '(You)'}</span>
+                      <div className={isMobile ? 'w-2 h-2 rounded-full' : 'w-3.5 h-3.5 rounded-full'} style={{ backgroundColor: player.color }} />
+                      <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '12px' }}>
+                        <span style={{ fontSize: isMobile ? '24px' : '48px', lineHeight: '1' }}>{player.emoji}</span>
+                        <span style={{ fontSize: isMobile ? '12px' : '14px' }}>{player.username} {player.id === socket?.id && '(You)'}</span>
                       </span>
                     </div>
-                    <span className={`text-xs px-3 py-1.5 rounded-full font-bold ${player.isReady ? 'bg-[rgba(0,230,118,0.15)] text-[var(--accent-green)]' : 'bg-gray-800 text-gray-400'}`}>
+                    <span className={`${isMobile ? 'text-[10px] px-2 py-1' : 'text-xs px-3 py-1.5'} rounded-full font-bold ${player.isReady ? 'bg-[rgba(0,230,118,0.15)] text-[var(--accent-green)]' : 'bg-gray-800 text-gray-400'}`}>
                       {player.isReady ? 'READY' : 'NOT READY'}
                     </span>
                   </div>
@@ -942,51 +1181,112 @@ export default function App() {
                 .filter(p => p.id !== socket?.id)
                 .map(p => p.emoji);
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '6px' : '12px' }}>
                   <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider font-bold text-center">Choose Your Hero</h3>
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(5, 80px)',
-                      gap: '12px',
+                      gridTemplateColumns: isMobile ? 'repeat(5, 58px)' : 'repeat(5, 90px)',
+                      gap: isMobile ? '6px' : '16px',
                       justifyContent: 'center'
                     }}
                   >
-                    {HEROES.map(hero => {
+                    {HEROES.map((hero, idx) => {
                       const isTaken = takenEmojis.includes(hero.emoji);
                       const isSelected = self?.emoji === hero.emoji;
                       return (
-                        <button
-                          type="button"
+                        <div
                           key={hero.emoji}
-                          onClick={() => !isTaken && handleSelectHero(hero.emoji)}
-                          disabled={isTaken}
                           style={{
-                            fontSize: '48px',
-                            width: '80px',
-                            height: '80px',
                             display: 'flex',
+                            flexDirection: 'column',
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            border: isSelected
-                              ? `4px solid ${hero.color}`
-                              : isTaken
-                              ? '2px dashed #334155'
-                              : '2px solid var(--border-light)',
-                            borderRadius: '16px',
-                            backgroundColor: isSelected
-                              ? `${hero.color}22`
-                              : 'rgba(0, 0, 0, 0.2)',
-                            cursor: isTaken ? 'not-allowed' : 'pointer',
-                            opacity: isTaken ? 0.25 : 1,
-                            transition: 'all 0.2s',
-                            boxShadow: isSelected ? `0 0 15px ${hero.color}` : 'none'
+                            gap: '4px',
+                            position: 'relative'
                           }}
-                          className={isTaken ? '' : 'hover:scale-105'}
-                          title={isTaken ? `${hero.name} (Already Taken)` : hero.name}
+                          onMouseEnter={() => setHoveredHeroIndex(idx)}
+                          onMouseLeave={() => setHoveredHeroIndex(null)}
                         >
-                          {hero.emoji}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => !isTaken && handleSelectHero(hero.emoji)}
+                            disabled={isTaken}
+                            style={{
+                              fontSize: isMobile ? '30px' : '48px',
+                              width: isMobile ? '50px' : '80px',
+                              height: isMobile ? '50px' : '80px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: isSelected
+                                ? `${isMobile ? '3px' : '4px'} solid ${hero.color}`
+                                : isTaken
+                                ? '1.5px dashed #334155'
+                                : '2px solid var(--border-light)',
+                              borderRadius: isMobile ? '10px' : '16px',
+                              backgroundColor: isSelected
+                                ? `${hero.color}22`
+                                : 'rgba(0, 0, 0, 0.2)',
+                              cursor: isTaken ? 'not-allowed' : 'pointer',
+                              opacity: isTaken ? 0.25 : 1,
+                              transition: 'all 0.2s',
+                              boxShadow: isSelected ? `0 0 15px ${hero.color}` : 'none'
+                            }}
+                            className={isTaken ? '' : 'hover:scale-105'}
+                            title={isTaken ? `${hero.name} (Already Taken)` : hero.name}
+                          >
+                            {hero.emoji}
+                          </button>
+                          <span
+                            style={{
+                              fontSize: isMobile ? '8px' : '10px',
+                              fontWeight: 'bold',
+                              color: isSelected ? hero.color : '#94a3b8',
+                              textAlign: 'center',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}
+                          >
+                            {hero.class}
+                          </span>
+
+                          {hoveredHeroIndex === idx && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: '110px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                zIndex: 300,
+                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                backdropFilter: 'blur(10px)',
+                                border: `1px solid ${hero.color}88`,
+                                borderRadius: '12px',
+                                padding: '10px 14px',
+                                width: '220px',
+                                boxShadow: `0 8px 30px rgba(0,0,0,0.8), 0 0 10px ${hero.color}33`,
+                                boxSizing: 'border-box',
+                                pointerEvents: 'none',
+                                textAlign: 'center'
+                              }}
+                            >
+                              <div style={{ fontWeight: '900', fontSize: '13px', color: 'white', letterSpacing: '0.5px' }}>
+                                {hero.name}
+                              </div>
+                              <div style={{ fontSize: '11px', color: hero.color, fontWeight: 'bold', marginTop: '2px', textTransform: 'uppercase' }}>
+                                {hero.class} Specialty
+                              </div>
+                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '8px', paddingTop: '8px' }}>
+                                <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>
+                                  Signature Cards (8x)
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 'bold', marginTop: '3px' }}>
+                                  {hero.signatureCards.join(', ')}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
@@ -999,10 +1299,10 @@ export default function App() {
           <div
             style={{
               display: 'flex',
-              gap: '16px',
-              marginTop: '24px',
+              gap: isMobile ? '10px' : '16px',
+              marginTop: isMobile ? '16px' : '24px',
               borderTop: '1px solid var(--border-light)',
-              paddingTop: '24px',
+              paddingTop: isMobile ? '16px' : '24px',
               justifyContent: 'center',
               width: '100%',
               maxWidth: '440px',
@@ -1053,10 +1353,30 @@ export default function App() {
   let maxY: number;
 
   if (gameState.phase === 'PLACEMENT') {
-    minX = xs.length > 0 ? Math.min(-1, ...xs) - 1 : -2;
-    maxX = xs.length > 0 ? Math.max(1, ...xs) + 1 : 2;
-    minY = ys.length > 0 ? Math.min(-1, ...ys) - 1 : -2;
-    maxY = ys.length > 0 ? Math.max(1, ...ys) + 1 : 2;
+    const targetXs = [...xs];
+    const targetYs = [...ys];
+
+    // Collect all adjacent coordinates that are potential placement slots
+    const adjacents = new Set<string>();
+    for (const t of placedList) {
+      adjacents.add(`${t.position.x + 1},${t.position.y}`);
+      adjacents.add(`${t.position.x - 1},${t.position.y}`);
+      adjacents.add(`${t.position.x},${t.position.y + 1}`);
+      adjacents.add(`${t.position.x},${t.position.y - 1}`);
+    }
+
+    for (const key of adjacents) {
+      if (!gameState.placedTiles[key]) {
+        const [xStr, yStr] = key.split(',');
+        targetXs.push(parseInt(xStr, 10));
+        targetYs.push(parseInt(yStr, 10));
+      }
+    }
+
+    minX = targetXs.length > 0 ? Math.min(...targetXs) : -1;
+    maxX = targetXs.length > 0 ? Math.max(...targetXs) : 1;
+    minY = targetYs.length > 0 ? Math.min(...targetYs) : -1;
+    maxY = targetYs.length > 0 ? Math.max(...targetYs) : 1;
   } else {
     minX = xs.length > 0 ? Math.min(...xs) : 0;
     maxX = xs.length > 0 ? Math.max(...xs) : 0;
@@ -1101,9 +1421,12 @@ export default function App() {
     }
   };
 
-  const isMobile = dimensions.width <= 768;
-  const availableWidth = dimensions.width - (isMobile ? 0 : 320) - 80;
-  const availableHeight = dimensions.height - (isMobile ? 300 : 0) - 80;
+  // isMobile is defined at top of component
+  const availableWidth = isMobile ? (dimensions.width - 64) : (dimensions.width - 320 - 80);
+  const bottomHUDHeight = gameState?.phase === 'GAMEPLAY' ? 220 : 0;
+  const availableHeight = isMobile 
+    ? (dimensions.height * 0.7 - (gameState?.phase === 'GAMEPLAY' ? 110 : 0) - 24)
+    : (dimensions.height - bottomHUDHeight - 80);
 
   const cols = maxX - minX + 1;
   const rows = maxY - minY + 1;
@@ -1112,7 +1435,7 @@ export default function App() {
 
   const scaleX = availableWidth / boardW;
   const scaleY = availableHeight / boardH;
-  const scaleFactor = Math.max(0.3, Math.min(1.5, scaleX, scaleY));
+  const scaleFactor = Math.max(0.05, Math.min(1.5, scaleX, scaleY));
 
   // Validate if a coordinates placement is allowed
   const isPlacementValid = (x: number, y: number) => {
@@ -1126,64 +1449,9 @@ export default function App() {
     <div className="app-layout">
       {/* Sidebar - Players & Game Phase Info */}
       <div className="sidebar">
-        <div className="sidebar-section">
-          <div>
-            <h1 className="text-xl font-black text-[var(--accent-cyan)] m-0 tracking-wider">HOLLOWFALL</h1>
-            <p className="text-gray-400 text-xs m-0" style={{ marginBottom: '4px' }}>
-              {gameState.phase === 'PLACEMENT' ? 'Tile Setup' : 'Gameplay Phase'}
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 'bold' }}>
-                Room: {gameState.roomCode}
-              </span>
-              <button
-                onClick={handleCopyRoomCode}
-                title="Copy Room Code"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: copied ? 'var(--accent-green)' : '#64748b',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'color 0.2s',
-                  position: 'relative'
-                }}
-              >
-                {copied ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
-                )}
-                {copied && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '-20px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    backgroundColor: '#00E676',
-                    color: 'black',
-                    fontSize: '9px',
-                    fontWeight: 'bold',
-                    padding: '1px 4px',
-                    borderRadius: '3px',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
-                    zIndex: 10
-                  }}>
-                    Copied!
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
+        {!isMobile ? (
+          <>
+            <div className="sidebar-section">
 
           {gameState.phase === 'PLACEMENT' && activeTileLayout && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', backgroundColor: 'rgba(255,255,255,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid #1a1f26' }}>
@@ -1208,12 +1476,6 @@ export default function App() {
 
           {gameState.phase === 'GAMEPLAY' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
-              <div style={{ backgroundColor: 'rgba(0,230,118,0.05)', borderColor: 'var(--accent-green)', borderWidth: '1px', borderStyle: 'solid', padding: '12px', borderRadius: '12px', textAlign: 'center' }}>
-                <h3 style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent-green)', margin: '0 0 2px 0' }}>MAZE READY</h3>
-                <p style={{ fontSize: '11px', color: '#cbd5e1', margin: '0' }}>All 4 sectors aligned.</p>
-              </div>
-
-
               {/* Active Player Actions */}
               {isActiveTurn && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px', marginBottom: '8px' }}>
@@ -1379,22 +1641,6 @@ export default function App() {
                 </button>
               )}
 
-              {/* Concede Button */}
-              <button
-                onClick={handleConcede}
-                className="btn-secondary"
-                style={{
-                  width: '100%',
-                  marginTop: '16px',
-                  borderColor: 'rgba(239, 68, 68, 0.4)',
-                  color: '#ef4444',
-                  fontWeight: 'bold',
-                  fontSize: '12px',
-                  padding: '6px 0',
-                }}
-              >
-                🏳️ Concede
-              </button>
             </div>
           )}
 
@@ -1439,9 +1685,62 @@ export default function App() {
           )}
         </div>
 
-        <div style={{ marginTop: '24px', borderTop: '1px solid var(--border-light)', paddingTop: '16px', textAlign: 'center' }}>
-          <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'monospace' }}>Room: {gameState.roomCode}</span>
-        </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
+            {/* Small Ritual Feed without a title */}
+            {gameState && gameState.gameLogs && gameState.gameLogs.length > 0 && (
+              <div
+                style={{
+                  flexGrow: 1,
+                  overflowY: 'auto',
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                  borderRadius: '8px',
+                  padding: '8px',
+                  border: '1px solid rgba(255,255,255,0.03)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                  color: '#94a3b8',
+                  lineHeight: '1.4'
+                }}
+              >
+                {gameState.gameLogs.map((log, idx) => (
+                  <div key={`log-${idx}`} style={{ wordBreak: 'break-all' }}>
+                    {log}
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* End Turn button at the very bottom */}
+            {isActiveTurn && gameState.phase === 'GAMEPLAY' && (
+              <button
+                onClick={handleEndTurn}
+                className="btn-primary"
+                style={{
+                  width: '100%',
+                  backgroundColor: 'var(--accent-cyan)',
+                  color: 'black',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  padding: '10px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '8px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  flexShrink: 0
+                }}
+              >
+                End Turn ➔
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Main Board Space */}
@@ -1449,25 +1748,105 @@ export default function App() {
         className="main-content"
         style={{
           overflow: 'auto',
-          paddingBottom: gameState.phase === 'GAMEPLAY' ? '220px' : '24px',
+          paddingBottom: (isMobile || gameState.phase !== 'GAMEPLAY') ? '24px' : '220px',
           boxSizing: 'border-box'
         }}
       >
-        {/* Turn Indicator Overlay (Top Right) */}
+        {/* Targeting Banner */}
+        {targetingCardId && (
+          <div
+            style={{
+              position: 'absolute',
+              top: isMobile ? '12px' : '24px',
+              right: isMobile ? '64px' : 'auto',
+              left: isMobile ? 'auto' : '50%',
+              transform: isMobile ? 'none' : 'translateX(-50%)',
+              zIndex: 110,
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              backdropFilter: 'blur(8px)',
+              border: '2px solid var(--accent-crimson)',
+              color: 'white',
+              padding: isMobile ? '6px 10px' : '10px 20px',
+              borderRadius: isMobile ? '8px' : '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: isMobile ? '8px' : '16px',
+              fontSize: isMobile ? '11px' : '13px',
+              fontWeight: 'bold',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px', whiteSpace: 'nowrap' }}>
+              <span style={{ display: 'inline-block', transform: isMobile ? 'scale(1)' : 'scale(1.2)' }}>🎯</span>
+              {isMobile 
+                ? `Cast: ${self?.hand.find(c => c.id === targetingCardId)?.name}`
+                : `Cast ${self?.hand.find(c => c.id === targetingCardId)?.name}: Select target cell on map`
+              }
+            </span>
+            <button
+              onClick={() => {
+                setTargetingCardId(null);
+                setSelectedCardId(null);
+              }}
+              className="btn-secondary"
+              style={{
+                padding: isMobile ? '2px 6px' : '4px 12px',
+                fontSize: isMobile ? '10px' : '11px',
+                color: 'var(--accent-crimson)',
+                borderColor: 'var(--accent-crimson)',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                cursor: 'pointer',
+                borderRadius: '4px',
+                lineHeight: '1'
+              }}
+            >
+              {isMobile ? '✕' : 'Cancel'}
+            </button>
+          </div>
+        )}
+        {/* Settings Wheel Button (Top Right) */}
+        <button
+          onClick={() => setShowSettings(!showSettings)}
+          style={{
+            position: 'absolute',
+            top: isMobile ? '12px' : '24px',
+            right: isMobile ? '12px' : '24px',
+            zIndex: 50,
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid var(--border-light)',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '20px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+            transition: 'all 0.2s',
+          }}
+          title="Settings"
+        >
+          ⚙️
+        </button>
+
+        {/* Turn Indicator Overlay (Top Right / Docked Right on Mobile) */}
         {gameState.turnOrder.length > 0 && (
           <div
             style={{
               position: 'absolute',
-              top: '24px',
-              right: '24px',
+              top: isMobile ? '56px' : '76px',
+              right: isMobile ? '12px' : '24px',
               zIndex: 40,
               display: 'flex',
               flexDirection: 'column',
-              gap: '8px',
+              gap: isMobile ? '4px' : '8px',
               backgroundColor: 'rgba(15, 23, 42, 0.85)',
               backdropFilter: 'blur(8px)',
               border: '1px solid var(--border-light)',
-              padding: '8px 12px',
+              padding: isMobile ? '4px' : '8px 12px',
               borderRadius: '12px',
               boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)'
             }}
@@ -1475,6 +1854,8 @@ export default function App() {
             {gameState.turnOrder.map((pId) => {
               const player = gameState.players[pId];
               const isActive = pId === activePlayerId;
+              const hasAura = (player as any).hasTurnAside || (player as any).hasSpiritSkin || (player as any).hasThorns;
+
               return (
                 <div
                   key={pId}
@@ -1483,20 +1864,67 @@ export default function App() {
                   style={{
                     cursor: 'pointer',
                     display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
                     alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
+                    gap: isMobile ? '4px' : '6px 12px',
+                    padding: isMobile ? '6px 4px' : '6px 12px',
                     borderRadius: '8px',
                     border: isActive ? `2px solid ${player.color}` : '2px solid transparent',
                     boxShadow: isActive ? `0 0 10px ${player.color}44` : 'none',
-                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.03)' : 'transparent',
-                    transition: 'all 0.2s'
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
+                    transition: 'all 0.2s',
+                    width: isMobile ? '46px' : 'auto',
+                    boxSizing: 'border-box'
                   }}
                 >
-                  <span style={{ fontSize: '22px', lineHeight: '1' }}>{player.emoji}</span>
-                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
-                    {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && ' (Offline)'}
-                  </span>
+                  <span style={{ fontSize: isMobile ? '20px' : '22px', lineHeight: '1' }}>{player.emoji}</span>
+                  {!isMobile && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
+                        {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && ' (Offline)'}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#94a3b8' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          🧵 <span style={{ color: 'white', fontWeight: 'bold' }}>{player.thread}</span>
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                          ⚡ <span style={{ color: 'var(--accent-cyan)', fontWeight: 'bold' }}>{player.ap}</span>
+                        </span>
+                        {hasAura && (
+                          <span style={{ display: 'flex', gap: '3px', marginLeft: '4px' }}>
+                            {(player as any).hasTurnAside && <span title="Turn Aside Aura">🛡️</span>}
+                            {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura">🪨</span>}
+                            {(player as any).hasThorns && <span title="Thorns Talisman">🌵</span>}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {isMobile && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', marginTop: '2px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '3px', width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-around', width: '100%', gap: '2px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: '9px' }}>🧵</span>
+                          <span style={{ fontSize: '9px', color: 'white', fontWeight: 'bold', marginTop: '1px' }}>
+                            {player.thread}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span style={{ fontSize: '9px' }}>⚡</span>
+                          <span style={{ fontSize: '9px', color: 'var(--accent-cyan)', fontWeight: 'bold', marginTop: '1px' }}>
+                            {player.ap}
+                          </span>
+                        </div>
+                      </div>
+                      {hasAura && (
+                        <div style={{ display: 'flex', gap: '2px', fontSize: '9px', marginTop: '2px', justifyContent: 'center', width: '100%' }}>
+                          {(player as any).hasTurnAside && <span>🛡️</span>}
+                          {(player as any).hasSpiritSkin && <span>🪨</span>}
+                          {(player as any).hasThorns && <span>🌵</span>}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1517,7 +1945,7 @@ export default function App() {
               className="player-inspector-card"
               style={{
                 position: 'absolute',
-                top: '150px',
+                top: '220px',
                 right: '24px',
                 zIndex: 45,
                 backgroundColor: 'rgba(15, 23, 42, 0.95)',
@@ -1572,6 +2000,17 @@ export default function App() {
                     {player.hasAttackedThisTurn ? 'Used' : player.isFirstTurnOfMatch ? 'Forbidden' : 'Ready'}
                   </span>
                 </div>
+                {/* Active Auras */}
+                {((player as any).hasTurnAside || (player as any).hasSpiritSkin || (player as any).hasThorns) && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>🛡️ Auras:</span>
+                    <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold', display: 'flex', gap: '4px' }}>
+                      {(player as any).hasTurnAside && <span title="Turn Aside Aura" style={{ color: 'var(--accent-cyan)' }}>🛡️</span>}
+                      {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura" style={{ color: 'var(--accent-green)' }}>🪨</span>}
+                      {(player as any).hasThorns && <span title="Thorns Talisman" style={{ color: '#FF6D00' }}>🌵</span>}
+                    </span>
+                  </div>
+                )}
                 {/* Carrying status */}
                 {(() => {
                   const carried = gameState.treasures ? Object.values(gameState.treasures).find(t => t.carrierId === hoveredPlayerId) : null;
@@ -1597,17 +2036,35 @@ export default function App() {
           </div>
         )}
 
-        {/* 2D Board Rendering */}
+        {/* Board Scaler Wrapper to prevent CSS layout displacement */}
         <div
-          className="board-container"
           style={{
-            gridTemplateColumns: `repeat(${maxX - minX + 1}, ${cellWidth}px)`,
-            transform: `scale(${scaleFactor})`,
-            transformOrigin: 'center center',
-            transition: 'transform 0.15s ease-out',
-            marginBottom: '24px'
+            width: `${boardW * scaleFactor}px`,
+            height: `${boardH * scaleFactor}px`,
+            position: 'relative',
+            left: isMobile ? '-22px' : '0',
+            margin: 'auto',
+            marginBottom: '24px',
+            overflow: 'visible',
+            flexShrink: 0
           }}
         >
+          {/* 2D Board Rendering */}
+          <div
+            className="board-container"
+            style={{
+              gridTemplateColumns: `repeat(${maxX - minX + 1}, ${cellWidth}px)`,
+              transform: `scale(${scaleFactor})`,
+              transformOrigin: 'top left',
+              transition: 'transform 0.15s ease-out',
+              margin: 0,
+              width: `${boardW}px`,
+              height: `${boardH}px`,
+              position: 'absolute',
+              top: 0,
+              left: 0
+            }}
+          >
           {macroGrid.map(({ x, y }) => {
             const key = `${x},${y}`;
             const tile = gameState.placedTiles[key];
@@ -1648,7 +2105,9 @@ export default function App() {
                           self?.ap,
                           gameState.placedTiles,
                           gameState.wallsState,
-                          gameState.phase === 'GAMEPLAY'
+                          gameState.phase === 'GAMEPLAY',
+                          targetingCardId,
+                          handleInteractWall
                         )}
                       </g>
                     </svg>
@@ -1753,8 +2212,8 @@ export default function App() {
                             gameState.tokenPositions
                           ).valid;
 
-                          // 2. Kindle the Storm targeting
-                          const isKindleTarget = targetingCardId === 'ash_kindle_storm' && isActiveTurn && !!occupiedPlayerId && occupiedPlayerId !== socket?.id;
+                          // 2. Kindle the Storm, Fireball, and Immolate targeting
+                          const isKindleTarget = (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') && isActiveTurn && !!occupiedPlayerId && occupiedPlayerId !== socket?.id;
 
                           // 3. Miststep targeting
                           let isMiststepTarget = false;
@@ -1769,6 +2228,15 @@ export default function App() {
                           if (targetingCardId === 'working_don_wolf' && isActiveTurn && myTokenPos) {
                             const dist = getWrappingManhattanDistance(myTokenPos, targetPos, gameState.placedTiles);
                             isDonWolfTarget = dist <= 4 && !occupiedPlayerId;
+                          }
+
+                          // 3.7. Shift Spirit targeting
+                          let isShiftSpiritTarget = false;
+                          if (targetingCardId === 'working_shift_spirit' && isActiveTurn && myTokenPos) {
+                            const p = occupiedPlayerId ? gameState.players[occupiedPlayerId] : null;
+                            if (p && p.thread > 0 && occupiedPlayerId !== socket?.id) {
+                              isShiftSpiritTarget = hasLineOfSight(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
+                            }
                           }
 
                           // 4. Raise Stone cell detection (player's current cell)
@@ -1786,13 +2254,18 @@ export default function App() {
                                     handleMoveToken(targetPos);
                                   } else if (isKindleTarget) {
                                     e.stopPropagation();
-                                    handlePlayCard('ash_kindle_storm', targetPos);
+                                    if (targetingCardId) {
+                                      handlePlayCard(targetingCardId, targetPos);
+                                    }
                                   } else if (isMiststepTarget) {
                                     e.stopPropagation();
                                     handlePlayCard('working_miststep', targetPos);
                                   } else if (isDonWolfTarget) {
                                     e.stopPropagation();
                                     handlePlayCard('working_don_wolf', targetPos);
+                                  } else if (isShiftSpiritTarget) {
+                                    e.stopPropagation();
+                                    handlePlayCard('working_shift_spirit', targetPos);
                                   }
                               }}
                               onMouseEnter={() => {
@@ -1807,8 +2280,8 @@ export default function App() {
                               }}
                               style={{
                                 position: 'relative',
-                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || occupiedPlayerId) ? 'pointer' : 'default',
-                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isRaiseStoneCell || occupiedPlayerId) ? 'auto' : 'none',
+                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || occupiedPlayerId) ? 'pointer' : 'default',
+                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || isRaiseStoneCell || occupiedPlayerId) ? 'auto' : 'none',
                                 border: lashablePlayer
                                   ? '2px solid var(--accent-crimson)'
                                   : isValidMove
@@ -1817,6 +2290,10 @@ export default function App() {
                                   ? '2px solid var(--accent-crimson)'
                                   : (isMiststepTarget || isDonWolfTarget)
                                   ? '1.5px dashed var(--accent-cyan)'
+                                  : isShiftSpiritTarget
+                                  ? '2px solid var(--accent-cyan)'
+                                  : occupiedPlayerId
+                                  ? `1.5px solid ${gameState.players[occupiedPlayerId]?.color || '#ffffff'}`
                                   : 'none',
                                 backgroundColor: lashablePlayer
                                   ? 'rgba(239, 68, 68, 0.15)'
@@ -1826,6 +2303,10 @@ export default function App() {
                                   ? 'rgba(255, 23, 68, 0.15)'
                                   : (isMiststepTarget || isDonWolfTarget)
                                   ? 'rgba(0, 229, 255, 0.1)'
+                                  : isShiftSpiritTarget
+                                  ? 'rgba(0, 229, 255, 0.15)'
+                                  : occupiedPlayerId
+                                  ? `${gameState.players[occupiedPlayerId]?.color || '#ffffff'}1a`
                                   : 'transparent',
                                 borderRadius: '4px',
                                 transition: 'all 0.15s ease'
@@ -1839,6 +2320,8 @@ export default function App() {
                                   ? 'Teleport here'
                                   : isDonWolfTarget
                                   ? 'Wolf Leap here'
+                                  : isShiftSpiritTarget
+                                  ? 'Swap positions with Shift Spirit'
                                   : ''
                               }
                             >
@@ -1892,68 +2375,82 @@ export default function App() {
                         })}
                       </div>
                     )}
-                    {/* Render dynamic uncarried treasures */}
-                    {gameState.treasures && Object.values(gameState.treasures).map((tr) => {
-                      if (tr.tileX === x && tr.tileY === y && tr.carrierId === null) {
-                        return (
-                          <div
-                            key={tr.id}
-                            style={{
-                              position: 'absolute',
-                              left: `${tr.c * subCellSize}px`,
-                              top: `${tr.r * subCellSize}px`,
-                              width: `${subCellSize}px`,
-                              height: `${subCellSize}px`,
-                              fontSize: `${Math.floor(tokenSize * 0.5)}px`,
-                              lineHeight: `${subCellSize}px`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              zIndex: 27,
-                              pointerEvents: 'none',
-                              userSelect: 'none'
-                            }}
-                          >
-                            💎
-                          </div>
-                        );
-                      }
-                      return null;
-                    })}
-
-                    {/* Render spawn Token (in gameplay phase) */}
-                    {Object.entries(gameState.tokenPositions).map(([pId, pos]) => {
-                      if (pos.tileX === x && pos.tileY === y) {
-                        const player = gameState.players[pId];
-                        const isCarrying = gameState.treasures && Object.values(gameState.treasures).some(t => t.carrierId === pId);
-                        return (
-                          <div
-                            key={pId}
-                            style={{
-                              position: 'absolute',
-                              left: `${pos.c * subCellSize}px`,
-                              top: `${pos.r * subCellSize}px`,
-                              width: `${subCellSize}px`,
-                              height: `${subCellSize}px`,
-                              fontSize: `${tokenSize}px`,
-                              lineHeight: `${subCellSize}px`,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              filter: `drop-shadow(0 0 6px ${player?.color})`,
-                              zIndex: 30,
-                              pointerEvents: 'none',
-                              cursor: 'default'
-                            }}
-                            className="floating-emoji"
-                          >
-                            {player?.emoji}
-                            {isCarrying && (
-                              <span style={{ fontSize: '10px', position: 'absolute', bottom: '-4px', right: '-4px', filter: 'drop-shadow(0 0 2px #00E5FF)' }}>
-                                💎
-                              </span>
-                            )}
-                          </div>
+                     {/* Render dynamic uncarried treasures */}
+                     {gameState.treasures && Object.values(gameState.treasures).map((tr) => {
+                       if (tr.tileX === x && tr.tileY === y && tr.carrierId === null) {
+                         const owner = gameState.players[tr.ownerId];
+                         const ownerColor = owner?.color || '#00E5FF';
+                         return (
+                           <div
+                             key={tr.id}
+                             style={{
+                               position: 'absolute',
+                               left: `${tr.c * subCellSize}px`,
+                               top: `${tr.r * subCellSize}px`,
+                               width: `${subCellSize}px`,
+                               height: `${subCellSize}px`,
+                               fontSize: `${Math.floor(tokenSize * 0.5)}px`,
+                               lineHeight: `${subCellSize}px`,
+                               display: 'flex',
+                               alignItems: 'center',
+                               justifyContent: 'center',
+                               filter: `drop-shadow(0 0 6px ${ownerColor})`,
+                               zIndex: 27,
+                               pointerEvents: 'none',
+                               userSelect: 'none'
+                             }}
+                           >
+                             💎
+                           </div>
+                         );
+                       }
+                       return null;
+                     })}
+ 
+                     {/* Render spawn Token (in gameplay phase) */}
+                     {Object.entries(gameState.tokenPositions).map(([pId, pos]) => {
+                       if (pos.tileX === x && pos.tileY === y) {
+                         const player = gameState.players[pId];
+                         return (
+                           <div
+                             key={pId}
+                             style={{
+                               position: 'absolute',
+                               left: `${pos.c * subCellSize}px`,
+                               top: `${pos.r * subCellSize}px`,
+                               width: `${subCellSize}px`,
+                               height: `${subCellSize}px`,
+                               fontSize: `${tokenSize}px`,
+                               lineHeight: `${subCellSize}px`,
+                               display: 'flex',
+                               alignItems: 'center',
+                               justifyContent: 'center',
+                               filter: `drop-shadow(0 0 6px ${player?.color})`,
+                               zIndex: 30,
+                               pointerEvents: 'none',
+                               cursor: 'default'
+                             }}
+                             className="floating-emoji"
+                           >
+                             {player?.emoji}
+                             {(() => {
+                               const carriedTreasure = gameState.treasures && Object.values(gameState.treasures).find(t => t.carrierId === pId);
+                               if (!carriedTreasure) return null;
+                               const gemOwner = gameState.players[carriedTreasure.ownerId];
+                               const gemColor = gemOwner?.color || '#00E5FF';
+                               return (
+                                 <span style={{
+                                   fontSize: '10px',
+                                   position: 'absolute',
+                                   bottom: '-4px',
+                                   right: '-4px',
+                                   filter: `drop-shadow(0 0 4px ${gemColor})`
+                                 }}>
+                                   💎
+                                 </span>
+                               );
+                             })()}
+                           </div>
                         );
                       }
                       return null;
@@ -1975,6 +2472,100 @@ export default function App() {
               </div>
             );
           })}
+
+          {/* Rainbow Bridges Overlay */}
+          {gameState && (() => {
+            const bridges = getActiveRainbowBridges(gameState.placedTiles);
+            if (bridges.length === 0) return null;
+
+            // Calculate precise board dimensions including 16px gaps and 24px padding (matching the absolute container padding box)
+            const boardWidth = (maxX - minX + 1) * cellWidth + (maxX - minX) * 16 + 48;
+            const boardHeight = (maxY - minY + 1) * cellWidth + (maxY - minY) * 16 + 48;
+
+            return (
+              <svg
+                width={boardWidth}
+                height={boardHeight}
+                viewBox={`0 0 ${boardWidth} ${boardHeight}`}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: `${boardWidth}px`,
+                  height: `${boardHeight}px`,
+                  pointerEvents: 'none',
+                  zIndex: 26
+                }}
+              >
+                <defs>
+                  <linearGradient id="rainbow-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#ff0055" stopOpacity="0.8" />
+                    <stop offset="20%" stopColor="#ff7b00" stopOpacity="0.8" />
+                    <stop offset="40%" stopColor="#ffea00" stopOpacity="0.8" />
+                    <stop offset="60%" stopColor="#00e676" stopOpacity="0.8" />
+                    <stop offset="80%" stopColor="#00b0ff" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#d500f9" stopOpacity="0.8" />
+                  </linearGradient>
+                  <filter id="rainbow-glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+                {bridges.map((bridge, idx) => {
+                  const getEdgeCoords = (t: { x: number; y: number; r: number; c: number }) => {
+                    let ex = 24 + (t.x - minX) * (cellWidth + 16);
+                    let ey = 24 + (maxY - t.y) * (cellWidth + 16);
+                    if (t.c === 4) {
+                      ex += cellWidth;
+                      ey += t.r * subCellSize + subCellSize / 2;
+                    } else if (t.c === 0) {
+                      ey += t.r * subCellSize + subCellSize / 2;
+                    } else if (t.r === 0) {
+                      ex += t.c * subCellSize + subCellSize / 2;
+                    } else if (t.r === 4) {
+                      ex += t.c * subCellSize + subCellSize / 2;
+                      ey += cellWidth;
+                    }
+                    return { x: ex, y: ey };
+                  };
+
+                  const p1 = getEdgeCoords(bridge.tile1);
+                  const p2 = getEdgeCoords(bridge.tile2);
+
+                  // Determine which exit is horizontal (East/West) vs vertical (North/South)
+                  const isTile1Horizontal = bridge.tile1.c === 0 || bridge.tile1.c === 4;
+                  
+                  // The intersection point of the horizontal exit line and the vertical exit line
+                  const controlX = isTile1Horizontal ? p2.x : p1.x;
+                  const controlY = isTile1Horizontal ? p1.y : p2.y;
+
+                  return (
+                    <g key={`rainbow-bridge-${idx}`}>
+                      {/* Glow backing path */}
+                      <path
+                        d={`M ${p1.x} ${p1.y} Q ${controlX} ${controlY} ${p2.x} ${p2.y}`}
+                        stroke="url(#rainbow-grad)"
+                        strokeWidth={subCellSize * 0.7}
+                        fill="none"
+                        opacity="0.3"
+                        strokeLinecap="butt"
+                        filter="url(#rainbow-glow)"
+                      />
+                      {/* Main bridge path */}
+                      <path
+                        d={`M ${p1.x} ${p1.y} Q ${controlX} ${controlY} ${p2.x} ${p2.y}`}
+                        stroke="url(#rainbow-grad)"
+                        strokeWidth={subCellSize * 0.7}
+                        fill="none"
+                        opacity="0.45"
+                        strokeLinecap="butt"
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+            );
+          })()}
 
           {/* Spell Animations Overlay */}
           {activeAnimation && (() => {
@@ -1998,7 +2589,7 @@ export default function App() {
                   gridRow: '1 / -1'
                 }}
               >
-                {activeAnimation.cardId === 'ash_kindle_storm' && pTo && (
+                {(activeAnimation.cardId === 'ash_kindle_storm' || activeAnimation.cardId === 'ash_fireball' || activeAnimation.cardId === 'ash_immolate') && pTo && (
                   <div
                     className="kindle-spell-effect"
                     style={{
@@ -2024,12 +2615,21 @@ export default function App() {
                   </div>
                 )}
 
+                {activeAnimation.cardId === 'working_shift_spirit' && pTo && (
+                  <div className="swap-effect" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+                    <div className="miststep-fadeout" style={{ left: pFrom.x, top: pFrom.y }} />
+                    <div className="miststep-fadein" style={{ left: pTo.x, top: pTo.y }} />
+                    <div className="miststep-fadein" style={{ left: pFrom.x, top: pFrom.y }} />
+                    <div className="miststep-fadeout" style={{ left: pTo.x, top: pTo.y }} />
+                  </div>
+                )}
+
                 {activeAnimation.cardId === 'working_raise_stone' && pTo && (
                   <div className="raise-stone-effect" style={{ left: pTo.x, top: pTo.y }} />
                 )}
 
-                {activeAnimation.cardId === 'talisman_bear_charm' && (
-                  <div className="bear-charm-effect" style={{ left: pFrom.x, top: pFrom.y }} />
+                {activeAnimation.cardId === 'talisman_thorns' && (
+                  <div className="thorns-effect" style={{ left: pFrom.x, top: pFrom.y }} />
                 )}
 
                  {activeAnimation.cardId === 'working_don_wolf' && pTo && (
@@ -2187,56 +2787,216 @@ export default function App() {
                           true
                         )
                       )}
-                    </div>
-                  );
-                })()}
+                     </div>
+                   );
+                 })()}
+               </div>
+             );
+           })()}
+
+          {/* Lash Attack Animation Overlay */}
+          {activeLashAnimation && (() => {
+            const pFrom = getCellCoords(activeLashAnimation.from.tileX, activeLashAnimation.from.tileY, activeLashAnimation.from.r, activeLashAnimation.from.c);
+            const pTo = activeLashAnimation.targetWall
+              ? getBorderCoords(
+                  activeLashAnimation.targetWall.tileX,
+                  activeLashAnimation.targetWall.tileY,
+                  activeLashAnimation.targetWall.r,
+                  activeLashAnimation.targetWall.c,
+                  activeLashAnimation.targetWall.direction
+                )
+              : getCellCoords(
+                  activeLashAnimation.to.tileX,
+                  activeLashAnimation.to.tileY,
+                  activeLashAnimation.to.r,
+                  activeLashAnimation.to.c
+                );
+
+            return (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  pointerEvents: 'none',
+                  zIndex: 100,
+                  gridColumn: '1 / -1',
+                  gridRow: '1 / -1'
+                }}
+              >
+                {/* SVG Lash Line / Whip Strike */}
+                <svg
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none'
+                  }}
+                >
+                  <line
+                    x1={pFrom.x}
+                    y1={pFrom.y}
+                    x2={pTo.x}
+                    y2={pTo.y}
+                    stroke="#ff1744"
+                    strokeWidth="3"
+                    className="lash-whip-line"
+                  />
+                </svg>
+
+                {/* Slash Burst on Impact */}
+                <div
+                  className="lash-slash-effect"
+                  style={{
+                    left: `${pTo.x}px`,
+                    top: `${pTo.y}px`
+                  }}
+                />
               </div>
             );
           })()}
+
+          {/* Unified Combat Popups Overlay */}
+          {combatPopups.map(popup => {
+            const p = popup.direction
+              ? getBorderCoords(popup.tileX, popup.tileY, popup.r, popup.c, popup.direction)
+              : getCellCoords(popup.tileX, popup.tileY, popup.r, popup.c);
+            return (
+              <div
+                key={popup.id}
+                className={`combat-popup ${popup.type}`}
+                style={{
+                  position: 'absolute',
+                  left: `${p.x}px`,
+                  top: `${p.y}px`,
+                  pointerEvents: 'none',
+                  zIndex: 150
+                }}
+              >
+                {popup.text}
+              </div>
+            );
+          })}
         </div>
+      </div>
+
+        {/* Mobile-only Action Bar (visible below the board) */}
+        {isMobile && isActiveTurn && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '360px', margin: '16px auto 0 auto', padding: '0 16px', boxSizing: 'border-box' }}>
+            {/* Rotate Tile button in PLACEMENT phase */}
+            {gameState.phase === 'PLACEMENT' && activeTileLayout && (
+              <button
+                onClick={handleRotate}
+                className="btn-secondary"
+                style={{ width: '100%', padding: '10px 0', fontWeight: 'bold' }}
+              >
+                Rotate Tile (90° CW)
+              </button>
+            )}
+
+            {/* Pick Up / Drop Mask buttons in GAMEPLAY phase */}
+            {gameState.phase === 'GAMEPLAY' && (
+              <>
+                {/* Pick Up Treasure Button */}
+                {(() => {
+                  const sameCellTreasures = gameState.treasures && myTokenPos
+                    ? Object.values(gameState.treasures).filter(
+                        t => t.tileX === myTokenPos.tileX &&
+                             t.tileY === myTokenPos.tileY &&
+                             t.r === myTokenPos.r &&
+                             t.c === myTokenPos.c &&
+                             t.carrierId === null
+                      )
+                    : [];
+                  if (sameCellTreasures.length > 0 && self && self.ap > 0) {
+                    return sameCellTreasures.map(t => {
+                      const owner = gameState.players[t.ownerId];
+                      const label = owner
+                        ? `📥 Pick Up ${owner.username}'s Mask`
+                        : `📥 Pick Up Mask`;
+
+                      return (
+                        <button
+                          key={`pickup-mobile-${t.id}`}
+                          onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: t.id } })}
+                          className="btn-primary"
+                          style={{
+                            width: '100%',
+                            backgroundColor: 'var(--accent-green)',
+                            color: 'black',
+                            fontWeight: 'bold',
+                            padding: '10px 0'
+                          }}
+                        >
+                          {label} (1 AP)
+                        </button>
+                      );
+                    });
+                  }
+                  return null;
+                })()}
+
+                {/* Drop Treasure Button */}
+                {(() => {
+                  const carriedTr = gameState.treasures
+                    ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
+                    : null;
+                  if (carriedTr) {
+                    return (
+                      <button
+                        onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: carriedTr.id } })}
+                        className="btn-secondary"
+                        style={{
+                          width: '100%',
+                          borderColor: 'var(--accent-gold)',
+                          color: 'var(--accent-gold)',
+                          fontWeight: 'bold',
+                          padding: '10px 0'
+                        }}
+                      >
+                        📤 Drop Mask (Free Action)
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Card Hand / Inventory HUD */}
       {gameState.phase === 'GAMEPLAY' && self && (
         <div
+          className="cards-hud"
           style={{
             position: 'fixed',
             bottom: '16px',
             left: '50%',
             transform: 'translateX(-50%)',
-            height: '210px',
+            height: '190px',
             backgroundColor: 'rgba(15, 23, 42, 0.65)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
             borderRadius: '24px',
-            padding: '12px 32px',
+            padding: '12px 16px',
             display: 'flex',
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'center',
             zIndex: 100,
             boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
             boxSizing: 'border-box',
-            maxWidth: '92vw',
+            maxWidth: '96vw',
             width: 'auto'
           }}
         >
-          {/* Left Summary label */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 125, minWidth: '100px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Your Hand
-            </span>
-            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-              ({self.hand.length}/7 Rites)
-            </span>
-            {targetingCardId && (
-              <span style={{ fontSize: '10px', color: 'var(--accent-crimson)', animation: 'pulse 1.5s infinite', fontWeight: 'bold', marginTop: '4px' }}>
-                🎯 Target Needed
-              </span>
-            )}
-          </div>
-
-          {/* Cards List (Centered horizontally, fully formed) */}
+          {/* Cards List (Centered horizontally, fully formed, extended all the way to the edge) */}
           <div
             style={{
               display: 'flex',
@@ -2245,12 +3005,11 @@ export default function App() {
               pointerEvents: 'auto',
               flexGrow: 1,
               justifyContent: 'center',
-              alignItems: 'center',
-              padding: '0 24px'
+              alignItems: 'center'
             }}
           >
             {self.hand.map((card, idx) => {
-              const cardKey = `${card.id}-${idx}`;
+              const cardKey = `hand-${card.id}-${idx}`;
               const isSelected = selectedCardId === cardKey;
               const isHovered = hoveredCardId === cardKey;
 
@@ -2270,6 +3029,7 @@ export default function App() {
                 : '#94a3b8';
 
               const canCast = isActiveTurn && self.ap > 0 && !isWard;
+              const noTargetNeeded = card.id === 'talisman_thorns' || card.id === 'ash_turn_aside' || card.id === 'ash_spirit_skin' || card.id === 'offering_deep_breath';
 
               return (
                 <div
@@ -2278,31 +3038,39 @@ export default function App() {
                   onMouseLeave={() => setHoveredCardId(null)}
                   onClick={() => {
                     if (!canCast) return;
-                    const noTargetNeeded = card.id === 'talisman_bear_charm' || card.id === 'offering_deep_breath';
-                    if (isSelected) {
-                      if (noTargetNeeded) {
-                        handlePlayCard(card.id);
+                    if (isMobile) {
+                      if (isSelected) {
                         setSelectedCardId(null);
-                      } else {
                         setTargetingCardId(null);
-                        setSelectedCardId(null);
+                      } else {
+                        setSelectedCardId(cardKey);
                       }
                     } else {
-                      setSelectedCardId(cardKey);
-                      if (!noTargetNeeded) {
-                        setTargetingCardId(card.id);
+                      if (isSelected) {
+                        if (noTargetNeeded) {
+                          handlePlayCard(card.id);
+                          setSelectedCardId(null);
+                        } else {
+                          setTargetingCardId(null);
+                          setSelectedCardId(null);
+                        }
                       } else {
-                        setTargetingCardId(null);
+                        setSelectedCardId(cardKey);
+                        if (!noTargetNeeded) {
+                          setTargetingCardId(card.id);
+                        } else {
+                          setTargetingCardId(null);
+                        }
                       }
                     }
                   }}
                   style={{
-                    width: '110px',
-                    height: '165px',
-                    minWidth: '110px',
-                    maxWidth: '110px',
-                    minHeight: '165px',
-                    maxHeight: '165px',
+                    width: isMobile ? '65px' : '110px',
+                    height: isMobile ? '88px' : '165px',
+                    minWidth: isMobile ? '65px' : '110px',
+                    maxWidth: isMobile ? '65px' : '110px',
+                    minHeight: isMobile ? '88px' : '165px',
+                    maxHeight: isMobile ? '88px' : '165px',
                     flexShrink: 0,
                     backgroundColor: 'rgba(15, 23, 42, 0.98)',
                     border: isSelected 
@@ -2316,7 +3084,7 @@ export default function App() {
                       : isHovered 
                       ? `0 0 12px ${typeColor}` 
                       : `0 0 6px ${typeColor}22`,
-                    padding: '10px',
+                    padding: isMobile ? '4px' : '10px',
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
@@ -2327,74 +3095,70 @@ export default function App() {
                     opacity: (targetingCardId && !isSelected) ? 0.5 : 1
                   }}
                 >
-
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                    <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
-                      {card.type}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '4px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
+                  {isMobile ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', alignItems: 'center', width: '100%', overflow: 'hidden' }}>
+                      <span style={{ fontSize: '8px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
                         {card.name}
                       </span>
-                      <span style={{ fontSize: '13px', flexShrink: 0 }}>
+                      <span style={{ fontSize: '26px', margin: 'auto 0' }}>
                         {getCardTypeEmoji(card.id)}
                       </span>
+                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor }}>
+                        {card.type}
+                      </span>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                          {card.type}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
+                            {card.name}
+                          </span>
+                          <span style={{ fontSize: '13px', flexShrink: 0 }}>
+                            {getCardTypeEmoji(card.id)}
+                          </span>
+                        </div>
+                      </div>
 
-                  {/* Description */}
-                  <div style={{
-                    fontSize: '11px',
-                    color: '#94a3b8',
-                    lineHeight: '1.3',
-                    opacity: 1,
-                    flexGrow: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    marginTop: '4px'
-                  }}>
-                    {card.description}
-                  </div>
+                      <div style={{
+                        fontSize: '11px',
+                        color: '#94a3b8',
+                        lineHeight: '1.3',
+                        opacity: 1,
+                        flexGrow: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        marginTop: '4px'
+                      }}>
+                        {card.description}
+                      </div>
 
-                  {/* CTA Label */}
-                  <div style={{
-                    fontSize: '8px',
-                    fontWeight: 'bold',
-                    color: isSelected ? 'var(--accent-cyan)' : '#64748b',
-                    textAlign: 'center',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px',
-                    opacity: 1,
-                    marginTop: '2px'
-                  }}>
-                    {isWard
-                      ? '🛡️ Defense'
-                      : isSelected 
-                      ? (card.id === 'talisman_bear_charm' || card.id === 'working_don_wolf' || card.id === 'offering_deep_breath'
-                        ? '➔ Click to Cast' 
-                        : '🎯 Target board') 
-                      : '⚡ Cast Rite'}
-                  </div>
+                      <div style={{
+                        fontSize: '8px',
+                        fontWeight: 'bold',
+                        color: isSelected ? 'var(--accent-cyan)' : '#64748b',
+                        textAlign: 'center',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        opacity: 1,
+                        marginTop: '2px'
+                      }}>
+                        {isWard
+                          ? '🛡️ Defense'
+                          : isSelected 
+                          ? (noTargetNeeded
+                            ? '➔ Click to Cast' 
+                            : '🎯 Target board') 
+                          : '⚡ Cast Rite'}
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
-          </div>
-
-          {/* Right helper buttons / controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', zIndex: 125, minWidth: '100px', justifyContent: 'flex-end' }}>
-            {targetingCardId && (
-              <button
-                onClick={() => {
-                  setTargetingCardId(null);
-                  setSelectedCardId(null);
-                }}
-                className="btn-secondary"
-                style={{ padding: '4px 10px', fontSize: '11px', color: 'var(--accent-crimson)', borderColor: 'var(--accent-crimson)' }}
-              >
-                Cancel Target
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -2516,6 +3280,391 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={() => setShowSettings(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#0f172a',
+              border: '1px solid var(--border-light)',
+              borderRadius: '16px',
+              padding: '24px',
+              width: '320px',
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
+              <h3 style={{ margin: 0, color: 'white', fontSize: '16px', fontWeight: 'bold' }}>Settings</h3>
+              <button
+                onClick={() => setShowSettings(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Audio Placeholders */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Audio Settings</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label htmlFor="bgm-volume" style={{ fontSize: '13px', color: '#cbd5e1' }}>Music Volume</label>
+                <input
+                  id="bgm-volume"
+                  type="range"
+                  min="0"
+                  max="100"
+                  defaultValue="50"
+                  disabled
+                  style={{ width: '120px', accentColor: 'var(--accent-cyan)', cursor: 'not-allowed' }}
+                  title="Audio settings placeholder"
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label htmlFor="sfx-volume" style={{ fontSize: '13px', color: '#cbd5e1' }}>SFX Volume</label>
+                <input
+                  id="sfx-volume"
+                  type="range"
+                  min="0"
+                  max="100"
+                  defaultValue="80"
+                  disabled
+                  style={{ width: '120px', accentColor: 'var(--accent-cyan)', cursor: 'not-allowed' }}
+                  title="Audio settings placeholder"
+                />
+              </div>
+            </div>
+
+            {/* Display Placeholders */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Display Settings</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label htmlFor="gfx-quality" style={{ fontSize: '13px', color: '#cbd5e1' }}>Graphics Quality</label>
+                <select
+                  id="gfx-quality"
+                  disabled
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: '6px',
+                    color: 'white',
+                    fontSize: '12px',
+                    padding: '4px 8px',
+                    cursor: 'not-allowed',
+                  }}
+                >
+                  <option>High (Default)</option>
+                  <option>Medium</option>
+                  <option>Low</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label htmlFor="toggle-animations" style={{ fontSize: '13px', color: '#cbd5e1' }}>Enable Animations</label>
+                <input
+                  id="toggle-animations"
+                  type="checkbox"
+                  defaultChecked
+                  disabled
+                  style={{ cursor: 'not-allowed' }}
+                />
+              </div>
+            </div>
+
+            {/* Room Info / Clickable Link */}
+            {gameState && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Match Info</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#cbd5e1' }}>Room Link</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <a
+                      href={`${window.location.origin}/?room=${gameState.roomCode}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        color: 'var(--accent-cyan)',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      {gameState.roomCode}
+                    </a>
+                    <button
+                      onClick={handleCopyRoomCode}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: copied ? 'var(--accent-green)' : '#64748b',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        padding: '2px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      title="Copy Join Link"
+                    >
+                      {copied ? '✓' : '📋'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Concede Button */}
+            {gameState?.phase === 'GAMEPLAY' && (
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px', display: 'flex', flexDirection: 'column' }}>
+                <button
+                  onClick={() => {
+                    setShowSettings(false);
+                    handleConcede();
+                  }}
+                  className="btn-secondary"
+                  style={{
+                    width: '100%',
+                    borderColor: 'rgba(239, 68, 68, 0.4)',
+                    color: '#ef4444',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    padding: '8px 0',
+                  }}
+                >
+                  🏳️ Concede Match
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Zoomed Detailed Card Card (Mobile only) */}
+      {isMobile && selectedCardId && self && !targetingCardId && !flingingCardId && (() => {
+        const cardIndex = self.hand.findIndex((c, idx) => `hand-${c.id}-${idx}` === selectedCardId);
+        const card = self.hand[cardIndex];
+        if (!card) return null;
+
+        const isBane = card.type === 'bane';
+        const isWard = card.type === 'ward';
+        const isWorking = card.type === 'working';
+        const isOffering = card.type === 'offering';
+
+        const typeColor = isBane
+          ? '#ff1744'
+          : isWard
+          ? '#ffd600'
+          : isWorking
+          ? '#00e5ff'
+          : (isOffering || card.type === 'talisman')
+          ? '#00e676'
+          : '#94a3b8';
+
+        const canCast = isActiveTurn && self.ap > 0 && !isWard;
+        const noTargetNeeded = card.id === 'talisman_thorns' || card.id === 'ash_turn_aside' || card.id === 'ash_spirit_skin' || card.id === 'offering_deep_breath';
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(2px)',
+              zIndex: 110,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            onClick={() => {
+              setSelectedCardId(null);
+              setTargetingCardId(null);
+            }}
+          >
+            <div
+              style={{
+                width: '230px',
+                height: '340px',
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(16px)',
+                border: `2px solid ${typeColor}`,
+                borderRadius: '16px',
+                boxShadow: `0 0 30px ${typeColor}66`,
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxSizing: 'border-box',
+                position: 'relative'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                  {card.type}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                  <span style={{ fontSize: '17px', fontWeight: 'bold', color: 'white' }}>
+                    {card.name}
+                  </span>
+                  <span style={{ fontSize: '22px' }}>
+                    {getCardTypeEmoji(card.id)}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '13.5px', color: '#cbd5e1', lineHeight: '1.4', flexGrow: 1, display: 'flex', alignItems: 'center', margin: '16px 0' }}>
+                {card.description}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {canCast ? (
+                  noTargetNeeded ? (
+                    <button
+                      onClick={() => handlePlayCard(card.id)}
+                      className="btn-primary"
+                      style={{
+                        width: '100%',
+                        backgroundColor: 'var(--accent-cyan)',
+                        color: 'black',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        padding: '8px 0',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cast Spell (1 AP)
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setTargetingCardId(card.id);
+                      }}
+                      className="btn-primary"
+                      style={{
+                        width: '100%',
+                        backgroundColor: 'var(--accent-gold)',
+                        color: 'black',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        padding: '8px 0',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Target Spell
+                    </button>
+                  )
+                ) : (
+                  <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', padding: '6px 0' }}>
+                    {!isActiveTurn ? 'Not your turn' : self.ap <= 0 ? 'Out of AP' : 'Cannot cast'}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => {
+                    setSelectedCardId(null);
+                    setTargetingCardId(null);
+                  }}
+                  className="btn-secondary"
+                  style={{
+                    width: '100%',
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    fontSize: '12.5px',
+                    padding: '6px 0',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Flinging Card Animation Overlay */}
+      {flingingCardId && (() => {
+        const card = self?.hand?.find(c => c.id === flingingCardId);
+        if (!card) return null;
+
+        const isBane = card.type === 'bane';
+        const isWard = card.type === 'ward';
+        const isWorking = card.type === 'working';
+        const isOffering = card.type === 'offering';
+
+        const typeColor = isBane
+          ? '#ff1744'
+          : isWard
+          ? '#ffd600'
+          : isWorking
+          ? '#00e5ff'
+          : (isOffering || card.type === 'talisman')
+          ? '#00e676'
+          : '#94a3b8';
+
+        return (
+          <div
+            className="card-fling-effect"
+            style={{
+              width: '120px',
+              height: '180px',
+              backgroundColor: 'rgba(15, 23, 42, 0.98)',
+              border: `2px solid ${typeColor}`,
+              borderRadius: '12px',
+              boxShadow: `0 0 20px ${typeColor}`,
+              padding: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor }}>
+                {card.type}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+                  {card.name}
+                </span>
+                <span>{getCardTypeEmoji(card.id)}</span>
+              </div>
+            </div>
+            <div style={{ fontSize: '14px', textAlign: 'center' }}>✨</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
