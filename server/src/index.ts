@@ -813,6 +813,15 @@ io.on('connection', (socket) => {
             return;
           }
 
+          const discardHand = message.payload?.discardHand === true;
+          if (discardHand) {
+            const player = room.players[playerId];
+            if (player) {
+              broadcastSystemMessage(currentRoomCode, `${player.username} discarded their entire hand of ${player.hand.length} cards.`);
+              player.hand = [];
+            }
+          }
+
           passTurn(room);
           broadcastState(currentRoomCode, room);
           break;

@@ -89,7 +89,7 @@ export type ClientMessage =
   | { event: 'INTERACT_DOOR'; payload: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' } }
   | { event: 'MOVE_TOKEN'; payload: TokenPosition }
   | { event: 'SELECT_HERO'; payload: { emoji: string } }
-  | { event: 'END_TURN' }
+  | { event: 'END_TURN'; payload?: { discardHand?: boolean } }
   | { event: 'PLAY_CARD'; payload: { cardId: string; target?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' } } }
   | { event: 'RESET_GAME' }
   | { event: 'LASH_ATTACK'; payload: { targetPlayerId?: string; targetWall?: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' } } }

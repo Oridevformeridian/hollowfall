@@ -793,8 +793,11 @@ export default function App() {
     }
   };
 
-  const handleEndTurn = () => {
-    sendEvent({ event: 'END_TURN' });
+  const handleEndTurn = (discardHand: boolean = false) => {
+    sendEvent({
+      event: 'END_TURN',
+      payload: { discardHand }
+    });
   };
 
   const handlePlayCard = (cardId: string, target?: any) => {
@@ -1712,22 +1715,48 @@ export default function App() {
 
               {/* End Turn Button (only for active player) */}
               {isActiveTurn && (
-                <button
-                  onClick={handleEndTurn}
-                  className="btn-primary"
-                  style={{
-                    width: '100%',
-                    marginTop: '8px',
-                    backgroundColor: 'var(--accent-cyan)',
-                    fontWeight: 'bold',
-                    fontSize: '13px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  End Turn ➔
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', width: '100%' }}>
+                  <button
+                    onClick={() => handleEndTurn(false)}
+                    className="btn-primary"
+                    style={{
+                      width: '100%',
+                      backgroundColor: 'var(--accent-cyan)',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '8px 0',
+                      borderRadius: '8px',
+                      border: 'none',
+                      color: 'black',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    End Turn ➔
+                  </button>
+                  <button
+                    onClick={() => handleEndTurn(true)}
+                    className="btn-secondary"
+                    style={{
+                      width: '100%',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      color: '#ef4444',
+                      border: '1px dashed #ef4444',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '6px 0',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🗑️ Discard Hand & End Turn
+                  </button>
+                </div>
               )}
 
             </div>
@@ -1806,27 +1835,47 @@ export default function App() {
             
             {/* End Turn button at the very bottom */}
             {isActiveTurn && gameState.phase === 'GAMEPLAY' && (
-              <button
-                onClick={handleEndTurn}
-                className="btn-primary"
-                style={{
-                  width: '100%',
-                  backgroundColor: 'var(--accent-cyan)',
-                  color: 'black',
-                  fontWeight: 'bold',
-                  fontSize: '13px',
-                  padding: '10px 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  flexShrink: 0
-                }}
-              >
-                End Turn ➔
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flexShrink: 0, marginTop: '8px' }}>
+                <button
+                  onClick={() => handleEndTurn(false)}
+                  className="btn-primary"
+                  style={{
+                    width: '100%',
+                    backgroundColor: 'var(--accent-cyan)',
+                    color: 'black',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    padding: '10px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  End Turn ➔
+                </button>
+                <button
+                  onClick={() => handleEndTurn(true)}
+                  style={{
+                    width: '100%',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                    border: '1px dashed #ef4444',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    padding: '8px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🗑️ Discard Hand & End Turn
+                </button>
+              </div>
             )}
           </div>
         )}
