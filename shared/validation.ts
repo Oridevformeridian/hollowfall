@@ -1,4 +1,4 @@
-import { PlacedTile, TokenPosition } from './types';
+import { PlacedTile, TokenPosition, GameState, PlayerId } from './types';
 import { FIXED_TILES } from './constants';
 
 /**
@@ -181,8 +181,8 @@ export function checkWrapping(
 
   const isEastWrap = from.tileX === maxTileXOnRow && to.tileX === minTileXOnRow && dy === 0 && from.r === 2 && from.c === 4 && to.r === 2 && to.c === 0;
   const isWestWrap = from.tileX === minTileXOnRow && to.tileX === maxTileXOnRow && dy === 0 && from.r === 2 && from.c === 0 && to.r === 2 && to.c === 4;
-  const isNorthWrap = from.tileY === minTileYOnCol && to.tileY === maxTileYOnCol && dx === 0 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
-  const isSouthWrap = from.tileY === maxTileYOnCol && to.tileY === minTileYOnCol && dx === 0 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
+  const isNorthWrap = from.tileY === maxTileYOnCol && to.tileY === minTileYOnCol && dx === 0 && from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2;
+  const isSouthWrap = from.tileY === minTileYOnCol && to.tileY === maxTileYOnCol && dx === 0 && from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2;
 
   const isWrap = isEastWrap || isWestWrap || isNorthWrap || isSouthWrap;
 
@@ -521,6 +521,26 @@ export function getWrappingManhattanDistance(
   return diffC + diffR;
 }
 
+/**
+ * Validates if the target cell is a valid Miststep destination.
+ * Miststep can only target cells in cardinal directions (N/S/E/W) up to distance 4.
+ */
+export function isValidMiststepTarget(
+  from: TokenPosition,
+  to: TokenPosition,
+  placedTiles: Record<string, PlacedTile>
+): boolean {
+  // Must be in a cardinal direction (N/S/E/W) from the starting position:
+  // - North/South: same column (tileX and cell column c are identical)
+  // - East/West: same row (tileY and cell row r are identical)
+  const isCardinal = (from.tileX === to.tileX && from.c === to.c) || (from.tileY === to.tileY && from.r === to.r);
+  if (!isCardinal) return false;
+
+  const dist = getWrappingManhattanDistance(from, to, placedTiles);
+  return dist > 0 && dist <= 4;
+}
+
+
 
 /**
  * Validates player token movement step.
@@ -636,7 +656,7 @@ export function validateTokenMove(
     }
   }
 
-  const isNorthCrossing = (dx === 0 && dy === -1) || isNorthWrap;
+  const isNorthCrossing = (dx === 0 && dy === 1) || isNorthWrap;
   if (isNorthCrossing) {
     if (from.r === 0 && from.c === 2 && to.r === 4 && to.c === 2) {
       const checkFrom = isBorderBlocked(from.tileX, from.tileY, 0, 2, 'H', placedTiles, doorsState, wallsState, true);
@@ -647,7 +667,7 @@ export function validateTokenMove(
     }
   }
 
-  const isSouthCrossing = (dx === 0 && dy === 1) || isSouthWrap;
+  const isSouthCrossing = (dx === 0 && dy === -1) || isSouthWrap;
   if (isSouthCrossing) {
     if (from.r === 4 && from.c === 2 && to.r === 0 && to.c === 2) {
       const checkFrom = isBorderBlocked(from.tileX, from.tileY, 4, 2, 'H', placedTiles, doorsState, wallsState, true);
@@ -762,4 +782,41 @@ export function getActiveRainbowBridges(placedTiles: Record<string, PlacedTile>)
     }
   }
   return bridges;
+}
+
+/**
+ * Checks if any player has both of their masks/treasures sitting in enemy Hearths.
+ * Returns an array of PlayerIds who are eliminated under this rule.
+ */
+export function checkBoundFateEliminations(room: GameState): PlayerId[] {
+  const eliminated: PlayerId[] = [];
+  const alivePlayers = Object.values(room.players).filter(p => p.thread > 0 && !p.hasConceded);
+
+  for (const player of alivePlayers) {
+    const pId = player.id;
+    // Find all treasures (masks) owned by this player
+    const playerTreasures = Object.values(room.treasures || {}).filter(t => t.ownerId === pId);
+
+    // Bound Fate: if both of a Walker's Masks sit in enemies' Hearths at once, that Walker is eliminated
+    if (playerTreasures.length === 2) {
+      const bothInEnemyHearths = playerTreasures.every(t => {
+        // Must not be carried
+        if (t.carrierId !== null) return false;
+        // Must be on a Hearth cell (r: 2, c: 2)
+        if (t.r !== 2 || t.c !== 2) return false;
+        // Must be on an enemy's tile
+        const tileKey = `${t.tileX},${t.tileY}`;
+        const tile = room.placedTiles[tileKey];
+        if (!tile) return false;
+        // The tile's owner must not be the player themselves
+        return tile.placedBy !== pId;
+      });
+
+      if (bothInEnemyHearths) {
+        eliminated.push(pId);
+      }
+    }
+  }
+
+  return eliminated;
 }

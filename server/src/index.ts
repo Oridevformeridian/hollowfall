@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance } from '../../shared/validation';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget } from '../../shared/validation';
 import { HEROES } from '../../shared/constants';
 import { buildDeckForEmoji, shuffle, getRemainingDeckForReshuffle } from '../../shared/deck';
 
@@ -31,6 +31,9 @@ const io = new Server(server, {
 
 // In-memory store for game rooms
 const rooms = new Map<string, GameState>();
+
+// In-memory store for player disconnection timeout timers (keyed by "roomCode:username")
+const disconnectTimers = new Map<string, any>();
 
 function concedePlayer(roomCode: string, pId: string) {
   const room = rooms.get(roomCode);
@@ -69,7 +72,7 @@ function concedePlayer(roomCode: string, pId: string) {
     // Give victory points to the remaining player if there is one
     if (nonConcededPlayers.length === 1) {
       const winner = nonConcededPlayers[0];
-      winner.severPoints = Math.max(winner.severPoints || 0, 2);
+      winner.severPoints = Math.max(winner.severPoints || 0, room.victoryPointsTarget || 2);
       recalculatePoints(room);
       broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
     }
@@ -151,6 +154,23 @@ function passTurn(room: GameState) {
 }
 
 function recalculatePoints(room: GameState) {
+  // Check for Bound Fate eliminations
+  const toEliminate = checkBoundFateEliminations(room);
+  if (toEliminate.length > 0) {
+    const pId = toEliminate[0];
+    const player = room.players[pId];
+    if (player) {
+      handlePlayerDefeated(
+        room,
+        pId,
+        null,
+        `${player.username} has both Masks in enemy Hearths and was eliminated by Bound Fate!`,
+        room.roomCode
+      );
+    }
+    return;
+  }
+
   for (const pId of Object.keys(room.players)) {
     const p = room.players[pId];
     p.points = p.severPoints || 0;
@@ -179,7 +199,7 @@ function recalculatePoints(room: GameState) {
 
   for (const pId of Object.keys(room.players)) {
     const p = room.players[pId];
-    if (p.points >= 2) {
+    if (p.points >= (room.victoryPointsTarget || 2)) {
       room.phase = 'GAME_OVER';
     }
   }
@@ -252,7 +272,7 @@ function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: str
     room.phase = 'GAME_OVER';
     if (alivePlayers.length === 1) {
       const winner = alivePlayers[0];
-      winner.severPoints = Math.max(winner.severPoints || 0, 2);
+      winner.severPoints = Math.max(winner.severPoints || 0, room.victoryPointsTarget || 2);
       broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
     }
   } else {
@@ -299,7 +319,8 @@ io.on('connection', (socket) => {
               wallHp: {},
               tokenPositions: {},
               treasures: {},
-              gameLogs: []
+              gameLogs: [],
+              victoryPointsTarget: 2
             };
             rooms.set(targetRoomCode, room);
           }
@@ -366,6 +387,14 @@ io.on('connection', (socket) => {
             // Map this connection's playerId variable to the new ID
             playerId = newPlayerId;
             existingReconnectingPlayer.isDisconnected = false;
+
+            // Clear any active disconnect timer for this player
+            const timerKey = `${targetRoomCode}:${existingReconnectingPlayer.username}`;
+            if (disconnectTimers.has(timerKey)) {
+              clearTimeout(disconnectTimers.get(timerKey));
+              disconnectTimers.delete(timerKey);
+              console.log(`Cleared disconnect timer for reconnecting player: ${existingReconnectingPlayer.username}`);
+            }
 
             currentRoomCode = targetRoomCode;
             socket.join(targetRoomCode);
@@ -501,6 +530,29 @@ io.on('connection', (socket) => {
             room.players[pId].assignedTileIndex = tileIndices[i % 4];
           }
 
+          broadcastState(currentRoomCode, room);
+          break;
+        }
+
+        case 'SET_VICTORY_POINTS_TARGET': {
+          if (!currentRoomCode) return;
+          const room = rooms.get(currentRoomCode);
+          if (!room || room.phase !== 'LOBBY') return;
+
+          const player = room.players[playerId];
+          if (!player || !player.isHost) {
+            sendError(socket, 'Only the host can set the victory points target.');
+            return;
+          }
+
+          const { victoryPointsTarget } = message.payload;
+          if (typeof victoryPointsTarget !== 'number' || victoryPointsTarget < 2 || victoryPointsTarget > 5) {
+            sendError(socket, 'Victory points target must be a number between 2 and 5.');
+            return;
+          }
+
+          room.victoryPointsTarget = victoryPointsTarget;
+          broadcastSystemMessage(currentRoomCode, `Host updated the match target to ${victoryPointsTarget} victory points.`);
           broadcastState(currentRoomCode, room);
           break;
         }
@@ -965,7 +1017,7 @@ io.on('connection', (socket) => {
               handlePlayerDefeated(room, targetPlayerId, playerId, `${targetPlayer.username} was defeated by ${player.username}!`, currentRoomCode);
             }
             recalculatePoints(room);
-            if (player.points >= 2) {
+            if (player.points >= (room.victoryPointsTarget || 2)) {
               room.phase = 'GAME_OVER';
             }
 
@@ -987,16 +1039,11 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
-            // Check distance <= 3 Manhattan (with wrap-around)
+            // Check cardinal movement and distance <= 4 Manhattan (with wrap-around)
             const from = room.tokenPositions[playerId];
             if (!from) return;
-            const dist = getWrappingManhattanDistance(from, target, room.placedTiles);
-            if (dist > 3) {
-              sendError(socket, 'Target is too far (max distance 3 cells).');
-              return;
-            }
-            if (!hasLineOfSight(from, target, room.placedTiles, room.doorsState, room.wallsState)) {
-              sendError(socket, 'Target cell is not in your Line of Sight (LOS).');
+            if (!isValidMiststepTarget(from, target, room.placedTiles)) {
+              sendError(socket, 'Miststep must target a cell in a cardinal direction up to 4 cells away.');
               return;
             }
             room.tokenPositions[playerId] = {
@@ -1098,12 +1145,12 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
-            // Check distance <= 4 Manhattan (with wrap-around)
+            // Check distance <= 3 Manhattan (with wrap-around)
             const from = room.tokenPositions[playerId];
             if (!from) return;
             const dist = getWrappingManhattanDistance(from, target, room.placedTiles);
-            if (dist > 4) {
-              sendError(socket, 'Target is too far (max distance 4 cells).');
+            if (dist > 3) {
+              sendError(socket, 'Target is too far (max distance 3 cells).');
               return;
             }
 
@@ -1594,14 +1641,41 @@ io.on('connection', (socket) => {
         const player = room.players[playerId];
 
         if (room.phase === 'PLACEMENT' || room.phase === 'GAMEPLAY') {
-          // Game is active: mark player as disconnected. Wait indefinitely for reconnection or concession.
+          // Game is active: mark player as disconnected. Wait 10 minutes for reconnection before auto-conceding.
           if (player) {
             player.isDisconnected = true;
             broadcastSystemMessage(currentRoomCode, `${player.username} disconnected.`);
+
+            const roomCode = currentRoomCode;
+            const timerKey = `${roomCode}:${player.username}`;
+            if (disconnectTimers.has(timerKey)) {
+              clearTimeout(disconnectTimers.get(timerKey));
+            }
+            const timer = setTimeout(() => {
+              disconnectTimers.delete(timerKey);
+              const r = rooms.get(roomCode);
+              if (r) {
+                const p = Object.values(r.players).find(pl => pl.username === player.username);
+                if (p && p.isDisconnected) {
+                  broadcastSystemMessage(roomCode, `${p.username} has been auto-conceded due to 10 minutes of inactivity.`);
+                  concedePlayer(roomCode, p.id);
+                  broadcastState(roomCode, r);
+                }
+              }
+            }, 10 * 60 * 1000); // 10 minutes
+            disconnectTimers.set(timerKey, timer);
             
             // Check if all players in the room are now disconnected
             const allDisconnected = Object.values(room.players).every(p => p.isDisconnected || p.hasConceded);
             if (allDisconnected) {
+              // Clear any disconnect timers for players in this room
+              for (const p of Object.values(room.players)) {
+                const key = `${currentRoomCode}:${p.username}`;
+                if (disconnectTimers.has(key)) {
+                  clearTimeout(disconnectTimers.get(key));
+                  disconnectTimers.delete(key);
+                }
+              }
               rooms.delete(currentRoomCode);
               roomMetadata.delete(currentRoomCode);
               console.log(`Room ${currentRoomCode} deleted because all players disconnected.`);

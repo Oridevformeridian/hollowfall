@@ -76,6 +76,7 @@ export interface GameState {
   tokenPositions: Record<PlayerId, TokenPosition>;
   treasures: Record<string, Treasure>;
   gameLogs?: string[];
+  victoryPointsTarget?: number;
 }
 
 export type ClientMessage =
@@ -92,7 +93,8 @@ export type ClientMessage =
   | { event: 'LASH_ATTACK'; payload: { targetPlayerId?: string; targetWall?: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' } } }
   | { event: 'PICKUP_TREASURE'; payload: { treasureId: string } }
   | { event: 'DROP_TREASURE'; payload: { treasureId: string } }
-  | { event: 'CONCEDE' };
+  | { event: 'CONCEDE' }
+  | { event: 'SET_VICTORY_POINTS_TARGET'; payload: { victoryPointsTarget: number } };
 
 export type ServerMessage =
   | { event: 'STATE_UPDATE'; payload: GameState }
