@@ -1,4 +1,4 @@
-import { PlacedTile, TokenPosition, GameState, PlayerId } from './types';
+import { PlacedTile, TokenPosition, GameState, PlayerId, Player, Treasure } from './types';
 import { FIXED_TILES } from './constants';
 
 /**
@@ -820,3 +820,45 @@ export function checkBoundFateEliminations(room: GameState): PlayerId[] {
 
   return eliminated;
 }
+
+/**
+ * Pure function to calculate and update player points based on kills (severPoints) and mask placement.
+ * Returns the updated record of players.
+ */
+export function calculateScores(
+  players: Record<string, Player>,
+  placedTiles: Record<string, PlacedTile>,
+  treasures: Record<string, Treasure>
+): Record<string, Player> {
+  const updatedPlayers: Record<string, Player> = {};
+  for (const pId of Object.keys(players)) {
+    updatedPlayers[pId] = {
+      ...players[pId],
+      points: players[pId].severPoints || 0
+    };
+  }
+
+  if (treasures) {
+    for (const treasureId of Object.keys(treasures)) {
+      const treasure = treasures[treasureId];
+      if (treasure.carrierId === null) {
+        const tileKey = `${treasure.tileX},${treasure.tileY}`;
+        const tile = placedTiles[tileKey];
+        if (tile) {
+          if (treasure.r === 2 && treasure.c === 2) {
+            const hearthOwnerId = tile.placedBy;
+            if (treasure.ownerId !== hearthOwnerId) {
+              const hearthOwner = updatedPlayers[hearthOwnerId];
+              if (hearthOwner) {
+                hearthOwner.points += 1;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return updatedPlayers;
+}
+

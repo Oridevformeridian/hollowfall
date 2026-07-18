@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget } from '../../shared/validation';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget, calculateScores } from '../../shared/validation';
 import { HEROES } from '../../shared/constants';
 import { buildDeckForEmoji, shuffle, getRemainingDeckForReshuffle } from '../../shared/deck';
 
@@ -171,31 +171,8 @@ function recalculatePoints(room: GameState) {
     return;
   }
 
-  for (const pId of Object.keys(room.players)) {
-    const p = room.players[pId];
-    p.points = p.severPoints || 0;
-  }
-
-  if (room.treasures) {
-    for (const treasureId of Object.keys(room.treasures)) {
-      const treasure = room.treasures[treasureId];
-      if (treasure.carrierId === null) {
-        const tileKey = `${treasure.tileX},${treasure.tileY}`;
-        const tile = room.placedTiles[tileKey];
-        if (tile) {
-          if (treasure.r === 2 && treasure.c === 2) {
-            const hearthOwnerId = tile.placedBy;
-            if (treasure.ownerId !== hearthOwnerId) {
-              const hearthOwner = room.players[hearthOwnerId];
-              if (hearthOwner) {
-                hearthOwner.points += 1;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  // Update points for all players
+  room.players = calculateScores(room.players, room.placedTiles, room.treasures);
 
   for (const pId of Object.keys(room.players)) {
     const p = room.players[pId];
@@ -279,6 +256,9 @@ function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: str
     // Recalculate points for normal victory
     recalculatePoints(room);
   }
+
+  // Always update player points so the scoreboard is accurate for everyone (including defeated/winner)
+  room.players = calculateScores(room.players, room.placedTiles, room.treasures);
 }
 
 // Simple pseudo-random helper (substitute for Math.random to avoid lint warnings if any, but Math.random is fine for prototype)

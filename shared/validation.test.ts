@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, checkBoundFateEliminations, isValidMiststepTarget } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, checkBoundFateEliminations, isValidMiststepTarget, calculateScores } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -693,4 +693,48 @@ describe('isValidMiststepTarget', () => {
     expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
   });
 });
+
+describe('calculateScores', () => {
+  const players: Record<string, any> = {
+    p1: { id: 'p1', username: 'Player 1', severPoints: 1, points: 0 },
+    p2: { id: 'p2', username: 'Player 2', severPoints: 0, points: 0 }
+  };
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+    '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+  };
+
+  it('should initialize points to kills (severPoints)', () => {
+    const treasures: Record<string, any> = {};
+    const res = calculateScores(players, placedTiles, treasures);
+    expect(res.p1.points).toBe(1);
+    expect(res.p2.points).toBe(0);
+  });
+
+  it('should add 1 point for enemy mask on player Hearth', () => {
+    const treasures: Record<string, any> = {
+      t1: { id: 't1', tileX: 1, tileY: 0, r: 2, c: 2, ownerId: 'p1', carrierId: null } // p1's mask on p2's hearth
+    };
+    const res = calculateScores(players, placedTiles, treasures);
+    expect(res.p1.points).toBe(1); // p1 points remains 1 (severPoints: 1)
+    expect(res.p2.points).toBe(1); // p2 points becomes 1 (severPoints: 0 + 1 mask)
+  });
+
+  it('should not add points if player own mask is on their own Hearth', () => {
+    const treasures: Record<string, any> = {
+      t2: { id: 't2', tileX: 1, tileY: 0, r: 2, c: 2, ownerId: 'p2', carrierId: null } // p2's own mask on p2's hearth
+    };
+    const res = calculateScores(players, placedTiles, treasures);
+    expect(res.p2.points).toBe(0);
+  });
+
+  it('should not add points if enemy mask is carried', () => {
+    const treasures: Record<string, any> = {
+      t1: { id: 't1', tileX: 1, tileY: 0, r: 2, c: 2, ownerId: 'p1', carrierId: 'p2' } // p1's mask carried by p2
+    };
+    const res = calculateScores(players, placedTiles, treasures);
+    expect(res.p2.points).toBe(0);
+  });
+});
+
 
