@@ -1982,8 +1982,8 @@ export default function App() {
                         {hasAura && (
                           <span style={{ display: 'flex', gap: '3px', marginLeft: '4px' }}>
                             {(player as any).hasTurnAside && <span title="Turn Aside Aura">🛡️</span>}
-                            {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura">🪨</span>}
-                            {(player as any).hasThorns && <span title="Thorns Talisman">🌵</span>}
+                            {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura">🪨{(player as any).spiritSkin > 1 && `x${(player as any).spiritSkin}`}</span>}
+                            {(player as any).hasThorns && <span title="Thorns Talisman">🌵{(player as any).thorns > 1 && `x${(player as any).thorns}`}</span>}
                           </span>
                         )}
                       </div>
@@ -2008,8 +2008,8 @@ export default function App() {
                       {hasAura && (
                         <div style={{ display: 'flex', gap: '2px', fontSize: '9px', marginTop: '2px', justifyContent: 'center', width: '100%' }}>
                           {(player as any).hasTurnAside && <span>🛡️</span>}
-                          {(player as any).hasSpiritSkin && <span>🪨</span>}
-                          {(player as any).hasThorns && <span>🌵</span>}
+                          {(player as any).hasSpiritSkin && <span>🪨{(player as any).spiritSkin > 1 && `x${(player as any).spiritSkin}`}</span>}
+                          {(player as any).hasThorns && <span>🌵{(player as any).thorns > 1 && `x${(player as any).thorns}`}</span>}
                         </div>
                       )}
                     </div>
@@ -2095,8 +2095,8 @@ export default function App() {
                     <span style={{ fontSize: '11px', color: '#94a3b8' }}>🛡️ Auras:</span>
                     <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold', display: 'flex', gap: '4px' }}>
                       {(player as any).hasTurnAside && <span title="Turn Aside Aura" style={{ color: 'var(--accent-cyan)' }}>🛡️</span>}
-                      {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura" style={{ color: 'var(--accent-green)' }}>🪨</span>}
-                      {(player as any).hasThorns && <span title="Thorns Talisman" style={{ color: '#FF6D00' }}>🌵</span>}
+                      {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura" style={{ color: 'var(--accent-green)' }}>🪨{(player as any).spiritSkin > 1 && `x${(player as any).spiritSkin}`}</span>}
+                      {(player as any).hasThorns && <span title="Thorns Talisman" style={{ color: '#FF6D00' }}>🌵{(player as any).thorns > 1 && `x${(player as any).thorns}`}</span>}
                     </span>
                   </div>
                 )}

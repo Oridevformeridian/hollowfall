@@ -25,6 +25,8 @@ export interface Player {
   hasThorns?: boolean;
   hasTurnAside?: boolean;
   hasSpiritSkin?: boolean;
+  thorns?: number;
+  spiritSkin?: number;
 }
 
 export interface Treasure {

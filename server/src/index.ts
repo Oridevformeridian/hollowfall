@@ -441,7 +441,9 @@ io.on('connection', (socket) => {
             hasAttackedThisTurn: false,
             isFirstTurnOfMatch: true,
             form: 'normal',
-            sessionToken: newSessionToken
+            sessionToken: newSessionToken,
+            thorns: 0,
+            spiritSkin: 0
           };
 
           room.players[playerId] = player;
@@ -663,6 +665,10 @@ io.on('connection', (socket) => {
               p.hasAttackedThisTurn = false;
               p.isFirstTurnOfMatch = true;
               p.form = 'normal';
+              p.thorns = 0;
+              p.spiritSkin = 0;
+              p.hasThorns = false;
+              p.hasSpiritSkin = false;
               // Find a tile placed by this player
               const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === pId);
               if (playerTile) {
@@ -956,12 +962,24 @@ io.on('connection', (socket) => {
               targetPlayer.hasTurnAside = false;
               countered = 'turn_aside';
               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Turn Aside aura countered ${card.name}!`);
-            } else if (targetPlayer.hasSpiritSkin) {
-              targetPlayer.hasSpiritSkin = false;
+            } else if (targetPlayer.hasSpiritSkin && (targetPlayer.spiritSkin || 0) > 0) {
               countered = 'spirit_skin';
-              const reducedDmg = Math.max(0, damage - 2);
-              targetPlayer.thread = Math.max(0, targetPlayer.thread - reducedDmg);
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura reduced ${card.name} damage by 2 (took ${reducedDmg} damage).`);
+              const spiritSkinStacks = targetPlayer.spiritSkin || 0;
+              const blockedDmg = Math.min(damage, 2 * spiritSkinStacks);
+              const remainingDmg = damage - blockedDmg;
+              const expended = Math.ceil(blockedDmg / 2);
+
+              targetPlayer.spiritSkin = spiritSkinStacks - expended;
+              if (targetPlayer.spiritSkin <= 0) {
+                targetPlayer.hasSpiritSkin = false;
+              }
+
+              targetPlayer.thread = Math.max(0, targetPlayer.thread - remainingDmg);
+              if (remainingDmg === 0) {
+                broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura (x${spiritSkinStacks}) blocked all ${damage} damage (consumed ${expended} stacks).`);
+              } else {
+                broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura (x${spiritSkinStacks}) reduced ${card.name} damage by ${blockedDmg} (took ${remainingDmg} damage, consumed ${expended} stacks).`);
+              }
             } else {
               targetPlayer.thread = Math.max(0, targetPlayer.thread - damage);
               broadcastSystemMessage(currentRoomCode, `${player.username} cast ${card.name} on ${targetPlayer.username} for ${damage} damage!`);
@@ -977,9 +995,16 @@ io.on('connection', (socket) => {
             }
 
             // Thorns retaliation
-            if (targetPlayer.hasThorns && countered !== 'turn_aside') {
-              player.thread = Math.max(0, player.thread - 1);
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+            if (targetPlayer.hasThorns && (targetPlayer.thorns || 0) > 0 && countered !== 'turn_aside') {
+              const thornsStacks = targetPlayer.thorns || 0;
+              const retaliationDmg = thornsStacks;
+              const expended = Math.ceil(thornsStacks / 2);
+              targetPlayer.thorns = thornsStacks - expended;
+              if (targetPlayer.thorns <= 0) {
+                targetPlayer.hasThorns = false;
+              }
+              player.thread = Math.max(0, player.thread - retaliationDmg);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns (x${thornsStacks}) retaliated, dealing ${retaliationDmg} damage to ${player.username}!`);
               // Check if player died from thorns
               if (player.thread <= 0) {
                 handlePlayerDefeated(room, playerId, targetPlayerId, `${player.username} was defeated by Thorns retaliation from ${targetPlayer.username}!`, currentRoomCode);
@@ -1088,8 +1113,9 @@ io.on('connection', (socket) => {
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
           } else if (card.id === 'ash_spirit_skin') {
+            player.spiritSkin = (player.spiritSkin || 0) + 1;
             player.hasSpiritSkin = true;
-            broadcastSystemMessage(currentRoomCode, `${player.username} cast Spirit-Skin, gaining a damage-reduction shield.`);
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Spirit-Skin, gaining a damage-reduction shield (Stack count: ${player.spiritSkin}).`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -1098,8 +1124,9 @@ io.on('connection', (socket) => {
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
           } else if (card.id === 'talisman_thorns') {
+            player.thorns = (player.thorns || 0) + 1;
             player.hasThorns = true;
-            broadcastSystemMessage(currentRoomCode, `${player.username} invoked the Thorns talisman, enabling retaliation against attacks.`);
+            broadcastSystemMessage(currentRoomCode, `${player.username} invoked the Thorns talisman, enabling retaliation against attacks (Stack count: ${player.thorns}).`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -1341,10 +1368,14 @@ io.on('connection', (socket) => {
             let tookDamage = false;
             let damageDealt = 0;
             let blockedBySpiritSkin = false;
-            if (targetPlayer.hasSpiritSkin) {
-              targetPlayer.hasSpiritSkin = false;
+            if (targetPlayer.hasSpiritSkin && (targetPlayer.spiritSkin || 0) > 0) {
+              const spiritSkinStacks = targetPlayer.spiritSkin || 0;
+              targetPlayer.spiritSkin = spiritSkinStacks - 1;
+              if (targetPlayer.spiritSkin <= 0) {
+                targetPlayer.hasSpiritSkin = false;
+              }
               blockedBySpiritSkin = true;
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura blocked the Lash damage!`);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura blocked the Lash damage! (1 stack consumed, ${targetPlayer.spiritSkin} stacks left).`);
             } else {
               targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
               tookDamage = true;
@@ -1364,9 +1395,16 @@ io.on('connection', (socket) => {
             io.to(currentRoomCode).emit('message', JSON.stringify(lashAnimMsg));
 
             // Thorns retaliation
-            if (targetPlayer.hasThorns && tookDamage) {
-              player.thread = Math.max(0, player.thread - 1);
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+            if (targetPlayer.hasThorns && (targetPlayer.thorns || 0) > 0 && tookDamage) {
+              const thornsStacks = targetPlayer.thorns || 0;
+              const retaliationDmg = thornsStacks;
+              const expended = Math.ceil(thornsStacks / 2);
+              targetPlayer.thorns = thornsStacks - expended;
+              if (targetPlayer.thorns <= 0) {
+                targetPlayer.hasThorns = false;
+              }
+              player.thread = Math.max(0, player.thread - retaliationDmg);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns (x${thornsStacks}) retaliated, dealing ${retaliationDmg} damage to ${player.username}!`);
               // Check if player died from Thorns
               if (player.thread <= 0) {
                 handlePlayerDefeated(room, playerId, targetPlayerId, `${player.username} was defeated by Thorns retaliation from ${targetPlayer.username}!`, currentRoomCode);
