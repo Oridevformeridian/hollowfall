@@ -2470,6 +2470,7 @@ export default function App() {
                          return (
                            <div
                              key={tr.id}
+                             title={`${owner?.username || 'Enemy'}'s Mask`}
                              style={{
                                position: 'absolute',
                                left: `${tr.c * subCellSize}px`,
@@ -2483,7 +2484,8 @@ export default function App() {
                                justifyContent: 'center',
                                filter: `drop-shadow(0 0 6px ${ownerColor})`,
                                zIndex: 27,
-                               pointerEvents: 'none',
+                               pointerEvents: 'auto',
+                               cursor: 'help',
                                userSelect: 'none'
                              }}
                            >
