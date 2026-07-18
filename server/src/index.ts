@@ -1044,11 +1044,11 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
-            // Check cardinal movement and distance <= 4 Manhattan (with wrap-around)
+            // Check cardinal movement and distance <= 3 Manhattan (with wrap-around)
             const from = room.tokenPositions[playerId];
             if (!from) return;
             if (!isValidMiststepTarget(from, target, room.placedTiles)) {
-              sendError(socket, 'Miststep must target a cell in a cardinal direction up to 4 cells away.');
+              sendError(socket, 'Miststep must target a cell in a cardinal direction up to 3 cells away.');
               return;
             }
             room.tokenPositions[playerId] = {

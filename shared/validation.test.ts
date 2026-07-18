@@ -661,7 +661,7 @@ describe('isValidMiststepTarget', () => {
     expect(isValidMiststepTarget(from, to, placedTiles)).toBe(true);
   });
 
-  it('should return true for valid crossing cardinal move across tiles within distance 4', () => {
+  it('should return true for valid crossing cardinal move across tiles within distance 3', () => {
     const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
     const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 1 };
     // globalC_from = 4, globalC_to = 6 -> dist = 2
@@ -680,11 +680,16 @@ describe('isValidMiststepTarget', () => {
     expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
   });
 
-  it('should return false for cardinal move that is too far (dist > 4)', () => {
-    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
-    const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 2 };
-    // globalC_from = 2, globalC_to = 7 -> dist = 5
-    expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
+  it('should return false for cardinal move that is too far (dist >= 4)', () => {
+    // from (0, 0, 2, 4) to (1, 0, 2, 3) -> globalC_from = 4, globalC_to = 8 -> dist = 4
+    const fromAcross: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
+    const toAcross: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 3 };
+    expect(isValidMiststepTarget(fromAcross, toAcross, placedTiles)).toBe(false);
+
+    // from (0, 0, 2, 2) to (1, 0, 2, 2) -> globalC_from = 2, globalC_to = 7 -> dist = 5
+    const fromFar: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const toFar: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 2 };
+    expect(isValidMiststepTarget(fromFar, toFar, placedTiles)).toBe(false);
   });
 
   it('should return false for same cell (dist 0)', () => {

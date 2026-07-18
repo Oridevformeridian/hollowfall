@@ -172,7 +172,7 @@ export const BASIC_CARDS: Card[] = [
     id: 'working_miststep',
     name: 'Miststep',
     type: 'working',
-    description: 'Teleport to any cell up to 4 distance in a cardinal direction (N/S/E/W), ignoring LOS.'
+    description: 'Teleport to any cell up to 3 distance in a cardinal direction (N/S/E/W), ignoring LOS.'
   },
   {
     id: 'working_raise_stone',

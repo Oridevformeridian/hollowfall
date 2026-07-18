@@ -523,7 +523,7 @@ export function getWrappingManhattanDistance(
 
 /**
  * Validates if the target cell is a valid Miststep destination.
- * Miststep can only target cells in cardinal directions (N/S/E/W) up to distance 4.
+ * Miststep can only target cells in cardinal directions (N/S/E/W) up to distance 3.
  */
 export function isValidMiststepTarget(
   from: TokenPosition,
@@ -537,7 +537,7 @@ export function isValidMiststepTarget(
   if (!isCardinal) return false;
 
   const dist = getWrappingManhattanDistance(from, to, placedTiles);
-  return dist > 0 && dist <= 4;
+  return dist > 0 && dist <= 3;
 }
 
 
