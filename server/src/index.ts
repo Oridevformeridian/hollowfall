@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations } from '../../shared/validation';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget } from '../../shared/validation';
 import { HEROES } from '../../shared/constants';
 import { buildDeckForEmoji, shuffle, getRemainingDeckForReshuffle } from '../../shared/deck';
 
@@ -1039,12 +1039,11 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
-            // Check distance <= 4 Manhattan (with wrap-around)
+            // Check cardinal movement and distance <= 4 Manhattan (with wrap-around)
             const from = room.tokenPositions[playerId];
             if (!from) return;
-            const dist = getWrappingManhattanDistance(from, target, room.placedTiles);
-            if (dist > 4) {
-              sendError(socket, 'Target is too far (max distance 4 cells).');
+            if (!isValidMiststepTarget(from, target, room.placedTiles)) {
+              sendError(socket, 'Miststep must target a cell in a cardinal direction up to 4 cells away.');
               return;
             }
             room.tokenPositions[playerId] = {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, checkBoundFateEliminations } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, checkBoundFateEliminations, isValidMiststepTarget } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -642,3 +642,55 @@ describe('checkBoundFateEliminations', () => {
     expect(eliminated).toEqual([]);
   });
 });
+
+describe('isValidMiststepTarget', () => {
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+    '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+  };
+
+  it('should return true for valid horizontal cardinal move on same tile', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
+    expect(isValidMiststepTarget(from, to, placedTiles)).toBe(true);
+  });
+
+  it('should return true for valid vertical cardinal move on same tile', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 0, c: 2 };
+    expect(isValidMiststepTarget(from, to, placedTiles)).toBe(true);
+  });
+
+  it('should return true for valid crossing cardinal move across tiles within distance 4', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
+    const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 1 };
+    // globalC_from = 4, globalC_to = 6 -> dist = 2
+    expect(isValidMiststepTarget(from, to, placedTiles)).toBe(true);
+  });
+
+  it('should return false for diagonal move (non-cardinal)', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 3 };
+    expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
+  });
+
+  it('should return false for L-shaped move (non-cardinal)', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 4 };
+    expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
+  });
+
+  it('should return false for cardinal move that is too far (dist > 4)', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 2 };
+    // globalC_from = 2, globalC_to = 7 -> dist = 5
+    expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
+  });
+
+  it('should return false for same cell (dist 0)', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
+  });
+});
+

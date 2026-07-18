@@ -521,6 +521,26 @@ export function getWrappingManhattanDistance(
   return diffC + diffR;
 }
 
+/**
+ * Validates if the target cell is a valid Miststep destination.
+ * Miststep can only target cells in cardinal directions (N/S/E/W) up to distance 4.
+ */
+export function isValidMiststepTarget(
+  from: TokenPosition,
+  to: TokenPosition,
+  placedTiles: Record<string, PlacedTile>
+): boolean {
+  // Must be in a cardinal direction (N/S/E/W) from the starting position:
+  // - North/South: same column (tileX and cell column c are identical)
+  // - East/West: same row (tileY and cell row r are identical)
+  const isCardinal = (from.tileX === to.tileX && from.c === to.c) || (from.tileY === to.tileY && from.r === to.r);
+  if (!isCardinal) return false;
+
+  const dist = getWrappingManhattanDistance(from, to, placedTiles);
+  return dist > 0 && dist <= 4;
+}
+
+
 
 /**
  * Validates player token movement step.

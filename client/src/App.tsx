@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget } from './shared/validation.ts';
 
 const renderTileSvgContent = (
   layout: TileLayout,
@@ -2307,8 +2307,7 @@ export default function App() {
                           // 3. Miststep targeting
                           let isMiststepTarget = false;
                           if (targetingCardId === 'working_miststep' && isActiveTurn && myTokenPos) {
-                            const dist = getWrappingManhattanDistance(myTokenPos, targetPos, gameState.placedTiles);
-                            isMiststepTarget = dist <= 4 && !occupiedPlayerId;
+                            isMiststepTarget = isValidMiststepTarget(myTokenPos, targetPos, gameState.placedTiles) && !occupiedPlayerId;
                           }
 
                           // 3.5. Don the Wolf targeting
