@@ -3574,13 +3574,24 @@ export default function App() {
             
             {(() => {
               const target = gameState.victoryPointsTarget || 2;
-              const winner = Object.values(gameState.players).find(p => p.points >= target);
+              let winner = Object.values(gameState.players).find(p => p.points >= target);
+              let winReason = `Successfully reached ${target} victory points!`;
+              
+              if (!winner) {
+                // Find sole survivor
+                const survivors = Object.values(gameState.players).filter(p => p.thread > 0 && !p.hasConceded);
+                if (survivors.length === 1) {
+                  winner = survivors[0];
+                  winReason = 'Last Walker standing!';
+                }
+              }
+
               if (winner) {
                 return (
                   <div style={{ margin: '24px 0' }}>
                     <span style={{ fontSize: '64px', display: 'block', margin: '8px 0', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.4))' }}>{winner.emoji}</span>
                     <h3 style={{ fontSize: '24px', color: 'white', margin: '0', fontWeight: 'bold' }}>{winner.username} Wins!</h3>
-                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>Successfully reached {target} victory points!</p>
+                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>{winReason}</p>
                   </div>
                 );
               }
@@ -3597,16 +3608,26 @@ export default function App() {
               </div>
               {(() => {
                 const target = gameState.victoryPointsTarget || 2;
-                return Object.values(gameState.players).map(p => (
-                  <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', gap: '8px', fontSize: '13px', color: 'white', padding: '4px 0' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>{p.emoji}</span>
-                      <span style={{ fontWeight: p.points >= target ? 'bold' : 'normal', color: p.points >= target ? 'var(--accent-gold)' : 'white' }}>{p.username}</span>
-                    </span>
-                    <span style={{ textAlign: 'center' }}>{p.severPoints || 0}</span>
-                    <span style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--accent-gold)' }}>{p.points} / {target}</span>
-                  </div>
-                ));
+                let winner = Object.values(gameState.players).find(p => p.points >= target);
+                if (!winner) {
+                  const survivors = Object.values(gameState.players).filter(p => p.thread > 0 && !p.hasConceded);
+                  if (survivors.length === 1) {
+                    winner = survivors[0];
+                  }
+                }
+                return Object.values(gameState.players).map(p => {
+                  const isWinner = winner && p.id === winner.id;
+                  return (
+                    <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', gap: '8px', fontSize: '13px', color: 'white', padding: '4px 0' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{p.emoji}</span>
+                        <span style={{ fontWeight: isWinner ? 'bold' : 'normal', color: isWinner ? 'var(--accent-gold)' : 'white' }}>{p.username}</span>
+                      </span>
+                      <span style={{ textAlign: 'center' }}>{p.severPoints || 0}</span>
+                      <span style={{ textAlign: 'center', fontWeight: 'bold', color: isWinner ? 'var(--accent-gold)' : '#94a3b8' }}>{p.points} / {target}</span>
+                    </div>
+                  );
+                });
               })()}
             </div>
 

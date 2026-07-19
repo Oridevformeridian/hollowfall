@@ -790,6 +790,12 @@ export function getActiveRainbowBridges(placedTiles: Record<string, PlacedTile>)
  */
 export function checkBoundFateEliminations(room: GameState): PlayerId[] {
   const eliminated: PlayerId[] = [];
+  
+  // If target is greater than 2 (Long Hunt variant), Bound Fate elimination is disabled
+  if (room.victoryPointsTarget && room.victoryPointsTarget > 2) {
+    return eliminated;
+  }
+
   const alivePlayers = Object.values(room.players).filter(p => p.thread > 0 && !p.hasConceded);
 
   for (const player of alivePlayers) {

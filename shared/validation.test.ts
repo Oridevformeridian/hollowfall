@@ -641,6 +641,24 @@ describe('checkBoundFateEliminations', () => {
     const eliminated = checkBoundFateEliminations(room);
     expect(eliminated).toEqual([]);
   });
+
+  it('should not eliminate a player under Bound Fate if victoryPointsTarget > 2', () => {
+    const room = createMockRoom();
+    room.victoryPointsTarget = 3;
+    // Both of p1's masks are on p2's Hearth
+    room.treasures.t1_1.tileX = 1;
+    room.treasures.t1_1.tileY = 0;
+    room.treasures.t1_1.r = 2;
+    room.treasures.t1_1.c = 2;
+
+    room.treasures.t1_2.tileX = 1;
+    room.treasures.t1_2.tileY = 0;
+    room.treasures.t1_2.r = 2;
+    room.treasures.t1_2.c = 2;
+
+    const eliminated = checkBoundFateEliminations(room);
+    expect(eliminated).toEqual([]);
+  });
 });
 
 describe('isValidMiststepTarget', () => {
