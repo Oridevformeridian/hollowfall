@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget } from './shared/validation.ts';
+import { buildDeckForEmoji } from './shared/deck.ts';
 
 const renderTileSvgContent = (
   layout: TileLayout,
@@ -1388,42 +1389,62 @@ export default function App() {
                             {hero.class}
                           </span>
 
-                          {hoveredHeroIndex === idx && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: '110px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                zIndex: 300,
-                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                                backdropFilter: 'blur(10px)',
-                                border: `1px solid ${hero.color}88`,
-                                borderRadius: '12px',
-                                padding: '10px 14px',
-                                width: '220px',
-                                boxShadow: `0 8px 30px rgba(0,0,0,0.8), 0 0 10px ${hero.color}33`,
-                                boxSizing: 'border-box',
-                                pointerEvents: 'none',
-                                textAlign: 'center'
-                              }}
-                            >
-                              <div style={{ fontWeight: '900', fontSize: '13px', color: 'white', letterSpacing: '0.5px' }}>
-                                {hero.name}
-                              </div>
-                              <div style={{ fontSize: '11px', color: hero.color, fontWeight: 'bold', marginTop: '2px', textTransform: 'uppercase' }}>
-                                {hero.class} Specialty
-                              </div>
-                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '8px', paddingTop: '8px' }}>
-                                <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-                                  Signature Cards (8x)
+                          {hoveredHeroIndex === idx && (() => {
+                            const deck = buildDeckForEmoji(hero.emoji);
+                            const counts: Record<string, number> = {};
+                            deck.forEach(c => {
+                              counts[c.name] = (counts[c.name] || 0) + 1;
+                            });
+                            const sortedDeckList = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                            return (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  bottom: '110px',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  zIndex: 300,
+                                  backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                                  backdropFilter: 'blur(16px)',
+                                  border: `1.5px solid ${hero.color}`,
+                                  borderRadius: '12px',
+                                  padding: '12px 16px',
+                                  width: '240px',
+                                  boxShadow: `0 12px 40px rgba(0,0,0,0.9), 0 0 15px ${hero.color}44`,
+                                  boxSizing: 'border-box',
+                                  pointerEvents: 'none',
+                                  textAlign: 'left'
+                                }}
+                              >
+                                <div style={{ fontWeight: '900', fontSize: '13px', color: 'white', letterSpacing: '0.5px', textAlign: 'center' }}>
+                                  {hero.name}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 'bold', marginTop: '3px' }}>
-                                  {hero.signatureCards.join(', ')}
+                                <div style={{ fontSize: '11px', color: hero.color, fontWeight: 'bold', marginTop: '2px', textTransform: 'uppercase', textAlign: 'center' }}>
+                                  {hero.class} Specialty
+                                </div>
+                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '8px', paddingTop: '8px' }}>
+                                  <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                                    Starting Deck (40 cards):
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                    {sortedDeckList.map(([cardName, count]) => {
+                                      const isSignature = hero.signatureCards.includes(cardName);
+                                      return (
+                                        <div key={cardName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                                          <span style={{ fontWeight: isSignature ? 'bold' : 'normal', color: isSignature ? hero.color : 'inherit' }}>
+                                            {cardName} {isSignature && '★'}
+                                          </span>
+                                          <span style={{ fontWeight: 'bold', color: isSignature ? hero.color : '#64748b' }}>
+                                            {count}x
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -3353,7 +3374,16 @@ export default function App() {
                   onMouseEnter={() => setHoveredCardId(cardKey)}
                   onMouseLeave={() => setHoveredCardId(null)}
                   onClick={() => {
-                    if (!canCast) return;
+                    if (!canCast) {
+                      if (isMobile) {
+                        if (isSelected) {
+                          setSelectedCardId(null);
+                        } else {
+                          setSelectedCardId(cardKey);
+                        }
+                      }
+                      return;
+                    }
                     if (isMobile) {
                       if (isSelected) {
                         setSelectedCardId(null);
