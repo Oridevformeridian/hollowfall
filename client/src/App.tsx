@@ -2510,6 +2510,10 @@ export default function App() {
                             }
                           }
 
+                          const cellTreasure = gameState.treasures
+                            ? Object.values(gameState.treasures).find(t => t.tileX === x && t.tileY === y && t.r === r && t.c === c && t.carrierId === null)
+                            : null;
+
                           // 4. Raise Stone cell detection (player's current cell)
                           const isRaiseStoneCell = targetingCardId === 'working_raise_stone' && isActiveTurn && myTokenPos && myTokenPos.tileX === x && myTokenPos.tileY === y && myTokenPos.r === r && myTokenPos.c === c;
 
@@ -2551,8 +2555,14 @@ export default function App() {
                               }}
                               style={{
                                 position: 'relative',
-                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || occupiedPlayerId) ? 'pointer' : 'default',
-                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || isRaiseStoneCell || occupiedPlayerId) ? 'auto' : 'none',
+                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget)
+                                  ? 'pointer'
+                                  : cellTreasure
+                                  ? 'help'
+                                  : occupiedPlayerId
+                                  ? 'pointer'
+                                  : 'default',
+                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || isRaiseStoneCell || occupiedPlayerId || !!cellTreasure) ? 'auto' : 'none',
                                 border: lashablePlayer
                                   ? '2px solid var(--accent-crimson)'
                                   : isValidMove
@@ -2583,20 +2593,22 @@ export default function App() {
                                 transition: 'all 0.15s ease'
                               }}
                               title={
-                                isValidMove
-                                  ? 'Move here'
-                                  : isKindleTarget
-                                  ? 'Target with Kindle the Storm'
-                                  : isMiststepTarget
-                                  ? 'Teleport here'
-                                  : isDonWolfTarget
-                                  ? 'Wolf Leap here'
-                                  : isShiftSpiritTarget
-                                  ? 'Swap positions with Shift Spirit'
-                                  : ''
-                              }
-                            >
-                              {/* Edge-zone selectors for Raise Stone */}
+                                (() => {
+                                  let baseTitle = '';
+                                  if (isValidMove) baseTitle = 'Move here';
+                                  else if (isKindleTarget) baseTitle = 'Target with Kindle the Storm';
+                                  else if (isMiststepTarget) baseTitle = 'Teleport here';
+                                  else if (isDonWolfTarget) baseTitle = 'Wolf Leap here';
+                                  else if (isShiftSpiritTarget) baseTitle = 'Swap positions with Shift Spirit';
+                                  
+                                  if (cellTreasure) {
+                                    const owner = gameState.players[cellTreasure.ownerId];
+                                    const maskText = `${owner?.username || 'Enemy'}'s Mask`;
+                                    return baseTitle ? `${baseTitle} (${maskText})` : maskText;
+                                  }
+                                  return baseTitle || undefined;
+                                })()
+                              }>
                               {isRaiseStoneCell && (
                                 <>
                                   {r > 0 && (
@@ -2654,7 +2666,6 @@ export default function App() {
                          return (
                            <div
                              key={tr.id}
-                             title={`${owner?.username || 'Enemy'}'s Mask`}
                              style={{
                                position: 'absolute',
                                left: `${tr.c * subCellSize}px`,
@@ -2668,8 +2679,7 @@ export default function App() {
                                justifyContent: 'center',
                                filter: `drop-shadow(0 0 6px ${ownerColor})`,
                                zIndex: 27,
-                               pointerEvents: 'auto',
-                               cursor: 'help',
+                               pointerEvents: 'none',
                                userSelect: 'none'
                              }}
                            >
