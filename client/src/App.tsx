@@ -25,6 +25,12 @@ const renderTileSvgContent = (
   const cells = [];
   for (let r = 0; r < 5; r++) {
     for (let c = 0; c < 5; c++) {
+      const tileX = tilePos ? tilePos.x : 0;
+      const tileY = tilePos ? tilePos.y : 0;
+      const globalR = tilePos ? tileY * 5 + r : r;
+      const globalC = tilePos ? tileX * 5 + c : c;
+      const isEven = (globalR + globalC) % 2 === 0;
+
       cells.push(
         <rect
           key={`cell-${r}-${c}`}
@@ -32,7 +38,7 @@ const renderTileSvgContent = (
           y={r * 20}
           width="20"
           height="20"
-          fill="rgba(255, 255, 255, 0.01)"
+          fill={isEven ? 'rgba(255, 255, 255, 0.035)' : 'rgba(0, 0, 0, 0.3)'}
           stroke="rgba(255, 255, 255, 0.05)"
           strokeWidth="0.5"
         />
@@ -2931,7 +2937,7 @@ export default function App() {
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6 }}>
                     <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100">
                       <g transform={`rotate(${rotation} 50 50)`}>
-                        {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF')}
+                        {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF', { x, y })}
                       </g>
                     </svg>
                   </div>
