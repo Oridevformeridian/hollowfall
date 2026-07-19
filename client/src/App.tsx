@@ -383,6 +383,101 @@ function playVictoryChime() {
   }
 }
 
+function playMajorChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    
+    // C Major: C4 (261.63), E4 (329.63), G4 (392.00), C5 (523.25)
+    const freqs = [261.63, 329.63, 392.00, 523.25];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+      
+      gain.gain.setValueAtTime(0, now + idx * 0.1);
+      gain.gain.linearRampToValueAtTime(0.12, now + idx * 0.1 + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.1 + 0.8);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.1);
+      osc.stop(now + idx * 0.1 + 0.9);
+    });
+  } catch (e) {
+    console.error('playMajorChime failed:', e);
+  }
+}
+
+function playMinorChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    
+    // C Minor (falling): Eb5 (622.25), C5 (523.25), G4 (392.00), Eb4 (311.13)
+    const freqs = [622.25, 523.25, 392.00, 311.13];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+      
+      gain.gain.setValueAtTime(0, now + idx * 0.12);
+      gain.gain.linearRampToValueAtTime(0.12, now + idx * 0.12 + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.12 + 0.9);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.12);
+      osc.stop(now + idx * 0.12 + 1.0);
+    });
+  } catch (e) {
+    console.error('playMinorChime failed:', e);
+  }
+}
+
+function playDeathChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    
+    // Low dark descending growl: G3 (196.00), F#3 (185.00), Eb3 (155.56), C3 (130.81)
+    const freqs = [196.00, 185.00, 155.56, 130.81];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.18);
+      
+      gain.gain.setValueAtTime(0, now + idx * 0.18);
+      gain.gain.linearRampToValueAtTime(0.15, now + idx * 0.18 + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.18 + 1.2);
+      
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(400, now);
+      filter.Q.setValueAtTime(1, now);
+      
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start(now + idx * 0.18);
+      osc.stop(now + idx * 0.18 + 1.3);
+    });
+  } catch (e) {
+    console.error('playDeathChime failed:', e);
+  }
+}
+
 const ANIMALS = ['frog', 'duck', 'crab', 'bear', 'lion', 'wolf', 'deer', 'goat', 'owl', 'fish', 'fox', 'bird', 'cat', 'dog', 'pig'];
 const ITEMS = ['cup', 'spoon', 'fork', 'pen', 'book', 'key', 'bag', 'shoe', 'hat', 'box', 'bowl', 'lamp', 'door', 'desk', 'clock'];
 const COLORS = ['red', 'blue', 'green', 'pink', 'gray', 'teal', 'gold', 'yellow', 'black', 'white', 'orange', 'brown', 'purple'];
@@ -468,6 +563,46 @@ export default function App() {
   const gameStateRef = React.useRef(gameState);
   useEffect(() => {
     gameStateRef.current = gameState;
+  }, [gameState]);
+
+  const prevGameStateRef = React.useRef<any>(null);
+  useEffect(() => {
+    const prev = prevGameStateRef.current;
+    const current = gameState;
+    
+    // Update ref
+    prevGameStateRef.current = gameState;
+
+    if (!prev || !current || current.phase !== 'GAMEPLAY') return;
+
+    let pointGained = false;
+    let pointLost = false;
+    let playerKilled = false;
+
+    for (const [pId, p] of Object.entries(current.players)) {
+      const prevPlayer = prev.players[pId];
+      if (prevPlayer) {
+        if ((p as any).points > prevPlayer.points) {
+          pointGained = true;
+        } else if ((p as any).points < prevPlayer.points) {
+          pointLost = true;
+        }
+
+        if (prevPlayer.thread > 0 && (p as any).thread <= 0) {
+          playerKilled = true;
+        }
+      }
+    }
+
+    if (current.phase === 'GAMEPLAY') {
+      if (pointGained) {
+        playMajorChime();
+      } else if (pointLost) {
+        playMinorChime();
+      } else if (playerKilled) {
+        playDeathChime();
+      }
+    }
   }, [gameState]);
 
 
