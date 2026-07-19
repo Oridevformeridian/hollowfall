@@ -535,6 +535,52 @@ function playThwupSound() {
   }
 }
 
+function playTurnStartRiff() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+
+    // "dun DUN dun" riff notes
+    const notes = [
+      { freq: 130.81, start: 0, dur: 0.18, gainVal: 0.18 }, // C3
+      { freq: 261.63, start: 0.22, dur: 0.35, gainVal: 0.28 }, // C4 (accented)
+      { freq: 196.00, start: 0.62, dur: 0.3, gainVal: 0.2 } // G3
+    ];
+
+    notes.forEach((note) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(note.freq, now + note.start);
+
+      // Lowpass Wah/Punch filter envelope
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(300, now + note.start);
+      filter.frequency.exponentialRampToValueAtTime(1200, now + note.start + 0.05);
+      filter.frequency.exponentialRampToValueAtTime(250, now + note.start + note.dur);
+      filter.Q.setValueAtTime(1.5, now);
+
+      // Volume envelope
+      gain.gain.setValueAtTime(0, now + note.start);
+      gain.gain.linearRampToValueAtTime(note.gainVal, now + note.start + 0.03); // Fast attack
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + note.start + note.dur); // Decay
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now + note.start);
+      osc.stop(now + note.start + note.dur + 0.1);
+    });
+  } catch (e) {
+    console.error('playTurnStartRiff failed:', e);
+  }
+}
+
 const ANIMALS = ['frog', 'duck', 'crab', 'bear', 'lion', 'wolf', 'deer', 'goat', 'owl', 'fish', 'fox', 'bird', 'cat', 'dog', 'pig'];
 const ITEMS = ['cup', 'spoon', 'fork', 'pen', 'book', 'key', 'bag', 'shoe', 'hat', 'box', 'bowl', 'lamp', 'door', 'desk', 'clock'];
 const COLORS = ['red', 'blue', 'green', 'pink', 'gray', 'teal', 'gold', 'yellow', 'black', 'white', 'orange', 'brown', 'purple'];
@@ -632,7 +678,28 @@ export default function App() {
     // Update ref
     prevGameStateRef.current = gameState;
 
-    if (!prev || !current || current.phase !== 'GAMEPLAY') return;
+    if (!prev || !current) return;
+
+    // Check for turn change starting riff
+    const isNowGameplay = current.phase === 'GAMEPLAY';
+    const wasGameplay = prev.phase === 'GAMEPLAY';
+
+    if (isNowGameplay) {
+      const prevActiveId = wasGameplay && prev.turnOrder && prev.activePlayerIndex !== undefined
+        ? prev.turnOrder[prev.activePlayerIndex]
+        : null;
+      const currentActiveId = current.turnOrder && current.activePlayerIndex !== undefined
+        ? current.turnOrder[current.activePlayerIndex]
+        : null;
+
+      if (currentActiveId && socket?.id && currentActiveId === socket.id) {
+        if (!wasGameplay || currentActiveId !== prevActiveId) {
+          playTurnStartRiff();
+        }
+      }
+    }
+
+    if (current.phase !== 'GAMEPLAY' || prev.phase !== 'GAMEPLAY') return;
 
     let pointGained = false;
     let pointLost = false;
@@ -653,14 +720,12 @@ export default function App() {
       }
     }
 
-    if (current.phase === 'GAMEPLAY') {
-      if (pointGained) {
-        playMajorChime();
-      } else if (pointLost) {
-        playMinorChime();
-      } else if (playerKilled) {
-        playDeathChime();
-      }
+    if (pointGained) {
+      playMajorChime();
+    } else if (pointLost) {
+      playMinorChime();
+    } else if (playerKilled) {
+      playDeathChime();
     }
   }, [gameState]);
 
