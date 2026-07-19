@@ -72,7 +72,6 @@ function concedePlayer(roomCode: string, pId: string) {
     // Give victory points to the remaining player if there is one
     if (nonConcededPlayers.length === 1) {
       const winner = nonConcededPlayers[0];
-      winner.severPoints = Math.max(winner.severPoints || 0, room.victoryPointsTarget || 2);
       recalculatePoints(room);
       broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
     }
@@ -249,7 +248,6 @@ function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: str
     room.phase = 'GAME_OVER';
     if (alivePlayers.length === 1) {
       const winner = alivePlayers[0];
-      winner.severPoints = Math.max(winner.severPoints || 0, room.victoryPointsTarget || 2);
       broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
     }
   } else {
