@@ -479,6 +479,62 @@ function playDeathChime() {
   }
 }
 
+function playThwupSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    
+    // 1. Noise sweep (friction of sliding card)
+    const bufferSize = ctx.sampleRate * 0.12; // 120ms
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    
+    const noiseSource = ctx.createBufferSource();
+    noiseSource.buffer = buffer;
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1000, now);
+    filter.frequency.exponentialRampToValueAtTime(200, now + 0.12);
+    filter.Q.setValueAtTime(4, now);
+    
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.15, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    
+    noiseSource.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+    
+    // 2. Triangle pitch sweep (card body vibration / snap)
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.08);
+    
+    oscGain.gain.setValueAtTime(0.2, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    
+    osc.connect(oscGain);
+    oscGain.connect(ctx.destination);
+    
+    noiseSource.start(now);
+    osc.start(now);
+    
+    noiseSource.stop(now + 0.12);
+    osc.stop(now + 0.12);
+  } catch (err) {
+    console.error("Failed to play card thwup sound:", err);
+  }
+}
+
 const ANIMALS = ['frog', 'duck', 'crab', 'bear', 'lion', 'wolf', 'deer', 'goat', 'owl', 'fish', 'fox', 'bird', 'cat', 'dog', 'pig'];
 const ITEMS = ['cup', 'spoon', 'fork', 'pen', 'book', 'key', 'bag', 'shoe', 'hat', 'box', 'bowl', 'lamp', 'door', 'desk', 'clock'];
 const COLORS = ['red', 'blue', 'green', 'pink', 'gray', 'teal', 'gold', 'yellow', 'black', 'white', 'orange', 'brown', 'purple'];
@@ -530,6 +586,8 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [flingingCardId, setFlingingCardId] = useState<string | null>(null);
+  const [clientHand, setClientHand] = useState<{ id: string; name: string; type: string; description: string; clientId: string }[]>([]);
+  const handClientIdsRef = React.useRef<{ id: string; clientId: string }[]>([]);
 
   const [combatPopups, setCombatPopups] = useState<{
     id: string;
@@ -929,6 +987,46 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (!self) {
+      setClientHand([]);
+      handClientIdsRef.current = [];
+      return;
+    }
+
+    const currentHand = self.hand || [];
+    const prevClientHand = handClientIdsRef.current;
+    const newClientHand: typeof clientHand = [];
+    const pool = [...prevClientHand];
+
+    let hasNewDraw = false;
+
+    currentHand.forEach(card => {
+      const poolIdx = pool.findIndex(p => p.id === card.id);
+      if (poolIdx !== -1) {
+        newClientHand.push({
+          ...card,
+          clientId: pool[poolIdx].clientId
+        });
+        pool.splice(poolIdx, 1);
+      } else {
+        const newId = `card-${Math.random().toString(36).substring(2, 11)}`;
+        newClientHand.push({
+          ...card,
+          clientId: newId
+        });
+        hasNewDraw = true;
+      }
+    });
+
+    handClientIdsRef.current = newClientHand.map(c => ({ id: c.id, clientId: c.clientId }));
+    setClientHand(newClientHand);
+
+    if (hasNewDraw) {
+      playThwupSound();
+    }
+  }, [self?.hand]);
+
   const handleEndTurn = (discardHand: boolean = false) => {
     sendEvent({
       event: 'END_TURN',
@@ -937,6 +1035,7 @@ export default function App() {
   };
 
   const handlePlayCard = (cardId: string, target?: any) => {
+    playThwupSound();
     setFlingingCardId(cardId);
     setTimeout(() => {
       sendEvent({
@@ -3345,8 +3444,8 @@ export default function App() {
               alignItems: 'center'
             }}
           >
-            {self.hand.map((card, idx) => {
-              const cardKey = `hand-${card.id}-${idx}`;
+            {clientHand.map((card) => {
+              const cardKey = card.clientId;
               const isSelected = selectedCardId === cardKey;
               const isHovered = hoveredCardId === cardKey;
 
@@ -3371,6 +3470,7 @@ export default function App() {
               return (
                 <div
                   key={cardKey}
+                  className="card-draw-animation"
                   onMouseEnter={() => setHoveredCardId(cardKey)}
                   onMouseLeave={() => setHoveredCardId(null)}
                   onClick={() => {
@@ -3835,8 +3935,8 @@ export default function App() {
 
       {/* Zoomed Detailed Card Card (Mobile only) */}
       {isMobile && selectedCardId && self && !targetingCardId && !flingingCardId && (() => {
-        const cardIndex = self.hand.findIndex((c, idx) => `hand-${c.id}-${idx}` === selectedCardId);
-        const card = self.hand[cardIndex];
+        const cardIndex = clientHand.findIndex(c => c.clientId === selectedCardId);
+        const card = clientHand[cardIndex];
         if (!card) return null;
 
         const isBane = card.type === 'bane';
