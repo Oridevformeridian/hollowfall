@@ -987,45 +987,7 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    if (!self) {
-      setClientHand([]);
-      handClientIdsRef.current = [];
-      return;
-    }
 
-    const currentHand = self.hand || [];
-    const prevClientHand = handClientIdsRef.current;
-    const newClientHand: typeof clientHand = [];
-    const pool = [...prevClientHand];
-
-    let hasNewDraw = false;
-
-    currentHand.forEach(card => {
-      const poolIdx = pool.findIndex(p => p.id === card.id);
-      if (poolIdx !== -1) {
-        newClientHand.push({
-          ...card,
-          clientId: pool[poolIdx].clientId
-        });
-        pool.splice(poolIdx, 1);
-      } else {
-        const newId = `card-${Math.random().toString(36).substring(2, 11)}`;
-        newClientHand.push({
-          ...card,
-          clientId: newId
-        });
-        hasNewDraw = true;
-      }
-    });
-
-    handClientIdsRef.current = newClientHand.map(c => ({ id: c.id, clientId: c.clientId }));
-    setClientHand(newClientHand);
-
-    if (hasNewDraw) {
-      playThwupSound();
-    }
-  }, [self?.hand]);
 
   const handleEndTurn = (discardHand: boolean = false) => {
     sendEvent({
@@ -1077,6 +1039,46 @@ export default function App() {
     : null;
   const isActiveTurn = !!(socket && activePlayerId === socket.id);
   const myTokenPos = socket?.id && gameState ? gameState.tokenPositions[socket.id] : null;
+
+  useEffect(() => {
+    if (!self) {
+      setClientHand([]);
+      handClientIdsRef.current = [];
+      return;
+    }
+
+    const currentHand = self.hand || [];
+    const prevClientHand = handClientIdsRef.current;
+    const newClientHand: typeof clientHand = [];
+    const pool = [...prevClientHand];
+
+    let hasNewDraw = false;
+
+    currentHand.forEach(card => {
+      const poolIdx = pool.findIndex(p => p.id === card.id);
+      if (poolIdx !== -1) {
+        newClientHand.push({
+          ...card,
+          clientId: pool[poolIdx].clientId
+        });
+        pool.splice(poolIdx, 1);
+      } else {
+        const newId = `card-${Math.random().toString(36).substring(2, 11)}`;
+        newClientHand.push({
+          ...card,
+          clientId: newId
+        });
+        hasNewDraw = true;
+      }
+    });
+
+    handClientIdsRef.current = newClientHand.map(c => ({ id: c.id, clientId: c.clientId }));
+    setClientHand(newClientHand);
+
+    if (hasNewDraw) {
+      playThwupSound();
+    }
+  }, [self?.hand]);
 
   // Keyboard arrow movement controls
   useEffect(() => {
