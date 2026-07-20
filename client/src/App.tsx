@@ -1120,6 +1120,33 @@ export default function App() {
     ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
     : null;
 
+  const sameCellTreasures = gameState?.treasures && myTokenPos
+    ? Object.values(gameState.treasures).filter(
+        t => t.tileX === myTokenPos.tileX &&
+             t.tileY === myTokenPos.tileY &&
+             t.r === myTokenPos.r &&
+             t.c === myTokenPos.c &&
+             t.carrierId === null
+      )
+    : [];
+
+  const hasPickupableMask = !!(self && self.ap > 0 && sameCellTreasures.some(t => {
+    let isOwnDefault = false;
+    if (t.ownerId === socket?.id && gameState?.placedTiles && socket?.id) {
+      const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === socket.id);
+      if (ownerTile) {
+        const isOwnerTile = t.tileX === ownerTile.position.x && t.tileY === ownerTile.position.y;
+        const isCorner = (t.r === 0 || t.r === 4) && (t.c === 0 || t.c === 4);
+        if (isOwnerTile && isCorner) {
+          isOwnDefault = true;
+        }
+      }
+    }
+    return !isOwnDefault;
+  }));
+
+  const showLogsFloatingButtons = isActiveTurn && !!(myCarriedTreasure || (!myCarriedTreasure && hasPickupableMask));
+
   useEffect(() => {
     if (!self) {
       setClientHand([]);
@@ -2131,7 +2158,7 @@ export default function App() {
                     fontSize: '11px',
                     color: '#94a3b8',
                     lineHeight: '1.4',
-                    paddingRight: (isActiveTurn && myCarriedTreasure) ? '120px' : '8px'
+                    paddingRight: showLogsFloatingButtons ? '145px' : '8px'
                   }}
                 >
                   {gameState.gameLogs.map((log, idx) => (
@@ -2140,31 +2167,79 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                {isActiveTurn && myCarriedTreasure && (
-                  <button
-                    onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: myCarriedTreasure.id } })}
-                    className="btn-secondary pulse-glow"
-                    style={{
-                      position: 'absolute',
-                      bottom: '8px',
-                      right: '8px',
-                      borderColor: 'var(--accent-gold)',
-                      color: 'var(--accent-gold)',
-                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                      fontWeight: 'bold',
-                      fontSize: '10px',
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      zIndex: 30,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    📤 Drop Mask (Free)
-                  </button>
+                {isActiveTurn && (
+                  <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 30 }}>
+                    {myCarriedTreasure ? (
+                      <button
+                        onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: myCarriedTreasure.id } })}
+                        className="btn-secondary pulse-glow"
+                        style={{
+                          borderColor: 'var(--accent-gold)',
+                          color: 'var(--accent-gold)',
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          fontWeight: 'bold',
+                          fontSize: '10px',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          borderWidth: '1.5px',
+                          borderStyle: 'solid'
+                        }}
+                      >
+                        📤 Drop Mask (Free)
+                      </button>
+                    ) : (
+                      hasPickupableMask && sameCellTreasures.map(t => {
+                        const owner = gameState.players[t.ownerId];
+                        const label = owner
+                          ? `📥 Pick Up ${owner.username}'s Mask`
+                          : `📥 Pick Up Mask`;
+
+                        // Check if it's player's own mask at default position
+                        let isOwnDefault = false;
+                        if (t.ownerId === socket?.id) {
+                          const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === socket.id);
+                          if (ownerTile) {
+                            const isOwnerTile = t.tileX === ownerTile.position.x && t.tileY === ownerTile.position.y;
+                            const isCorner = (t.r === 0 || t.r === 4) && (t.c === 0 || t.c === 4);
+                            if (isOwnerTile && isCorner) {
+                              isOwnDefault = true;
+                            }
+                          }
+                        }
+
+                        if (isOwnDefault) return null;
+
+                        return (
+                          <button
+                            key={`pickup-log-desktop-${t.id}`}
+                            onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: t.id } })}
+                            className="btn-primary"
+                            style={{
+                              backgroundColor: 'var(--accent-gold)',
+                              color: 'black',
+                              fontWeight: 'bold',
+                              fontSize: '10px',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              border: 'none'
+                            }}
+                          >
+                            {label} (1 AP)
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -2192,7 +2267,7 @@ export default function App() {
                     fontSize: '11px',
                     color: '#94a3b8',
                     lineHeight: '1.4',
-                    paddingRight: (isActiveTurn && myCarriedTreasure) ? '110px' : '8px'
+                    paddingRight: showLogsFloatingButtons ? '125px' : '8px'
                   }}
                 >
                   {gameState.gameLogs.map((log, idx) => (
@@ -2201,31 +2276,79 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                {isActiveTurn && myCarriedTreasure && (
-                  <button
-                    onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: myCarriedTreasure.id } })}
-                    className="btn-secondary pulse-glow"
-                    style={{
-                      position: 'absolute',
-                      bottom: '6px',
-                      right: '6px',
-                      borderColor: 'var(--accent-gold)',
-                      color: 'var(--accent-gold)',
-                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                      fontWeight: 'bold',
-                      fontSize: '9px',
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      zIndex: 30,
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    📤 Drop Mask (Free)
-                  </button>
+                {isActiveTurn && (
+                  <div style={{ position: 'absolute', bottom: '6px', right: '6px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 30 }}>
+                    {myCarriedTreasure ? (
+                      <button
+                        onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: myCarriedTreasure.id } })}
+                        className="btn-secondary pulse-glow"
+                        style={{
+                          borderColor: 'var(--accent-gold)',
+                          color: 'var(--accent-gold)',
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          fontWeight: 'bold',
+                          fontSize: '9px',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          borderWidth: '1.5px',
+                          borderStyle: 'solid'
+                        }}
+                      >
+                        📤 Drop Mask (Free)
+                      </button>
+                    ) : (
+                      hasPickupableMask && sameCellTreasures.map(t => {
+                        const owner = gameState.players[t.ownerId];
+                        const label = owner
+                          ? `📥 Pick Up ${owner.username}'s Mask`
+                          : `📥 Pick Up Mask`;
+
+                        // Check if it's player's own mask at default position
+                        let isOwnDefault = false;
+                        if (t.ownerId === socket?.id) {
+                          const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === socket.id);
+                          if (ownerTile) {
+                            const isOwnerTile = t.tileX === ownerTile.position.x && t.tileY === ownerTile.position.y;
+                            const isCorner = (t.r === 0 || t.r === 4) && (t.c === 0 || t.c === 4);
+                            if (isOwnerTile && isCorner) {
+                              isOwnDefault = true;
+                            }
+                          }
+                        }
+
+                        if (isOwnDefault) return null;
+
+                        return (
+                          <button
+                            key={`pickup-log-mobile-${t.id}`}
+                            onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: t.id } })}
+                            className="btn-primary"
+                            style={{
+                              backgroundColor: 'var(--accent-gold)',
+                              color: 'black',
+                              fontWeight: 'bold',
+                              fontSize: '9px',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              border: 'none'
+                            }}
+                          >
+                            {label} (1 AP)
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -3463,36 +3586,13 @@ export default function App() {
         {/* Mobile-only Action Bar (visible below the board, pinned to bottom right of viewport) */}
         {(() => {
           if (!isMobile || !isActiveTurn) return null;
-
-          let hasContent = false;
-          let sameCellTreasures: any[] = [];
-
-          if (gameState.phase === 'PLACEMENT' && activeTileLayout) {
-            hasContent = true;
-          } else if (gameState.phase === 'GAMEPLAY') {
-            sameCellTreasures = gameState.treasures && myTokenPos
-              ? Object.values(gameState.treasures).filter(
-                  t => t.tileX === myTokenPos.tileX &&
-                       t.tileY === myTokenPos.tileY &&
-                       t.r === myTokenPos.r &&
-                       t.c === myTokenPos.c &&
-                       t.carrierId === null
-                )
-              : [];
-            const hasPickup = sameCellTreasures.length > 0 && self && self.ap > 0;
-
-            if (hasPickup) {
-              hasContent = true;
-            }
-          }
-
-          if (!hasContent) return null;
+          if (gameState.phase !== 'PLACEMENT' || !activeTileLayout) return null;
 
           return (
             <div
               style={{
                 position: 'fixed',
-                bottom: gameState.phase === 'GAMEPLAY' ? '220px' : '16px',
+                bottom: '16px',
                 right: '16px',
                 zIndex: 110,
                 display: 'flex',
@@ -3510,48 +3610,13 @@ export default function App() {
               }}
             >
               {/* Rotate Tile button in PLACEMENT phase */}
-              {gameState.phase === 'PLACEMENT' && activeTileLayout && (
-                <button
-                  onClick={handleRotate}
-                  className="btn-secondary"
-                  style={{ width: '100%', padding: '8px 0', fontSize: '11px', fontWeight: 'bold' }}
-                >
-                  Rotate Tile (90° CW)
-                </button>
-              )}
-
-              {/* Pick Up / Drop Mask buttons in GAMEPLAY phase */}
-              {gameState.phase === 'GAMEPLAY' && (
-                <>
-                  {/* Pick Up Treasure Button */}
-                  {sameCellTreasures.map(t => {
-                    const owner = gameState.players[t.ownerId];
-                    const label = owner
-                      ? `📥 Pick Up ${owner.username}'s Mask`
-                      : `📥 Pick Up Mask`;
-
-                    return (
-                      <button
-                        key={`pickup-mobile-${t.id}`}
-                        onClick={() => sendEvent({ event: 'PICKUP_TREASURE', payload: { treasureId: t.id } })}
-                        className="btn-primary"
-                        style={{
-                          width: '100%',
-                          backgroundColor: 'var(--accent-green)',
-                          color: 'black',
-                          fontWeight: 'bold',
-                          fontSize: '11px',
-                          padding: '8px 0'
-                        }}
-                      >
-                        {label} (1 AP)
-                      </button>
-                    );
-                  })}
-
-
-                </>
-              )}
+              <button
+                onClick={handleRotate}
+                className="btn-secondary"
+                style={{ width: '100%', padding: '8px 0', fontSize: '11px', fontWeight: 'bold' }}
+              >
+                Rotate Tile (90° CW)
+              </button>
             </div>
           );
         })()}
