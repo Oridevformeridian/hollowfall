@@ -1464,7 +1464,7 @@ export default function App() {
             {/* Column 1: Connected Players (Now uses Room Code as Header) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--accent-cyan)' }}>{gameState.roomCode}</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--accent-cyan)' }}>LOBBY: {gameState.roomCode}</span>
                 <button
                   onClick={handleCopyRoomCode}
                   title="Copy Room Code"
@@ -1516,7 +1516,7 @@ export default function App() {
                   display: 'grid',
                   gridTemplateColumns: 'repeat(2, 1fr)',
                   gridTemplateRows: 'repeat(3, 1fr)',
-                  gap: isMobile ? '6px' : '10px',
+                  gap: isMobile ? '8px' : '10px',
                   width: '100%',
                   boxSizing: 'border-box'
                 }}
@@ -1588,7 +1588,7 @@ export default function App() {
                     style={{
                       display: 'grid',
                       gridTemplateColumns: isMobile ? 'repeat(5, 46px)' : 'repeat(5, 90px)',
-                      gap: isMobile ? '4px' : '16px',
+                      gap: isMobile ? '16px' : '16px',
                       justifyContent: 'center'
                     }}
                   >
@@ -1648,7 +1648,7 @@ export default function App() {
                               letterSpacing: '0.5px'
                             }}
                           >
-                            {hero.class}
+{isMobile && hero.class.includes('/') ? (<>{hero.class.split('/')[0]}<br />{hero.class.split('/')[1]}</>) : hero.class}
                           </span>
 
                           {hoveredHeroIndex === idx && (() => {
@@ -1700,7 +1700,7 @@ export default function App() {
                                 <div style={{ fontWeight: '900', fontSize: '13px', color: 'white', letterSpacing: '0.5px', textAlign: 'center' }}>
                                   {hero.name}
                                 </div>
-                                <div style={{ fontSize: '11px', color: hero.color, fontWeight: 'bold', marginTop: '2px', textTransform: 'uppercase', textAlign: 'center' }}>
+                                <div style={{ fontSize: '11px', color: hero.color, fontWeight: 'bold', marginTop: '6px', textTransform: 'uppercase', textAlign: 'center' }}>
                                   {hero.class} Specialty
                                 </div>
                                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '8px', paddingTop: '8px' }}>
@@ -1823,33 +1823,6 @@ export default function App() {
               )}
             </div>
           </div>
-<div style={{display: 'flex', justifyContent: 'center', marginTop: isMobile ? '8px' : '12px'}}>
-  <button
-    onClick={handleCopyRoomCode}
-    title="Copy Room Code"
-    style={{
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      color: copied ? 'var(--accent-green)' : '#94a3b8',
-      padding: '4px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      transition: 'color 0.2s',
-    }}
-  >
-    {copied ? (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-    ) : (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-      </svg>
-    )}
-  </button>
-</div>
 
           {/* Centered Ready/Start buttons below both elements */}
           <div
