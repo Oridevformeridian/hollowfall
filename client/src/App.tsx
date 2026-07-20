@@ -3457,7 +3457,7 @@ export default function App() {
                              {(() => {
                                const ownerHero = HEROES.find(h => h.emoji === owner?.emoji);
                                if (ownerHero) {
-                                 return <ClassSymbol heroClass={ownerHero.class} color={ownerColor} opacity={0.6} size="24px" />;
+                                 return <ClassSymbol heroClass={ownerHero.class} color={ownerColor} opacity={0.6} size="30px" />;
                                }
                                return null;
                              })()}
@@ -3515,7 +3515,7 @@ export default function App() {
                                    {(() => {
                                      const gemOwnerHero = HEROES.find(h => h.emoji === gemOwner?.emoji);
                                      if (gemOwnerHero) {
-                                       return <ClassSymbol heroClass={gemOwnerHero.class} color={gemColor} opacity={0.6} size="16px" />;
+                                       return <ClassSymbol heroClass={gemOwnerHero.class} color={gemColor} opacity={0.6} size="20px" />;
                                      }
                                      return null;
                                    })()}
