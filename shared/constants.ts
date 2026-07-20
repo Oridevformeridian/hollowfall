@@ -161,7 +161,8 @@ export const BASIC_CARDS: Card[] = [
     id: 'ash_turn_aside',
     name: 'Turn Aside',
     type: 'working',
-    description: 'Aura: Block and cancel the next incoming attack spell (consumed on trigger).'
+    description: 'Aura: Block and cancel the next incoming attack spell (consumed on trigger).',
+    expend: true
   },
   {
     id: 'ash_spirit_skin',
@@ -179,25 +180,29 @@ export const BASIC_CARDS: Card[] = [
     id: 'working_raise_stone',
     name: 'Raise Stone',
     type: 'working',
-    description: 'Create a permanent stone wall on an adjacent border.'
+    description: 'Create a permanent stone wall on an adjacent border.',
+    expend: true
   },
   {
     id: 'talisman_thorns',
     name: 'Thorns',
     type: 'talisman',
-    description: 'Talisman: Retaliate against attacks, dealing 1 damage back to the attacker.'
+    description: 'Talisman: Retaliate against attacks, dealing 1 damage back to the attacker.',
+    expend: true
   },
   {
     id: 'working_don_wolf',
     name: 'Don the Wolf',
     type: 'working',
-    description: 'Leap: Teleport up to 3 cells Manhattan distance, even around corners.'
+    description: 'Leap: Teleport up to 3 cells Manhattan distance, even around corners.',
+    expend: true
   },
   {
     id: 'working_shift_spirit',
     name: 'Shift Spirit',
     type: 'working',
-    description: 'Swap positions with a Walker in your Line of Sight (LOS).'
+    description: 'Swap positions with a Walker in your Line of Sight (LOS).',
+    expend: true
   },
   {
     id: 'offering_deep_breath',
