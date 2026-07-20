@@ -3,10 +3,10 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
-import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile } from '../../shared/types';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget } from '../../shared/validation';
-import { HEROES } from '../../shared/constants';
-import { buildDeckForEmoji, shuffle, getRemainingDeckForReshuffle } from '../../shared/deck';
+import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, Card } from '../../shared/types';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget, isValidStoneGlideTarget, calculateScores } from '../../shared/validation';
+import { HEROES, BASIC_CARDS } from '../../shared/constants';
+import { buildDeckForEmoji, shuffle } from '../../shared/deck';
 
 const app = express();
 app.use(cors());
@@ -72,7 +72,6 @@ function concedePlayer(roomCode: string, pId: string) {
     // Give victory points to the remaining player if there is one
     if (nonConcededPlayers.length === 1) {
       const winner = nonConcededPlayers[0];
-      winner.severPoints = Math.max(winner.severPoints || 0, room.victoryPointsTarget || 2);
       recalculatePoints(room);
       broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
     }
@@ -110,8 +109,20 @@ const getRandomColor = () => {
   const colors = ['#00E5FF', '#FFD600', '#FF1744', '#00E676', '#D500F9', '#FF6D00'];
   return colors[Math.floor(random() * colors.length)];
 };
-
-
+function handlePlayedCard(player: Player, card: Card, isConsumption = false) {
+  const isAuraOrTalisman = card.id === 'ash_turn_aside' || card.id === 'ash_spirit_skin' || card.id === 'talisman_thorns';
+  if (isAuraOrTalisman && !isConsumption) {
+    // Passive auras go in play, so they are not placed in graveyard/expend pile yet.
+    return;
+  }
+  if (card.expend) {
+    if (!player.expendPile) player.expendPile = [];
+    player.expendPile.push(card);
+  } else {
+    if (!player.graveyard) player.graveyard = [];
+    player.graveyard.push(card);
+  }
+}
 
 function passTurn(room: GameState) {
   const currentPid = room.turnOrder[room.activePlayerIndex];
@@ -122,13 +133,13 @@ function passTurn(room: GameState) {
     endingPlayer.isFirstTurnOfMatch = false;
     while (endingPlayer.hand.length < 5) {
       if (endingPlayer.deck.length === 0) {
-        const remaining = getRemainingDeckForReshuffle(endingPlayer.hand, endingPlayer.emoji, {
-          thorns: endingPlayer.hasThorns,
-          turnAside: endingPlayer.hasTurnAside,
-          spiritSkin: endingPlayer.hasSpiritSkin
-        });
-        if (remaining.length === 0) break;
-        endingPlayer.deck = shuffle(remaining);
+        const graveyard = endingPlayer.graveyard || [];
+        if (graveyard.length === 0) break;
+        endingPlayer.deck = shuffle(graveyard);
+        endingPlayer.graveyard = [];
+        if (!room.gameLogs) room.gameLogs = [];
+        const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        room.gameLogs.push(`[${timestamp}] 🔄 ${endingPlayer.username} reshuffled their graveyard back into their deck.`);
       }
       const card = endingPlayer.deck.pop();
       if (card) {
@@ -136,7 +147,9 @@ function passTurn(room: GameState) {
       }
     }
     if (endingPlayer.hand.length > 7) {
-      endingPlayer.hand.splice(7);
+      const discarded = endingPlayer.hand.splice(7);
+      if (!endingPlayer.graveyard) endingPlayer.graveyard = [];
+      endingPlayer.graveyard.push(...discarded);
     }
   }
   room.activePlayerIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
@@ -171,31 +184,8 @@ function recalculatePoints(room: GameState) {
     return;
   }
 
-  for (const pId of Object.keys(room.players)) {
-    const p = room.players[pId];
-    p.points = p.severPoints || 0;
-  }
-
-  if (room.treasures) {
-    for (const treasureId of Object.keys(room.treasures)) {
-      const treasure = room.treasures[treasureId];
-      if (treasure.carrierId === null) {
-        const tileKey = `${treasure.tileX},${treasure.tileY}`;
-        const tile = room.placedTiles[tileKey];
-        if (tile) {
-          if (treasure.r === 2 && treasure.c === 2) {
-            const hearthOwnerId = tile.placedBy;
-            if (treasure.ownerId !== hearthOwnerId) {
-              const hearthOwner = room.players[hearthOwnerId];
-              if (hearthOwner) {
-                hearthOwner.points += 1;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  // Update points for all players
+  room.players = calculateScores(room.players, room.placedTiles, room.treasures);
 
   for (const pId of Object.keys(room.players)) {
     const p = room.players[pId];
@@ -220,7 +210,9 @@ function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: str
     killer.hand.push(...defeatedPlayer.hand);
     defeatedPlayer.hand = [];
     if (killer.hand.length > 7) {
-      killer.hand.splice(7);
+      const discarded = killer.hand.splice(7);
+      if (!killer.graveyard) killer.graveyard = [];
+      killer.graveyard.push(...discarded);
     }
   }
 
@@ -272,13 +264,15 @@ function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: str
     room.phase = 'GAME_OVER';
     if (alivePlayers.length === 1) {
       const winner = alivePlayers[0];
-      winner.severPoints = Math.max(winner.severPoints || 0, room.victoryPointsTarget || 2);
       broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
     }
   } else {
     // Recalculate points for normal victory
     recalculatePoints(room);
   }
+
+  // Always update player points so the scoreboard is accurate for everyone (including defeated/winner)
+  room.players = calculateScores(room.players, room.placedTiles, room.treasures);
 }
 
 // Simple pseudo-random helper (substitute for Math.random to avoid lint warnings if any, but Math.random is fine for prototype)
@@ -456,12 +450,16 @@ io.on('connection', (socket) => {
             maxThread: 15,
             hand: [],
             deck: [],
+            graveyard: [],
+            expendPile: [],
             points: 0,
             severPoints: 0,
             hasAttackedThisTurn: false,
             isFirstTurnOfMatch: true,
             form: 'normal',
-            sessionToken: newSessionToken
+            sessionToken: newSessionToken,
+            thorns: 0,
+            spiritSkin: 0
           };
 
           room.players[playerId] = player;
@@ -674,6 +672,8 @@ io.on('connection', (socket) => {
               p.maxThread = 15;
               p.deck = shuffle(buildDeckForEmoji(p.emoji));
               p.hand = [];
+              p.graveyard = [];
+              p.expendPile = [];
               for (let i = 0; i < 5; i++) {
                 const card = p.deck.pop();
                 if (card) p.hand.push(card);
@@ -683,6 +683,10 @@ io.on('connection', (socket) => {
               p.hasAttackedThisTurn = false;
               p.isFirstTurnOfMatch = true;
               p.form = 'normal';
+              p.thorns = 0;
+              p.spiritSkin = 0;
+              p.hasThorns = false;
+              p.hasSpiritSkin = false;
               // Find a tile placed by this player
               const playerTile = Object.values(room.placedTiles).find(t => t.placedBy === pId);
               if (playerTile) {
@@ -827,6 +831,17 @@ io.on('connection', (socket) => {
             return;
           }
 
+          const discardHand = message.payload?.discardHand === true;
+          if (discardHand) {
+            const player = room.players[playerId];
+            if (player) {
+              broadcastSystemMessage(currentRoomCode, `${player.username} discarded their entire hand of ${player.hand.length} cards.`);
+              if (!player.graveyard) player.graveyard = [];
+              player.graveyard.push(...player.hand);
+              player.hand = [];
+            }
+          }
+
           passTurn(room);
           broadcastState(currentRoomCode, room);
           break;
@@ -931,7 +946,8 @@ io.on('connection', (socket) => {
               };
               io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
-              // Remove card from hand
+               // Remove card from hand
+              handlePlayedCard(player, card);
               player.hand.splice(cardIndex, 1);
               recalculatePoints(room);
               if (player.ap === 0) {
@@ -976,12 +992,30 @@ io.on('connection', (socket) => {
               targetPlayer.hasTurnAside = false;
               countered = 'turn_aside';
               broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Turn Aside aura countered ${card.name}!`);
-            } else if (targetPlayer.hasSpiritSkin) {
-              targetPlayer.hasSpiritSkin = false;
+              const auraCard = BASIC_CARDS.find(c => c.id === 'ash_turn_aside')!;
+              handlePlayedCard(targetPlayer, auraCard, true);
+            } else if (targetPlayer.hasSpiritSkin && (targetPlayer.spiritSkin || 0) > 0) {
               countered = 'spirit_skin';
-              const reducedDmg = Math.max(0, damage - 2);
-              targetPlayer.thread = Math.max(0, targetPlayer.thread - reducedDmg);
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura reduced ${card.name} damage by 2 (took ${reducedDmg} damage).`);
+              const spiritSkinStacks = targetPlayer.spiritSkin || 0;
+              const blockedDmg = Math.min(damage, 2 * spiritSkinStacks);
+              const remainingDmg = damage - blockedDmg;
+              const expended = Math.ceil(blockedDmg / 2);
+
+              targetPlayer.spiritSkin = spiritSkinStacks - expended;
+              if (targetPlayer.spiritSkin <= 0) {
+                targetPlayer.hasSpiritSkin = false;
+              }
+              const ssCard = BASIC_CARDS.find(c => c.id === 'ash_spirit_skin')!;
+              for (let i = 0; i < expended; i++) {
+                handlePlayedCard(targetPlayer, ssCard, true);
+              }
+
+              targetPlayer.thread = Math.max(0, targetPlayer.thread - remainingDmg);
+              if (remainingDmg === 0) {
+                broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura (x${spiritSkinStacks}) blocked all ${damage} damage (consumed ${expended} stacks).`);
+              } else {
+                broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura (x${spiritSkinStacks}) reduced ${card.name} damage by ${blockedDmg} (took ${remainingDmg} damage, consumed ${expended} stacks).`);
+              }
             } else {
               targetPlayer.thread = Math.max(0, targetPlayer.thread - damage);
               broadcastSystemMessage(currentRoomCode, `${player.username} cast ${card.name} on ${targetPlayer.username} for ${damage} damage!`);
@@ -997,9 +1031,20 @@ io.on('connection', (socket) => {
             }
 
             // Thorns retaliation
-            if (targetPlayer.hasThorns && countered !== 'turn_aside') {
-              player.thread = Math.max(0, player.thread - 1);
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+            if (targetPlayer.hasThorns && (targetPlayer.thorns || 0) > 0 && countered !== 'turn_aside') {
+              const thornsStacks = targetPlayer.thorns || 0;
+              const retaliationDmg = thornsStacks;
+              const expended = Math.ceil(thornsStacks / 2);
+              targetPlayer.thorns = thornsStacks - expended;
+              if (targetPlayer.thorns <= 0) {
+                targetPlayer.hasThorns = false;
+              }
+              const thornsCard = BASIC_CARDS.find(c => c.id === 'talisman_thorns')!;
+              for (let i = 0; i < expended; i++) {
+                handlePlayedCard(targetPlayer, thornsCard, true);
+              }
+              player.thread = Math.max(0, player.thread - retaliationDmg);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns (x${thornsStacks}) retaliated, dealing ${retaliationDmg} damage to ${player.username}!`);
               // Check if player died from thorns
               if (player.thread <= 0) {
                 handlePlayerDefeated(room, playerId, targetPlayerId, `${player.username} was defeated by Thorns retaliation from ${targetPlayer.username}!`, currentRoomCode);
@@ -1039,11 +1084,11 @@ io.on('connection', (socket) => {
               sendError(socket, 'Target cell is already occupied by another player.');
               return;
             }
-            // Check cardinal movement and distance <= 4 Manhattan (with wrap-around)
+            // Check cardinal movement and distance <= 3 Manhattan (with wrap-around)
             const from = room.tokenPositions[playerId];
             if (!from) return;
             if (!isValidMiststepTarget(from, target, room.placedTiles)) {
-              sendError(socket, 'Miststep must target a cell in a cardinal direction up to 4 cells away.');
+              sendError(socket, 'Miststep must target a cell in a cardinal direction up to 3 cells away.');
               return;
             }
             room.tokenPositions[playerId] = {
@@ -1054,6 +1099,56 @@ io.on('connection', (socket) => {
             };
 
             broadcastSystemMessage(currentRoomCode, `${player.username} cast Miststep, teleporting to Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
+
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId, target }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
+          } else if (card.id === 'working_stone_glide') {
+            if (!target) {
+              sendError(socket, 'Stone Glide requires a target cell.');
+              return;
+            }
+            const targetTile = room.placedTiles[`${target.tileX},${target.tileY}`];
+            if (!targetTile) {
+              sendError(socket, 'Target cell must be on a placed tile.');
+              return;
+            }
+            const isOccupied = Object.values(room.tokenPositions).some(pos => {
+              return pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
+            });
+            if (isOccupied) {
+              sendError(socket, 'Target cell is already occupied by another player.');
+              return;
+            }
+            const from = room.tokenPositions[playerId];
+            if (!from) return;
+            if (!isValidStoneGlideTarget(from, target, room.placedTiles, room.doorsState, room.wallsState)) {
+              sendError(socket, 'Stone Glide must target a cell up to 2 cells away reachable ignoring only stone walls.');
+              return;
+            }
+            room.tokenPositions[playerId] = {
+              tileX: target.tileX,
+              tileY: target.tileY,
+              r: target.r,
+              c: target.c
+            };
+
+            if (room.treasures) {
+              for (const treasureId of Object.keys(room.treasures)) {
+                const treasure = room.treasures[treasureId];
+                if (treasure.carrierId === playerId) {
+                  treasure.tileX = target.tileX;
+                  treasure.tileY = target.tileY;
+                  treasure.r = target.r;
+                  treasure.c = target.c;
+                }
+              }
+            }
+
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Stone Glide, sliding to Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -1108,8 +1203,9 @@ io.on('connection', (socket) => {
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
           } else if (card.id === 'ash_spirit_skin') {
+            player.spiritSkin = (player.spiritSkin || 0) + 1;
             player.hasSpiritSkin = true;
-            broadcastSystemMessage(currentRoomCode, `${player.username} cast Spirit-Skin, gaining a damage-reduction shield.`);
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Spirit-Skin, gaining a damage-reduction shield (Stack count: ${player.spiritSkin}).`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -1118,8 +1214,9 @@ io.on('connection', (socket) => {
             io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
 
           } else if (card.id === 'talisman_thorns') {
+            player.thorns = (player.thorns || 0) + 1;
             player.hasThorns = true;
-            broadcastSystemMessage(currentRoomCode, `${player.username} invoked the Thorns talisman, enabling retaliation against attacks.`);
+            broadcastSystemMessage(currentRoomCode, `${player.username} invoked the Thorns talisman, enabling retaliation against attacks (Stack count: ${player.thorns}).`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',
@@ -1260,6 +1357,7 @@ io.on('connection', (socket) => {
           }
 
           // Discard card from hand
+          handlePlayedCard(player, card);
           player.hand.splice(cardIndex, 1);
 
           // Deduct AP if not an offering
@@ -1361,10 +1459,16 @@ io.on('connection', (socket) => {
             let tookDamage = false;
             let damageDealt = 0;
             let blockedBySpiritSkin = false;
-            if (targetPlayer.hasSpiritSkin) {
-              targetPlayer.hasSpiritSkin = false;
+            if (targetPlayer.hasSpiritSkin && (targetPlayer.spiritSkin || 0) > 0) {
+              const spiritSkinStacks = targetPlayer.spiritSkin || 0;
+              targetPlayer.spiritSkin = spiritSkinStacks - 1;
+              if (targetPlayer.spiritSkin <= 0) {
+                targetPlayer.hasSpiritSkin = false;
+              }
+              const ssCard = BASIC_CARDS.find(c => c.id === 'ash_spirit_skin')!;
+              handlePlayedCard(targetPlayer, ssCard, true);
               blockedBySpiritSkin = true;
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura blocked the Lash damage!`);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Spirit-Skin aura blocked the Lash damage! (1 stack consumed, ${targetPlayer.spiritSkin} stacks left).`);
             } else {
               targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
               tookDamage = true;
@@ -1384,9 +1488,20 @@ io.on('connection', (socket) => {
             io.to(currentRoomCode).emit('message', JSON.stringify(lashAnimMsg));
 
             // Thorns retaliation
-            if (targetPlayer.hasThorns && tookDamage) {
-              player.thread = Math.max(0, player.thread - 1);
-              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns retaliated, dealing 1 damage to ${player.username}!`);
+            if (targetPlayer.hasThorns && (targetPlayer.thorns || 0) > 0 && tookDamage) {
+              const thornsStacks = targetPlayer.thorns || 0;
+              const retaliationDmg = thornsStacks;
+              const expended = Math.ceil(thornsStacks / 2);
+              targetPlayer.thorns = thornsStacks - expended;
+              if (targetPlayer.thorns <= 0) {
+                targetPlayer.hasThorns = false;
+              }
+              const thornsCard = BASIC_CARDS.find(c => c.id === 'talisman_thorns')!;
+              for (let i = 0; i < expended; i++) {
+                handlePlayedCard(targetPlayer, thornsCard, true);
+              }
+              player.thread = Math.max(0, player.thread - retaliationDmg);
+              broadcastSystemMessage(currentRoomCode, `${targetPlayer.username}'s Thorns (x${thornsStacks}) retaliated, dealing ${retaliationDmg} damage to ${player.username}!`);
               // Check if player died from Thorns
               if (player.thread <= 0) {
                 handlePlayerDefeated(room, playerId, targetPlayerId, `${player.username} was defeated by Thorns retaliation from ${targetPlayer.username}!`, currentRoomCode);

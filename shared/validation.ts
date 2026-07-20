@@ -1,4 +1,4 @@
-import { PlacedTile, TokenPosition, GameState, PlayerId } from './types';
+import { PlacedTile, TokenPosition, GameState, PlayerId, Player, Treasure } from './types';
 import { FIXED_TILES } from './constants';
 
 /**
@@ -523,7 +523,7 @@ export function getWrappingManhattanDistance(
 
 /**
  * Validates if the target cell is a valid Miststep destination.
- * Miststep can only target cells in cardinal directions (N/S/E/W) up to distance 4.
+ * Miststep can only target cells in cardinal directions (N/S/E/W) up to distance 3.
  */
 export function isValidMiststepTarget(
   from: TokenPosition,
@@ -537,7 +537,62 @@ export function isValidMiststepTarget(
   if (!isCardinal) return false;
 
   const dist = getWrappingManhattanDistance(from, to, placedTiles);
-  return dist > 0 && dist <= 4;
+  return dist > 0 && dist <= 3;
+}
+
+/**
+ * Validates if the target cell is a valid Stone Glide destination.
+ * Stone Glide allows moving up to 2 cells in any direction ignoring Raised Stone walls.
+ */
+export function isValidStoneGlideTarget(
+  from: TokenPosition,
+  to: TokenPosition,
+  placedTiles: Record<string, PlacedTile>,
+  doorsState: Record<string, 'OPEN' | 'CLOSED'>,
+  _wallsState?: Record<string, boolean>
+): boolean {
+  const fromTile = placedTiles[`${from.tileX},${from.tileY}`];
+  const toTile = placedTiles[`${to.tileX},${to.tileY}`];
+  if (!fromTile || !toTile) return false;
+
+  const dist = getWrappingManhattanDistance(from, to, placedTiles);
+  if (dist === 0 || dist > 2) return false;
+
+  // Bypass Raised Stone walls by passing an empty wallsState
+  const emptyWallsState: Record<string, boolean> = {};
+
+  if (dist === 1) {
+    const check = validateTokenMove(from, to, placedTiles, doorsState, emptyWallsState);
+    return check.valid;
+  }
+
+  // Find if there is any orthogonally adjacent intermediate cell that forms a valid path
+  const keys = Object.keys(placedTiles);
+  const neighbors: TokenPosition[] = [];
+
+  for (const key of keys) {
+    const [tx, ty] = key.split(',').map(Number);
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        const candidate = { tileX: tx, tileY: ty, r, c };
+        if (getWrappingManhattanDistance(from, candidate, placedTiles) === 1) {
+          neighbors.push(candidate);
+        }
+      }
+    }
+  }
+
+  for (const mid of neighbors) {
+    if (getWrappingManhattanDistance(mid, to, placedTiles) === 1) {
+      const step1 = validateTokenMove(from, mid, placedTiles, doorsState, emptyWallsState);
+      const step2 = validateTokenMove(mid, to, placedTiles, doorsState, emptyWallsState);
+      if (step1.valid && step2.valid) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 
@@ -790,6 +845,12 @@ export function getActiveRainbowBridges(placedTiles: Record<string, PlacedTile>)
  */
 export function checkBoundFateEliminations(room: GameState): PlayerId[] {
   const eliminated: PlayerId[] = [];
+  
+  // If target is greater than 2 (Long Hunt variant), Bound Fate elimination is disabled
+  if (room.victoryPointsTarget && room.victoryPointsTarget > 2) {
+    return eliminated;
+  }
+
   const alivePlayers = Object.values(room.players).filter(p => p.thread > 0 && !p.hasConceded);
 
   for (const player of alivePlayers) {
@@ -820,3 +881,45 @@ export function checkBoundFateEliminations(room: GameState): PlayerId[] {
 
   return eliminated;
 }
+
+/**
+ * Pure function to calculate and update player points based on kills (severPoints) and mask placement.
+ * Returns the updated record of players.
+ */
+export function calculateScores(
+  players: Record<string, Player>,
+  placedTiles: Record<string, PlacedTile>,
+  treasures: Record<string, Treasure>
+): Record<string, Player> {
+  const updatedPlayers: Record<string, Player> = {};
+  for (const pId of Object.keys(players)) {
+    updatedPlayers[pId] = {
+      ...players[pId],
+      points: players[pId].severPoints || 0
+    };
+  }
+
+  if (treasures) {
+    for (const treasureId of Object.keys(treasures)) {
+      const treasure = treasures[treasureId];
+      if (treasure.carrierId === null) {
+        const tileKey = `${treasure.tileX},${treasure.tileY}`;
+        const tile = placedTiles[tileKey];
+        if (tile) {
+          if (treasure.r === 2 && treasure.c === 2) {
+            const hearthOwnerId = tile.placedBy;
+            if (treasure.ownerId !== hearthOwnerId) {
+              const hearthOwner = updatedPlayers[hearthOwnerId];
+              if (hearthOwner) {
+                hearthOwner.points += 1;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return updatedPlayers;
+}
+

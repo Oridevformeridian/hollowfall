@@ -30,7 +30,7 @@ export function buildDeckForEmoji(emoji: string): Card[] {
   if (emoji === '🧙‍♂️' || emoji === '🧙‍♀️') {
     classCardId = 'ash_immolate';
   } else if (emoji === '🧝‍♂️' || emoji === '🧝‍♀️') {
-    classCardId = 'working_raise_stone'; // Elf specialty: Raise Stone (gives 16x total)
+    classCardId = 'working_stone_glide'; // Elf specialty: Stone Glide (5x)
   } else if (emoji === '🤴' || emoji === '👸') {
     classCardId = 'talisman_thorns'; // Royal specialty: Thorns
   } else if (emoji === '🧚‍♂️' || emoji === '🧚‍♀️') {
@@ -49,9 +49,11 @@ export function buildDeckForEmoji(emoji: string): Card[] {
 
   const deck: Card[] = [];
 
-  // 8x class-specific card
+  // Class-specific card (8x for others, 5x for Elf)
   const classCard = findCard(classCardId);
-  for (let i = 0; i < 8; i++) {
+  const isElf = emoji === '🧝‍♂️' || emoji === '🧝‍♀️';
+  const specialtyCount = isElf ? 5 : 8;
+  for (let i = 0; i < specialtyCount; i++) {
     deck.push({ ...classCard });
   }
 
@@ -67,9 +69,10 @@ export function buildDeckForEmoji(emoji: string): Card[] {
     deck.push({ ...fireball });
   }
 
-  // 5x Raise Stone
+  // 5x Raise Stone (8x for Elf)
   const raiseStone = findCard('working_raise_stone');
-  for (let i = 0; i < 5; i++) {
+  const raiseStoneCount = isElf ? 8 : 5;
+  for (let i = 0; i < raiseStoneCount; i++) {
     deck.push({ ...raiseStone });
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, checkBoundFateEliminations, isValidMiststepTarget } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, checkBoundFateEliminations, isValidMiststepTarget, isValidStoneGlideTarget, calculateScores } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -641,6 +641,24 @@ describe('checkBoundFateEliminations', () => {
     const eliminated = checkBoundFateEliminations(room);
     expect(eliminated).toEqual([]);
   });
+
+  it('should not eliminate a player under Bound Fate if victoryPointsTarget > 2', () => {
+    const room = createMockRoom();
+    room.victoryPointsTarget = 3;
+    // Both of p1's masks are on p2's Hearth
+    room.treasures.t1_1.tileX = 1;
+    room.treasures.t1_1.tileY = 0;
+    room.treasures.t1_1.r = 2;
+    room.treasures.t1_1.c = 2;
+
+    room.treasures.t1_2.tileX = 1;
+    room.treasures.t1_2.tileY = 0;
+    room.treasures.t1_2.r = 2;
+    room.treasures.t1_2.c = 2;
+
+    const eliminated = checkBoundFateEliminations(room);
+    expect(eliminated).toEqual([]);
+  });
 });
 
 describe('isValidMiststepTarget', () => {
@@ -661,7 +679,7 @@ describe('isValidMiststepTarget', () => {
     expect(isValidMiststepTarget(from, to, placedTiles)).toBe(true);
   });
 
-  it('should return true for valid crossing cardinal move across tiles within distance 4', () => {
+  it('should return true for valid crossing cardinal move across tiles within distance 3', () => {
     const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
     const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 1 };
     // globalC_from = 4, globalC_to = 6 -> dist = 2
@@ -680,11 +698,16 @@ describe('isValidMiststepTarget', () => {
     expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
   });
 
-  it('should return false for cardinal move that is too far (dist > 4)', () => {
-    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
-    const to: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 2 };
-    // globalC_from = 2, globalC_to = 7 -> dist = 5
-    expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
+  it('should return false for cardinal move that is too far (dist >= 4)', () => {
+    // from (0, 0, 2, 4) to (1, 0, 2, 3) -> globalC_from = 4, globalC_to = 8 -> dist = 4
+    const fromAcross: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 };
+    const toAcross: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 3 };
+    expect(isValidMiststepTarget(fromAcross, toAcross, placedTiles)).toBe(false);
+
+    // from (0, 0, 2, 2) to (1, 0, 2, 2) -> globalC_from = 2, globalC_to = 7 -> dist = 5
+    const fromFar: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const toFar: TokenPosition = { tileX: 1, tileY: 0, r: 2, c: 2 };
+    expect(isValidMiststepTarget(fromFar, toFar, placedTiles)).toBe(false);
   });
 
   it('should return false for same cell (dist 0)', () => {
@@ -693,4 +716,90 @@ describe('isValidMiststepTarget', () => {
     expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
   });
 });
+
+describe('isValidStoneGlideTarget', () => {
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+    '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+  };
+  const doorsState = {};
+
+  it('should return true for orthogonal and diagonal moves of distance 1 or 2', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 1, c: 0 };
+    
+    // Dist 1
+    expect(isValidStoneGlideTarget(from, { tileX: 0, tileY: 0, r: 1, c: 1 }, placedTiles, doorsState)).toBe(true);
+    // Dist 2 orthogonal
+    expect(isValidStoneGlideTarget(from, { tileX: 0, tileY: 0, r: 1, c: 2 }, placedTiles, doorsState)).toBe(true);
+    // Dist 2 diagonal
+    expect(isValidStoneGlideTarget(from, { tileX: 0, tileY: 0, r: 2, c: 1 }, placedTiles, doorsState)).toBe(true);
+  });
+
+  it('should return true even if there is a Raised Stone wall in the way', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 3 };
+    const wallsState = { '0,0:2,2:V': true }; // Raised stone wall between (2,2) and (2,3)
+    
+    expect(isValidStoneGlideTarget(from, to, placedTiles, doorsState, wallsState)).toBe(true);
+  });
+
+  it('should return false for regular wall blockage', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    // Tile 1 has a horizontal wall at r=2, c=2 (Horizontal wall between (2,2) and (3,2))
+    // Wait! Horizontal wall between (r, c) and (r+1, c) means horizontal wall between row 2 and 3 at col 2: w.r === 2 && w.c === 2.
+    // Yes! Let's verify it blocks:
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 2 };
+    expect(isValidStoneGlideTarget(from, to, placedTiles, doorsState)).toBe(false);
+  });
+
+  it('should return false for distance > 2', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 1 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 }; // Dist = 3
+    expect(isValidStoneGlideTarget(from, to, placedTiles, doorsState)).toBe(false);
+  });
+});
+
+describe('calculateScores', () => {
+  const players: Record<string, any> = {
+    p1: { id: 'p1', username: 'Player 1', severPoints: 1, points: 0 },
+    p2: { id: 'p2', username: 'Player 2', severPoints: 0, points: 0 }
+  };
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+    '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+  };
+
+  it('should initialize points to kills (severPoints)', () => {
+    const treasures: Record<string, any> = {};
+    const res = calculateScores(players, placedTiles, treasures);
+    expect(res.p1.points).toBe(1);
+    expect(res.p2.points).toBe(0);
+  });
+
+  it('should add 1 point for enemy mask on player Hearth', () => {
+    const treasures: Record<string, any> = {
+      t1: { id: 't1', tileX: 1, tileY: 0, r: 2, c: 2, ownerId: 'p1', carrierId: null } // p1's mask on p2's hearth
+    };
+    const res = calculateScores(players, placedTiles, treasures);
+    expect(res.p1.points).toBe(1); // p1 points remains 1 (severPoints: 1)
+    expect(res.p2.points).toBe(1); // p2 points becomes 1 (severPoints: 0 + 1 mask)
+  });
+
+  it('should not add points if player own mask is on their own Hearth', () => {
+    const treasures: Record<string, any> = {
+      t2: { id: 't2', tileX: 1, tileY: 0, r: 2, c: 2, ownerId: 'p2', carrierId: null } // p2's own mask on p2's hearth
+    };
+    const res = calculateScores(players, placedTiles, treasures);
+    expect(res.p2.points).toBe(0);
+  });
+
+  it('should not add points if enemy mask is carried', () => {
+    const treasures: Record<string, any> = {
+      t1: { id: 't1', tileX: 1, tileY: 0, r: 2, c: 2, ownerId: 'p1', carrierId: 'p2' } // p1's mask carried by p2
+    };
+    const res = calculateScores(players, placedTiles, treasures);
+    expect(res.p2.points).toBe(0);
+  });
+});
+
 

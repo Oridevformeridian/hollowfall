@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget, isValidStoneGlideTarget } from './shared/validation.ts';
+import { buildDeckForEmoji } from './shared/deck.ts';
 
 const renderTileSvgContent = (
   layout: TileLayout,
@@ -24,6 +25,12 @@ const renderTileSvgContent = (
   const cells = [];
   for (let r = 0; r < 5; r++) {
     for (let c = 0; c < 5; c++) {
+      const tileX = tilePos ? tilePos.x : 0;
+      const tileY = tilePos ? tilePos.y : 0;
+      const globalR = tilePos ? tileY * 5 + r : r;
+      const globalC = tilePos ? tileX * 5 + c : c;
+      const isEven = (globalR + globalC) % 2 === 0;
+
       cells.push(
         <rect
           key={`cell-${r}-${c}`}
@@ -31,7 +38,7 @@ const renderTileSvgContent = (
           y={r * 20}
           width="20"
           height="20"
-          fill="rgba(255, 255, 255, 0.01)"
+          fill={isEven ? 'rgba(255, 255, 255, 0.035)' : 'rgba(0, 0, 0, 0.3)'}
           stroke="rgba(255, 255, 255, 0.05)"
           strokeWidth="0.5"
         />
@@ -383,6 +390,203 @@ function playVictoryChime() {
   }
 }
 
+function playMajorChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    
+    // C Major: C4 (261.63), E4 (329.63), G4 (392.00), C5 (523.25)
+    const freqs = [261.63, 329.63, 392.00, 523.25];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+      
+      gain.gain.setValueAtTime(0, now + idx * 0.1);
+      gain.gain.linearRampToValueAtTime(0.12, now + idx * 0.1 + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.1 + 0.8);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.1);
+      osc.stop(now + idx * 0.1 + 0.9);
+    });
+  } catch (e) {
+    console.error('playMajorChime failed:', e);
+  }
+}
+
+function playMinorChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    
+    // C Minor (falling): Eb5 (622.25), C5 (523.25), G4 (392.00), Eb4 (311.13)
+    const freqs = [622.25, 523.25, 392.00, 311.13];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.12);
+      
+      gain.gain.setValueAtTime(0, now + idx * 0.12);
+      gain.gain.linearRampToValueAtTime(0.12, now + idx * 0.12 + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.12 + 0.9);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.12);
+      osc.stop(now + idx * 0.12 + 1.0);
+    });
+  } catch (e) {
+    console.error('playMinorChime failed:', e);
+  }
+}
+
+function playDeathChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    
+    // Low dark descending growl: G3 (196.00), F#3 (185.00), Eb3 (155.56), C3 (130.81)
+    const freqs = [196.00, 185.00, 155.56, 130.81];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.18);
+      
+      gain.gain.setValueAtTime(0, now + idx * 0.18);
+      gain.gain.linearRampToValueAtTime(0.15, now + idx * 0.18 + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.18 + 1.2);
+      
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(400, now);
+      filter.Q.setValueAtTime(1, now);
+      
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.start(now + idx * 0.18);
+      osc.stop(now + idx * 0.18 + 1.3);
+    });
+  } catch (e) {
+    console.error('playDeathChime failed:', e);
+  }
+}
+
+function playThwupSound() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+    
+    // 1. Noise sweep (friction of sliding card)
+    const bufferSize = ctx.sampleRate * 0.12; // 120ms
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    
+    const noiseSource = ctx.createBufferSource();
+    noiseSource.buffer = buffer;
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1000, now);
+    filter.frequency.exponentialRampToValueAtTime(200, now + 0.12);
+    filter.Q.setValueAtTime(4, now);
+    
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.15, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    
+    noiseSource.connect(filter);
+    filter.connect(noiseGain);
+    noiseGain.connect(ctx.destination);
+    
+    // 2. Triangle pitch sweep (card body vibration / snap)
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(160, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.08);
+    
+    oscGain.gain.setValueAtTime(0.2, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    
+    osc.connect(oscGain);
+    oscGain.connect(ctx.destination);
+    
+    noiseSource.start(now);
+    osc.start(now);
+    
+    noiseSource.stop(now + 0.12);
+    osc.stop(now + 0.12);
+  } catch (err) {
+    console.error("Failed to play card thwup sound:", err);
+  }
+}
+
+function playTurnStartRiff() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+
+    // "dun DUN dun" riff notes
+    const notes = [
+      { freq: 130.81, start: 0, dur: 0.18, gainVal: 0.18 }, // C3
+      { freq: 261.63, start: 0.22, dur: 0.35, gainVal: 0.28 }, // C4 (accented)
+      { freq: 196.00, start: 0.62, dur: 0.3, gainVal: 0.2 } // G3
+    ];
+
+    notes.forEach((note) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(note.freq, now + note.start);
+
+      // Lowpass Wah/Punch filter envelope
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(300, now + note.start);
+      filter.frequency.exponentialRampToValueAtTime(1200, now + note.start + 0.05);
+      filter.frequency.exponentialRampToValueAtTime(250, now + note.start + note.dur);
+      filter.Q.setValueAtTime(1.5, now);
+
+      // Volume envelope
+      gain.gain.setValueAtTime(0, now + note.start);
+      gain.gain.linearRampToValueAtTime(note.gainVal, now + note.start + 0.03); // Fast attack
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + note.start + note.dur); // Decay
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now + note.start);
+      osc.stop(now + note.start + note.dur + 0.1);
+    });
+  } catch (e) {
+    console.error('playTurnStartRiff failed:', e);
+  }
+}
+
 const ANIMALS = ['frog', 'duck', 'crab', 'bear', 'lion', 'wolf', 'deer', 'goat', 'owl', 'fish', 'fox', 'bird', 'cat', 'dog', 'pig'];
 const ITEMS = ['cup', 'spoon', 'fork', 'pen', 'book', 'key', 'bag', 'shoe', 'hat', 'box', 'bowl', 'lamp', 'door', 'desk', 'clock'];
 const COLORS = ['red', 'blue', 'green', 'pink', 'gray', 'teal', 'gold', 'yellow', 'black', 'white', 'orange', 'brown', 'purple'];
@@ -397,7 +601,7 @@ function generateLobbyName(): string {
 const getCardTypeEmoji = (cardId: string) => {
   if (cardId === 'ash_kindle_storm' || cardId === 'ash_fireball' || cardId === 'ash_immolate') return '⚔️';
   if (cardId === 'talisman_thorns') return '🌵';
-  if (cardId === 'working_miststep' || cardId === 'working_don_wolf') return '🌀';
+  if (cardId === 'working_miststep' || cardId === 'working_don_wolf' || cardId === 'working_stone_glide') return '🌀';
   if (cardId === 'working_shift_spirit') return '↔️';
   if (cardId === 'offering_deep_breath') return '🏥';
   if (cardId === 'ash_turn_aside' || cardId === 'ash_spirit_skin') return '🛡️';
@@ -433,7 +637,11 @@ export default function App() {
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showGraveyardTooltip, setShowGraveyardTooltip] = useState(false);
+  const [showExpendTooltip, setShowExpendTooltip] = useState(false);
   const [flingingCardId, setFlingingCardId] = useState<string | null>(null);
+  const [clientHand, setClientHand] = useState<{ id: string; name: string; type: string; description: string; clientId: string; expend?: boolean }[]>([]);
+  const handClientIdsRef = React.useRef<{ id: string; clientId: string }[]>([]);
 
   const [combatPopups, setCombatPopups] = useState<{
     id: string;
@@ -468,6 +676,65 @@ export default function App() {
   const gameStateRef = React.useRef(gameState);
   useEffect(() => {
     gameStateRef.current = gameState;
+  }, [gameState]);
+
+  const prevGameStateRef = React.useRef<any>(null);
+  useEffect(() => {
+    const prev = prevGameStateRef.current;
+    const current = gameState;
+    
+    // Update ref
+    prevGameStateRef.current = gameState;
+
+    if (!prev || !current) return;
+
+    // Check for turn change starting riff
+    const isNowGameplay = current.phase === 'GAMEPLAY';
+    const wasGameplay = prev.phase === 'GAMEPLAY';
+
+    if (isNowGameplay) {
+      const prevActiveId = wasGameplay && prev.turnOrder && prev.activePlayerIndex !== undefined
+        ? prev.turnOrder[prev.activePlayerIndex]
+        : null;
+      const currentActiveId = current.turnOrder && current.activePlayerIndex !== undefined
+        ? current.turnOrder[current.activePlayerIndex]
+        : null;
+
+      if (currentActiveId && socket?.id && currentActiveId === socket.id) {
+        if (!wasGameplay || currentActiveId !== prevActiveId) {
+          playTurnStartRiff();
+        }
+      }
+    }
+
+    if (current.phase !== 'GAMEPLAY' || prev.phase !== 'GAMEPLAY') return;
+
+    let pointGained = false;
+    let pointLost = false;
+    let playerKilled = false;
+
+    for (const [pId, p] of Object.entries(current.players)) {
+      const prevPlayer = prev.players[pId];
+      if (prevPlayer) {
+        if ((p as any).points > prevPlayer.points) {
+          pointGained = true;
+        } else if ((p as any).points < prevPlayer.points) {
+          pointLost = true;
+        }
+
+        if (prevPlayer.thread > 0 && (p as any).thread <= 0) {
+          playerKilled = true;
+        }
+      }
+    }
+
+    if (pointGained) {
+      playMajorChime();
+    } else if (pointLost) {
+      playMinorChime();
+    } else if (playerKilled) {
+      playDeathChime();
+    }
   }, [gameState]);
 
 
@@ -623,6 +890,10 @@ export default function App() {
             } else if (cardId === 'working_miststep') {
               if (target) {
                 spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '✨ Miststep', 'effect', 200);
+              }
+            } else if (cardId === 'working_stone_glide') {
+              if (target) {
+                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '⛰️ Stone Glide', 'effect', 200);
               }
             } else if (cardId === 'working_don_wolf') {
               if (target) {
@@ -793,11 +1064,17 @@ export default function App() {
     }
   };
 
-  const handleEndTurn = () => {
-    sendEvent({ event: 'END_TURN' });
+
+
+  const handleEndTurn = (discardHand: boolean = false) => {
+    sendEvent({
+      event: 'END_TURN',
+      payload: { discardHand }
+    });
   };
 
   const handlePlayCard = (cardId: string, target?: any) => {
+    playThwupSound();
     setFlingingCardId(cardId);
     setTimeout(() => {
       sendEvent({
@@ -839,6 +1116,46 @@ export default function App() {
     : null;
   const isActiveTurn = !!(socket && activePlayerId === socket.id);
   const myTokenPos = socket?.id && gameState ? gameState.tokenPositions[socket.id] : null;
+
+  useEffect(() => {
+    if (!self) {
+      setClientHand([]);
+      handClientIdsRef.current = [];
+      return;
+    }
+
+    const currentHand = self.hand || [];
+    const prevClientHand = handClientIdsRef.current;
+    const newClientHand: typeof clientHand = [];
+    const pool = [...prevClientHand];
+
+    let hasNewDraw = false;
+
+    currentHand.forEach(card => {
+      const poolIdx = pool.findIndex(p => p.id === card.id);
+      if (poolIdx !== -1) {
+        newClientHand.push({
+          ...card,
+          clientId: pool[poolIdx].clientId
+        });
+        pool.splice(poolIdx, 1);
+      } else {
+        const newId = `card-${Math.random().toString(36).substring(2, 11)}`;
+        newClientHand.push({
+          ...card,
+          clientId: newId
+        });
+        hasNewDraw = true;
+      }
+    });
+
+    handClientIdsRef.current = newClientHand.map(c => ({ id: c.id, clientId: c.clientId }));
+    setClientHand(newClientHand);
+
+    if (hasNewDraw) {
+      playThwupSound();
+    }
+  }, [self?.hand]);
 
   // Keyboard arrow movement controls
   useEffect(() => {
@@ -1250,42 +1567,62 @@ export default function App() {
                             {hero.class}
                           </span>
 
-                          {hoveredHeroIndex === idx && (
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: '110px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                zIndex: 300,
-                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                                backdropFilter: 'blur(10px)',
-                                border: `1px solid ${hero.color}88`,
-                                borderRadius: '12px',
-                                padding: '10px 14px',
-                                width: '220px',
-                                boxShadow: `0 8px 30px rgba(0,0,0,0.8), 0 0 10px ${hero.color}33`,
-                                boxSizing: 'border-box',
-                                pointerEvents: 'none',
-                                textAlign: 'center'
-                              }}
-                            >
-                              <div style={{ fontWeight: '900', fontSize: '13px', color: 'white', letterSpacing: '0.5px' }}>
-                                {hero.name}
-                              </div>
-                              <div style={{ fontSize: '11px', color: hero.color, fontWeight: 'bold', marginTop: '2px', textTransform: 'uppercase' }}>
-                                {hero.class} Specialty
-                              </div>
-                              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '8px', paddingTop: '8px' }}>
-                                <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px' }}>
-                                  Signature Cards (8x)
+                          {hoveredHeroIndex === idx && (() => {
+                            const deck = buildDeckForEmoji(hero.emoji);
+                            const counts: Record<string, number> = {};
+                            deck.forEach(c => {
+                              counts[c.name] = (counts[c.name] || 0) + 1;
+                            });
+                            const sortedDeckList = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                            return (
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  bottom: '110px',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  zIndex: 300,
+                                  backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                                  backdropFilter: 'blur(16px)',
+                                  border: `1.5px solid ${hero.color}`,
+                                  borderRadius: '12px',
+                                  padding: '12px 16px',
+                                  width: '240px',
+                                  boxShadow: `0 12px 40px rgba(0,0,0,0.9), 0 0 15px ${hero.color}44`,
+                                  boxSizing: 'border-box',
+                                  pointerEvents: 'none',
+                                  textAlign: 'left'
+                                }}
+                              >
+                                <div style={{ fontWeight: '900', fontSize: '13px', color: 'white', letterSpacing: '0.5px', textAlign: 'center' }}>
+                                  {hero.name}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: 'bold', marginTop: '3px' }}>
-                                  {hero.signatureCards.join(', ')}
+                                <div style={{ fontSize: '11px', color: hero.color, fontWeight: 'bold', marginTop: '2px', textTransform: 'uppercase', textAlign: 'center' }}>
+                                  {hero.class} Specialty
+                                </div>
+                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: '8px', paddingTop: '8px' }}>
+                                  <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#64748b', fontWeight: 'bold', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                                    Starting Deck (40 cards):
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                    {sortedDeckList.map(([cardName, count]) => {
+                                      const isSignature = hero.signatureCards.includes(cardName);
+                                      return (
+                                        <div key={cardName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                                          <span style={{ fontWeight: isSignature ? 'bold' : 'normal', color: isSignature ? hero.color : 'inherit' }}>
+                                            {cardName} {isSignature && '★'}
+                                          </span>
+                                          <span style={{ fontWeight: 'bold', color: isSignature ? hero.color : '#64748b' }}>
+                                            {count}x
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -1712,22 +2049,48 @@ export default function App() {
 
               {/* End Turn Button (only for active player) */}
               {isActiveTurn && (
-                <button
-                  onClick={handleEndTurn}
-                  className="btn-primary"
-                  style={{
-                    width: '100%',
-                    marginTop: '8px',
-                    backgroundColor: 'var(--accent-cyan)',
-                    fontWeight: 'bold',
-                    fontSize: '13px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  End Turn ➔
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px', width: '100%' }}>
+                  <button
+                    onClick={() => handleEndTurn(false)}
+                    className="btn-primary"
+                    style={{
+                      width: '100%',
+                      backgroundColor: 'var(--accent-cyan)',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '8px 0',
+                      borderRadius: '8px',
+                      border: 'none',
+                      color: 'black',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    End Turn ➔
+                  </button>
+                  <button
+                    onClick={() => handleEndTurn(true)}
+                    className="btn-secondary"
+                    style={{
+                      width: '100%',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      color: '#ef4444',
+                      border: '1px dashed #ef4444',
+                      fontWeight: 'bold',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '6px 0',
+                      borderRadius: '8px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🗑️ Discard Hand & End Turn
+                  </button>
+                </div>
               )}
 
             </div>
@@ -1806,27 +2169,47 @@ export default function App() {
             
             {/* End Turn button at the very bottom */}
             {isActiveTurn && gameState.phase === 'GAMEPLAY' && (
-              <button
-                onClick={handleEndTurn}
-                className="btn-primary"
-                style={{
-                  width: '100%',
-                  backgroundColor: 'var(--accent-cyan)',
-                  color: 'black',
-                  fontWeight: 'bold',
-                  fontSize: '13px',
-                  padding: '10px 0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: '8px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  flexShrink: 0
-                }}
-              >
-                End Turn ➔
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', flexShrink: 0, marginTop: '8px' }}>
+                <button
+                  onClick={() => handleEndTurn(false)}
+                  className="btn-primary"
+                  style={{
+                    width: '100%',
+                    backgroundColor: 'var(--accent-cyan)',
+                    color: 'black',
+                    fontWeight: 'bold',
+                    fontSize: '13px',
+                    padding: '10px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  End Turn ➔
+                </button>
+                <button
+                  onClick={() => handleEndTurn(true)}
+                  style={{
+                    width: '100%',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    color: '#ef4444',
+                    border: '1px dashed #ef4444',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    padding: '8px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🗑️ Discard Hand & End Turn
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -1982,8 +2365,8 @@ export default function App() {
                         {hasAura && (
                           <span style={{ display: 'flex', gap: '3px', marginLeft: '4px' }}>
                             {(player as any).hasTurnAside && <span title="Turn Aside Aura">🛡️</span>}
-                            {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura">🪨</span>}
-                            {(player as any).hasThorns && <span title="Thorns Talisman">🌵</span>}
+                            {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura">🪨{(player as any).spiritSkin > 1 && `x${(player as any).spiritSkin}`}</span>}
+                            {(player as any).hasThorns && <span title="Thorns Talisman">🌵{(player as any).thorns > 1 && `x${(player as any).thorns}`}</span>}
                           </span>
                         )}
                       </div>
@@ -2008,8 +2391,8 @@ export default function App() {
                       {hasAura && (
                         <div style={{ display: 'flex', gap: '2px', fontSize: '9px', marginTop: '2px', justifyContent: 'center', width: '100%' }}>
                           {(player as any).hasTurnAside && <span>🛡️</span>}
-                          {(player as any).hasSpiritSkin && <span>🪨</span>}
-                          {(player as any).hasThorns && <span>🌵</span>}
+                          {(player as any).hasSpiritSkin && <span>🪨{(player as any).spiritSkin > 1 && `x${(player as any).spiritSkin}`}</span>}
+                          {(player as any).hasThorns && <span>🌵{(player as any).thorns > 1 && `x${(player as any).thorns}`}</span>}
                         </div>
                       )}
                     </div>
@@ -2089,14 +2472,32 @@ export default function App() {
                     {player.hasAttackedThisTurn ? 'Used' : player.isFirstTurnOfMatch ? 'Forbidden' : 'Ready'}
                   </span>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px', marginTop: '2px' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>🎴 Deck:</span>
+                  <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>
+                    {player.deck?.length ?? 0} cards
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>🪦 Graveyard:</span>
+                  <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>
+                    {player.graveyard?.length ?? 0} cards
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>🔥 Expended:</span>
+                  <span style={{ fontSize: '11px', color: '#ff6d00', fontWeight: 'bold' }}>
+                    {player.expendPile?.length ?? 0} cards
+                  </span>
+                </div>
                 {/* Active Auras */}
                 {((player as any).hasTurnAside || (player as any).hasSpiritSkin || (player as any).hasThorns) && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px', marginTop: '2px' }}>
                     <span style={{ fontSize: '11px', color: '#94a3b8' }}>🛡️ Auras:</span>
                     <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold', display: 'flex', gap: '4px' }}>
                       {(player as any).hasTurnAside && <span title="Turn Aside Aura" style={{ color: 'var(--accent-cyan)' }}>🛡️</span>}
-                      {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura" style={{ color: 'var(--accent-green)' }}>🪨</span>}
-                      {(player as any).hasThorns && <span title="Thorns Talisman" style={{ color: '#FF6D00' }}>🌵</span>}
+                      {(player as any).hasSpiritSkin && <span title="Spirit-Skin Aura" style={{ color: 'var(--accent-green)' }}>🪨{(player as any).spiritSkin > 1 && `x${(player as any).spiritSkin}`}</span>}
+                      {(player as any).hasThorns && <span title="Thorns Talisman" style={{ color: '#FF6D00' }}>🌵{(player as any).thorns > 1 && `x${(player as any).thorns}`}</span>}
                     </span>
                   </div>
                 )}
@@ -2310,6 +2711,12 @@ export default function App() {
                             isMiststepTarget = isValidMiststepTarget(myTokenPos, targetPos, gameState.placedTiles) && !occupiedPlayerId;
                           }
 
+                          // 3.1. Stone Glide targeting
+                          let isStoneGlideTarget = false;
+                          if (targetingCardId === 'working_stone_glide' && isActiveTurn && myTokenPos) {
+                            isStoneGlideTarget = isValidStoneGlideTarget(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState) && !occupiedPlayerId;
+                          }
+
                           // 3.5. Don the Wolf targeting
                           let isDonWolfTarget = false;
                           if (targetingCardId === 'working_don_wolf' && isActiveTurn && myTokenPos) {
@@ -2325,6 +2732,10 @@ export default function App() {
                               isShiftSpiritTarget = hasLineOfSight(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
                             }
                           }
+
+                          const cellTreasure = gameState.treasures
+                            ? Object.values(gameState.treasures).find(t => t.tileX === x && t.tileY === y && t.r === r && t.c === c && t.carrierId === null)
+                            : null;
 
                           // 4. Raise Stone cell detection (player's current cell)
                           const isRaiseStoneCell = targetingCardId === 'working_raise_stone' && isActiveTurn && myTokenPos && myTokenPos.tileX === x && myTokenPos.tileY === y && myTokenPos.r === r && myTokenPos.c === c;
@@ -2347,6 +2758,9 @@ export default function App() {
                                   } else if (isMiststepTarget) {
                                     e.stopPropagation();
                                     handlePlayCard('working_miststep', targetPos);
+                                  } else if (isStoneGlideTarget) {
+                                    e.stopPropagation();
+                                    handlePlayCard('working_stone_glide', targetPos);
                                   } else if (isDonWolfTarget) {
                                     e.stopPropagation();
                                     handlePlayCard('working_don_wolf', targetPos);
@@ -2367,15 +2781,21 @@ export default function App() {
                               }}
                               style={{
                                 position: 'relative',
-                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || occupiedPlayerId) ? 'pointer' : 'default',
-                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || isRaiseStoneCell || occupiedPlayerId) ? 'auto' : 'none',
+                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isStoneGlideTarget || isDonWolfTarget || isShiftSpiritTarget)
+                                  ? 'pointer'
+                                  : cellTreasure
+                                  ? 'help'
+                                  : occupiedPlayerId
+                                  ? 'pointer'
+                                  : 'default',
+                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isStoneGlideTarget || isDonWolfTarget || isShiftSpiritTarget || isRaiseStoneCell || occupiedPlayerId || !!cellTreasure) ? 'auto' : 'none',
                                 border: lashablePlayer
                                   ? '2px solid var(--accent-crimson)'
                                   : isValidMove
                                   ? '1.5px dashed var(--accent-green)'
                                   : isKindleTarget
                                   ? '2px solid var(--accent-crimson)'
-                                  : (isMiststepTarget || isDonWolfTarget)
+                                  : (isMiststepTarget || isStoneGlideTarget || isDonWolfTarget)
                                   ? '1.5px dashed var(--accent-cyan)'
                                   : isShiftSpiritTarget
                                   ? '2px solid var(--accent-cyan)'
@@ -2399,20 +2819,22 @@ export default function App() {
                                 transition: 'all 0.15s ease'
                               }}
                               title={
-                                isValidMove
-                                  ? 'Move here'
-                                  : isKindleTarget
-                                  ? 'Target with Kindle the Storm'
-                                  : isMiststepTarget
-                                  ? 'Teleport here'
-                                  : isDonWolfTarget
-                                  ? 'Wolf Leap here'
-                                  : isShiftSpiritTarget
-                                  ? 'Swap positions with Shift Spirit'
-                                  : ''
-                              }
-                            >
-                              {/* Edge-zone selectors for Raise Stone */}
+                                (() => {
+                                  let baseTitle = '';
+                                  if (isValidMove) baseTitle = 'Move here';
+                                  else if (isKindleTarget) baseTitle = 'Target with Kindle the Storm';
+                                  else if (isMiststepTarget) baseTitle = 'Teleport here';
+                                  else if (isDonWolfTarget) baseTitle = 'Wolf Leap here';
+                                  else if (isShiftSpiritTarget) baseTitle = 'Swap positions with Shift Spirit';
+                                  
+                                  if (cellTreasure) {
+                                    const owner = gameState.players[cellTreasure.ownerId];
+                                    const maskText = `${owner?.username || 'Enemy'}'s Mask`;
+                                    return baseTitle ? `${baseTitle} (${maskText})` : maskText;
+                                  }
+                                  return baseTitle || undefined;
+                                })()
+                              }>
                               {isRaiseStoneCell && (
                                 <>
                                   {r > 0 && (
@@ -2548,7 +2970,7 @@ export default function App() {
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6 }}>
                     <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100">
                       <g transform={`rotate(${rotation} 50 50)`}>
-                        {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF')}
+                        {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF', { x, y })}
                       </g>
                     </svg>
                   </div>
@@ -3116,6 +3538,39 @@ export default function App() {
             width: 'auto'
           }}
         >
+          {/* Draw Pile Widget */}
+          <div
+            style={{
+              width: isMobile ? '50px' : '85px',
+              height: isMobile ? '70px' : '120px',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              border: (self.deck && self.deck.length > 0) 
+                ? '1.5px solid rgba(0, 229, 255, 0.4)' 
+                : '1.5px dashed rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexShrink: 0,
+              gap: isMobile ? '2px' : '6px',
+              boxShadow: (self.deck && self.deck.length > 0) ? '0 0 10px rgba(0, 229, 255, 0.15)' : 'none',
+              position: 'relative'
+            }}
+            title={`Draw Pile (${self.deck?.length ?? 0} cards)`}
+          >
+            <span style={{ fontSize: isMobile ? '16px' : '28px', opacity: (self.deck && self.deck.length > 0) ? 1 : 0.4 }}>🎴</span>
+            <span style={{ fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', color: 'white' }}>
+              {self.deck?.length ?? 0}
+            </span>
+            <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: isMobile ? 'none' : 'inline' }}>
+              Draw
+            </span>
+          </div>
+
+          {/* Vertical Divider */}
+          <div style={{ width: '1px', height: '80%', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0 8px', flexShrink: 0 }} />
+
           {/* Cards List (Centered horizontally, fully formed, extended all the way to the edge) */}
           <div
             style={{
@@ -3128,8 +3583,8 @@ export default function App() {
               alignItems: 'center'
             }}
           >
-            {self.hand.map((card, idx) => {
-              const cardKey = `hand-${card.id}-${idx}`;
+            {clientHand.map((card) => {
+              const cardKey = card.clientId;
               const isSelected = selectedCardId === cardKey;
               const isHovered = hoveredCardId === cardKey;
 
@@ -3154,10 +3609,20 @@ export default function App() {
               return (
                 <div
                   key={cardKey}
+                  className="card-draw-animation"
                   onMouseEnter={() => setHoveredCardId(cardKey)}
                   onMouseLeave={() => setHoveredCardId(null)}
                   onClick={() => {
-                    if (!canCast) return;
+                    if (!canCast) {
+                      if (isMobile) {
+                        if (isSelected) {
+                          setSelectedCardId(null);
+                        } else {
+                          setSelectedCardId(cardKey);
+                        }
+                      }
+                      return;
+                    }
                     if (isMobile) {
                       if (isSelected) {
                         setSelectedCardId(null);
@@ -3223,16 +3688,33 @@ export default function App() {
                       <span style={{ fontSize: '26px', margin: 'auto 0' }}>
                         {getCardTypeEmoji(card.id)}
                       </span>
-                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor }}>
-                        {card.type}
+                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: card.expend ? '#ff6d00' : typeColor }}>
+                        {card.expend ? '🔥 Expend' : card.type}
                       </span>
                     </div>
                   ) : (
                     <>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
-                          {card.type}
-                        </span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                            {card.type}
+                          </span>
+                          {card.expend && (
+                            <span style={{
+                              fontSize: '7px',
+                              fontWeight: '900',
+                              backgroundColor: 'rgba(255, 109, 0, 0.15)',
+                              color: '#ff6d00',
+                              border: '1px solid rgba(255, 109, 0, 0.3)',
+                              borderRadius: '4px',
+                              padding: '1px 3px',
+                              letterSpacing: '0.5px',
+                              lineHeight: '1'
+                            }}>
+                              🔥 EXPEND
+                            </span>
+                          )}
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
                           <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
                             {card.name}
@@ -3279,6 +3761,146 @@ export default function App() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Vertical Divider */}
+          <div style={{ width: '1px', height: '80%', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0 8px', flexShrink: 0 }} />
+
+          {/* Graveyard Widget */}
+          <div
+            onMouseEnter={() => setShowGraveyardTooltip(true)}
+            onMouseLeave={() => setShowGraveyardTooltip(false)}
+            style={{
+              width: isMobile ? '50px' : '85px',
+              height: isMobile ? '70px' : '120px',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              border: (self.graveyard && self.graveyard.length > 0)
+                ? '1.5px solid rgba(168, 85, 247, 0.4)'
+                : '1.5px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexShrink: 0,
+              gap: isMobile ? '2px' : '6px',
+              boxShadow: (self.graveyard && self.graveyard.length > 0) ? '0 0 10px rgba(168, 85, 247, 0.15)' : 'none',
+              cursor: (self.graveyard && self.graveyard.length > 0) ? 'pointer' : 'default',
+              position: 'relative'
+            }}
+          >
+            <span style={{ fontSize: isMobile ? '16px' : '28px', opacity: (self.graveyard && self.graveyard.length > 0) ? 1 : 0.4 }}>🪦</span>
+            <span style={{ fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', color: 'white' }}>
+              {self.graveyard?.length ?? 0}
+            </span>
+            <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: isMobile ? 'none' : 'inline' }}>
+              Grave
+            </span>
+
+            {/* Graveyard Tooltip */}
+            {showGraveyardTooltip && self.graveyard && self.graveyard.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                bottom: isMobile ? '80px' : '130px',
+                right: isMobile ? '-40px' : '0',
+                backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                backdropFilter: 'blur(12px)',
+                border: '1.5px solid #a855f7',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                width: '180px',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(168, 85, 247, 0.3)',
+                zIndex: 200,
+                textAlign: 'left'
+              }}>
+                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#a855f7', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
+                  Graveyard ({self.graveyard.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {(() => {
+                    const counts: Record<string, number> = {};
+                    self.graveyard.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
+                    return Object.entries(counts).map(([name, count]) => (
+                      <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                        <span>{name}</span>
+                        <span style={{ fontWeight: 'bold', color: '#a855f7' }}>{count}x</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Expend Pile Widget */}
+          <div
+            onMouseEnter={() => setShowExpendTooltip(true)}
+            onMouseLeave={() => setShowExpendTooltip(false)}
+            style={{
+              width: isMobile ? '50px' : '85px',
+              height: isMobile ? '70px' : '120px',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              border: (self.expendPile && self.expendPile.length > 0)
+                ? '1.5px solid rgba(255, 109, 0, 0.4)'
+                : '1.5px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexShrink: 0,
+              gap: isMobile ? '2px' : '6px',
+              boxShadow: (self.expendPile && self.expendPile.length > 0) ? '0 0 10px rgba(255, 109, 0, 0.15)' : 'none',
+              cursor: (self.expendPile && self.expendPile.length > 0) ? 'pointer' : 'default',
+              position: 'relative',
+              marginLeft: '8px'
+            }}
+          >
+            <span style={{ fontSize: isMobile ? '16px' : '28px', opacity: (self.expendPile && self.expendPile.length > 0) ? 1 : 0.4 }}>🔥</span>
+            <span style={{ fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', color: 'white' }}>
+              {self.expendPile?.length ?? 0}
+            </span>
+            <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: isMobile ? 'none' : 'inline' }}>
+              Expend
+            </span>
+
+            {/* Expend Tooltip */}
+            {showExpendTooltip && self.expendPile && self.expendPile.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                bottom: isMobile ? '80px' : '130px',
+                right: '0',
+                backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                backdropFilter: 'blur(12px)',
+                border: '1.5px solid #ff6d00',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                width: '180px',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(255, 109, 0, 0.3)',
+                zIndex: 200,
+                textAlign: 'left'
+              }}>
+                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#ff6d00', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
+                  Expended ({self.expendPile.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {(() => {
+                    const counts: Record<string, number> = {};
+                    self.expendPile.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
+                    return Object.entries(counts).map(([name, count]) => (
+                      <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                        <span>{name}</span>
+                        <span style={{ fontWeight: 'bold', color: '#ff6d00' }}>{count}x</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3348,13 +3970,24 @@ export default function App() {
             
             {(() => {
               const target = gameState.victoryPointsTarget || 2;
-              const winner = Object.values(gameState.players).find(p => p.points >= target);
+              let winner = Object.values(gameState.players).find(p => p.points >= target);
+              let winReason = `Successfully reached ${target} victory points!`;
+              
+              if (!winner) {
+                // Find sole survivor
+                const survivors = Object.values(gameState.players).filter(p => p.thread > 0 && !p.hasConceded);
+                if (survivors.length === 1) {
+                  winner = survivors[0];
+                  winReason = 'Last Walker standing!';
+                }
+              }
+
               if (winner) {
                 return (
                   <div style={{ margin: '24px 0' }}>
                     <span style={{ fontSize: '64px', display: 'block', margin: '8px 0', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.4))' }}>{winner.emoji}</span>
                     <h3 style={{ fontSize: '24px', color: 'white', margin: '0', fontWeight: 'bold' }}>{winner.username} Wins!</h3>
-                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>Successfully reached {target} victory points!</p>
+                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>{winReason}</p>
                   </div>
                 );
               }
@@ -3371,16 +4004,26 @@ export default function App() {
               </div>
               {(() => {
                 const target = gameState.victoryPointsTarget || 2;
-                return Object.values(gameState.players).map(p => (
-                  <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', gap: '8px', fontSize: '13px', color: 'white', padding: '4px 0' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>{p.emoji}</span>
-                      <span style={{ fontWeight: p.points >= target ? 'bold' : 'normal', color: p.points >= target ? 'var(--accent-gold)' : 'white' }}>{p.username}</span>
-                    </span>
-                    <span style={{ textAlign: 'center' }}>{p.severPoints || 0}</span>
-                    <span style={{ textAlign: 'center', fontWeight: 'bold', color: 'var(--accent-gold)' }}>{p.points} / {target}</span>
-                  </div>
-                ));
+                let winner = Object.values(gameState.players).find(p => p.points >= target);
+                if (!winner) {
+                  const survivors = Object.values(gameState.players).filter(p => p.thread > 0 && !p.hasConceded);
+                  if (survivors.length === 1) {
+                    winner = survivors[0];
+                  }
+                }
+                return Object.values(gameState.players).map(p => {
+                  const isWinner = winner && p.id === winner.id;
+                  return (
+                    <div key={p.id} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px', gap: '8px', fontSize: '13px', color: 'white', padding: '4px 0' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{p.emoji}</span>
+                        <span style={{ fontWeight: isWinner ? 'bold' : 'normal', color: isWinner ? 'var(--accent-gold)' : 'white' }}>{p.username}</span>
+                      </span>
+                      <span style={{ textAlign: 'center' }}>{p.severPoints || 0}</span>
+                      <span style={{ textAlign: 'center', fontWeight: 'bold', color: isWinner ? 'var(--accent-gold)' : '#94a3b8' }}>{p.points} / {target}</span>
+                    </div>
+                  );
+                });
               })()}
             </div>
 
@@ -3588,8 +4231,8 @@ export default function App() {
 
       {/* Zoomed Detailed Card Card (Mobile only) */}
       {isMobile && selectedCardId && self && !targetingCardId && !flingingCardId && (() => {
-        const cardIndex = self.hand.findIndex((c, idx) => `hand-${c.id}-${idx}` === selectedCardId);
-        const card = self.hand[cardIndex];
+        const cardIndex = clientHand.findIndex(c => c.clientId === selectedCardId);
+        const card = clientHand[cardIndex];
         if (!card) return null;
 
         const isBane = card.type === 'bane';
