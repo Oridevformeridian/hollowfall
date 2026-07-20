@@ -130,11 +130,11 @@ export const HEROES: Hero[] = [
   { emoji: '🧞', color: '#D500F9', name: 'Genie', class: 'Beast Paths', signatureCards: ['Don the Wolf'] },          // Col 5, Top
 
   // Row 2 (bottom selection of the 2x5 grid)
-  { emoji: '🧙‍♀️', color: '#E0F7FA', name: 'Woman Mage', class: 'Ashwalk', signatureCards: ['Immolate'] },     // Col 1, Bottom
-  { emoji: '🧝‍♀️', color: '#B9F6CA', name: 'Woman Elf', class: 'Stoneshaping', signatureCards: ['Raise Stone', 'Stone Glide'] },     // Col 2, Bottom
-  { emoji: '👸', color: '#F50057', name: 'Princess', class: 'Bonecraft', signatureCards: ['Thorns'] },       // Col 3, Bottom
-  { emoji: '🧚‍♀️', color: '#FFAB40', name: 'Woman Fairy', class: 'Dreamwalking', signatureCards: ['Shift Spirit'] },    // Col 4, Bottom
-  { emoji: '🦄', color: '#E2E8F0', name: 'Unicorn', class: 'Beast Paths', signatureCards: ['Don the Wolf'] }         // Col 5, Bottom
+  { emoji: '🧙‍♀️', color: '#2962FF', name: 'Woman Mage', class: 'Ashwalk', signatureCards: ['Immolate'] },     // Col 1, Bottom
+  { emoji: '🧝‍♀️', color: '#8D6E63', name: 'Woman Elf', class: 'Stoneshaping', signatureCards: ['Raise Stone', 'Stone Glide'] },     // Col 2, Bottom
+  { emoji: '👸', color: '#D50000', name: 'Princess', class: 'Bonecraft', signatureCards: ['Thorns'] },       // Col 3, Bottom
+  { emoji: '🧚‍♀️', color: '#E91E63', name: 'Woman Fairy', class: 'Dreamwalking', signatureCards: ['Shift Spirit'] },    // Col 4, Bottom
+  { emoji: '🦄', color: '#00BFA5', name: 'Unicorn', class: 'Beast Paths', signatureCards: ['Don the Wolf'] }         // Col 5, Bottom
 ];
 
 export const BASIC_CARDS: Card[] = [

@@ -5,6 +5,23 @@ import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget, isValidStoneGlideTarget } from './shared/validation.ts';
 import { buildDeckForEmoji } from './shared/deck.ts';
 
+const getClassShapeSvg = (heroClass: string, color: string, addGlow: boolean = false) => {
+  const glowStyle = addGlow ? { filter: `drop-shadow(0 0 5px ${color})` } : {};
+  switch (heroClass) {
+    case 'Ashwalk':
+      return <polygon points="50,5 61,39 98,39 68,60 79,95 50,74 21,95 32,60 2,39 39,39" fill={color} stroke={color} strokeWidth="1" style={glowStyle} />;
+    case 'Stoneshaping':
+      return <polygon points="50,5 89,27 89,73 50,95 11,73 11,27" fill={color} stroke={color} strokeWidth="1" style={glowStyle} />;
+    case 'Bonecraft':
+      return <polygon points="10,20 90,20 50,90" fill={color} stroke={color} strokeWidth="1" style={glowStyle} />;
+    case 'Dreamwalking':
+      return <circle cx="50" cy="50" r="45" fill={color} stroke={color} strokeWidth="1" style={glowStyle} />;
+    case 'Beast Paths':
+    default:
+      return <polygon points="50,5 95,38 78,95 22,95 5,38" fill={color} stroke={color} strokeWidth="1" style={glowStyle} />;
+  }
+};
+
 const renderTileSvgContent = (
   layout: TileLayout,
   playerColor: string,
@@ -19,7 +36,8 @@ const renderTileSvgContent = (
   wallsState?: Record<string, boolean>,
   isGameplay?: boolean,
   targetingCardId?: string | null,
-  onClickWall?: (wall: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' }) => void
+  onClickWall?: (wall: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' }) => void,
+  playerEmoji?: string
 ) => {
   const rot = rotation || 0;
   const cells = [];
@@ -52,13 +70,25 @@ const renderTileSvgContent = (
       {cells}
 
       {/* Starting Star in Center */}
-      <polygon
-        points="50,40.2 52.8,47.2 59.8,47.2 54.2,51.4 57,58.4 50,54.2 43,58.4 45.8,51.4 40.2,47.2 47.2,47.2"
-        fill={playerColor}
-        stroke={playerColor}
-        strokeWidth="1"
-        style={{ filter: `drop-shadow(0 0 5px ${playerColor})` }}
-      />
+      {playerEmoji ? (() => {
+        const heroDef = HEROES.find(h => h.emoji === playerEmoji);
+        if (heroDef) {
+          return (
+            <g transform="translate(40, 40) scale(0.2)">
+              {getClassShapeSvg(heroDef.class, playerColor, true)}
+            </g>
+          );
+        }
+        return null;
+      })() : (
+        <polygon
+          points="50,40.2 52.8,47.2 59.8,47.2 54.2,51.4 57,58.4 50,54.2 43,58.4 45.8,51.4 40.2,47.2 47.2,47.2"
+          fill={playerColor}
+          stroke={playerColor}
+          strokeWidth="1"
+          style={{ filter: `drop-shadow(0 0 5px ${playerColor})` }}
+        />
+      )}
 
       {/* Render Walls */}
       {layout.vWalls.map((w, idx) => (
@@ -609,6 +639,27 @@ const getCardTypeEmoji = (cardId: string) => {
   return '✨';
 };
 
+const ClassSymbol = ({ heroClass, color, size = '100%', opacity = 0.4 }: { heroClass: string, color: string, size?: string, opacity?: number }) => {
+  return (
+    <svg 
+      viewBox="0 0 100 100" 
+      width={size} 
+      height={size} 
+      style={{ 
+        opacity, 
+        display: 'block', 
+        position: 'absolute', 
+        top: '50%', 
+        left: '50%', 
+        transform: 'translate(-50%, -50%)', 
+        pointerEvents: 'none' 
+      }}
+    >
+      {getClassShapeSvg(heroClass, color)}
+    </svg>
+  );
+};
+
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -642,12 +693,25 @@ export default function App() {
   const [flingingCardId, setFlingingCardId] = useState<string | null>(null);
   const [clientHand, setClientHand] = useState<{ id: string; name: string; type: string; description: string; clientId: string; expend?: boolean }[]>([]);
   const handClientIdsRef = React.useRef<{ id: string; clientId: string }[]>([]);
+  
+  const desktopLogRef = React.useRef<HTMLDivElement>(null);
+  const mobileLogRef = React.useRef<HTMLDivElement>(null);
+  const hasPlayed10sWarningRef = React.useRef(false);
 
+  useEffect(() => {
+    if (desktopLogRef.current) {
+      desktopLogRef.current.scrollTop = desktopLogRef.current.scrollHeight;
+    }
+    if (mobileLogRef.current) {
+      mobileLogRef.current.scrollTop = mobileLogRef.current.scrollHeight;
+    }
+  }, [gameState?.gameLogs]);
   const [timeLeft, setTimeLeft] = useState<number>(45);
 
   useEffect(() => {
     if (gameState?.phase !== 'GAMEPLAY' || !gameState?.turnExpiresAt) {
       setTimeLeft(45);
+      hasPlayed10sWarningRef.current = false;
       return;
     }
 
@@ -656,13 +720,79 @@ export default function App() {
       const diff = expires - Date.now();
       const seconds = Math.max(0, Math.ceil(diff / 1000));
       setTimeLeft(seconds);
+
+      const isActiveTurn = gameState.turnOrder && socket?.id && gameState.turnOrder[gameState.activePlayerIndex] === socket.id;
+      
+      if (isActiveTurn && seconds === 10 && !hasPlayed10sWarningRef.current) {
+        hasPlayed10sWarningRef.current = true;
+        try {
+          const ctx = getAudioCtx();
+          if (ctx) {
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+            const hitCount = 7; 
+            const interval = 0.035; // 35ms between hits (very fast 7-stroke roll)
+
+            for (let i = 0; i < hitCount; i++) {
+              const time = now + (i * interval);
+              const isLast = i === hitCount - 1;
+              const isAccent = i % 4 === 0 || isLast;
+              
+              // Drum body (low punch)
+              const osc = ctx.createOscillator();
+              const oscGain = ctx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(150, time);
+              osc.frequency.exponentialRampToValueAtTime(50, time + 0.05);
+              
+              oscGain.gain.setValueAtTime(0, time);
+              oscGain.gain.linearRampToValueAtTime(isLast ? 1.0 : (isAccent ? 0.6 : 0.3), time + 0.005);
+              oscGain.gain.exponentialRampToValueAtTime(0.01, time + (isLast ? 0.2 : 0.05));
+              
+              osc.connect(oscGain);
+              oscGain.connect(ctx.destination);
+              
+              // Snare rattle (noise)
+              const bufferSize = ctx.sampleRate * 0.1;
+              const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+              const data = buffer.getChannelData(0);
+              for (let j = 0; j < bufferSize; j++) {
+                data[j] = Math.random() * 2 - 1;
+              }
+              const noiseSource = ctx.createBufferSource();
+              noiseSource.buffer = buffer;
+              
+              const noiseFilter = ctx.createBiquadFilter();
+              noiseFilter.type = 'highpass';
+              noiseFilter.frequency.value = 1500;
+              
+              const noiseGain = ctx.createGain();
+              noiseGain.gain.setValueAtTime(0, time);
+              noiseGain.gain.linearRampToValueAtTime(isLast ? 0.8 : (isAccent ? 0.5 : 0.2), time + 0.005);
+              noiseGain.gain.exponentialRampToValueAtTime(0.01, time + (isLast ? 0.2 : 0.05));
+              
+              noiseSource.connect(noiseFilter);
+              noiseFilter.connect(noiseGain);
+              noiseGain.connect(ctx.destination);
+              
+              osc.start(time);
+              noiseSource.start(time);
+              osc.stop(time + 0.25);
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      } else if (seconds > 10) {
+        hasPlayed10sWarningRef.current = false;
+      }
     };
 
     updateTimer(); // Initial call
     const timerId = setInterval(updateTimer, 500);
 
     return () => clearInterval(timerId);
-  }, [gameState?.turnExpiresAt, gameState?.phase]);
+  }, [gameState?.turnExpiresAt, gameState?.phase, gameState?.turnOrder, gameState?.activePlayerIndex, socket?.id]);
 
   const [combatPopups, setCombatPopups] = useState<{
     id: string;
@@ -1431,9 +1561,36 @@ export default function App() {
             display: 'flex',
             flexDirection: 'column',
             gap: isMobile ? '10px' : '24px',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            position: 'relative'
           }}
         >
+          <button
+            onClick={() => {
+              sessionStorage.removeItem('hollowfall_active_room');
+              sessionStorage.removeItem('hollowfall_active_username');
+              window.location.reload();
+            }}
+            style={{
+              position: 'absolute',
+              top: isMobile ? '8px' : '16px',
+              right: isMobile ? '8px' : '16px',
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: isMobile ? '20px' : '24px',
+              cursor: 'pointer',
+              lineHeight: 1,
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10
+            }}
+            title="Leave Lobby"
+          >
+            ✕
+          </button>
           {error && (
             <div
               style={{
@@ -1487,7 +1644,8 @@ export default function App() {
                     </svg>
                   ) : (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <rect x="5" y="4" width="12" height="16" rx="2" ry="2" />
+                      <rect x="9" y="8" width="12" height="16" rx="2" ry="2" />
                     </svg>
                   )}
                   {copied && (
@@ -1527,10 +1685,19 @@ export default function App() {
                     return (
                       <div
                         key={player.id}
-                        className={`flex justify-between items-center bg-[rgba(255,255,255,0.03)] ${isMobile ? 'p-1.5 rounded-lg' : 'p-3 rounded-xl'} border border-gray-800`}
-                        style={{ height: isMobile ? '38px' : '56px', boxSizing: 'border-box' }}
+                        className={`flex justify-between items-center bg-[rgba(255,255,255,0.03)] ${isMobile ? 'p-1.5 rounded-lg' : 'p-3 rounded-xl'} border`}
+                        style={{ height: isMobile ? '38px' : '56px', boxSizing: 'border-box', border: `2px solid ${player.color || 'var(--border-light)'}`, position: 'relative', overflow: 'hidden' }}
                       >
-                        <div className="flex items-center gap-1.5 min-w-0" style={{ flexGrow: 1 }}>
+                        {(() => {
+                          const heroDef = HEROES.find(h => h.emoji === player.emoji);
+                          if (!heroDef) return null;
+                          return (
+                            <div style={{ position: 'absolute', bottom: isMobile ? '-8px' : '-12px', right: isMobile ? '-4px' : '4px', width: isMobile ? '36px' : '54px', height: isMobile ? '36px' : '54px', zIndex: 0 }}>
+                              <ClassSymbol heroClass={heroDef.class} color={heroDef.color} size="100%" opacity={0.35} />
+                            </div>
+                          );
+                        })()}
+                        <div className="flex items-center gap-1.5 min-w-0" style={{ flexGrow: 1, position: 'relative', zIndex: 1 }}>
                           <div className={isMobile ? 'w-1.5 h-1.5 rounded-full' : 'w-2.5 h-2.5 rounded-full'} style={{ backgroundColor: player.color, flexShrink: 0 }} />
                           <span className="font-semibold text-white truncate" style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px', minWidth: 0 }}>
                             <span style={{ fontSize: isMobile ? '16px' : '28px', lineHeight: '1', flexShrink: 0 }}>{player.emoji}</span>
@@ -1544,7 +1711,9 @@ export default function App() {
                           style={{
                             flexShrink: 0,
                             backgroundColor: player.isReady ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.05)',
-                            color: player.isReady ? 'var(--accent-green)' : '#94a3b8'
+                            color: player.isReady ? 'var(--accent-green)' : '#94a3b8',
+                            position: 'relative',
+                            zIndex: 1
                           }}
                         >
                           {player.isReady ? 'READY' : 'WAIT'}
@@ -1631,12 +1800,15 @@ export default function App() {
                               cursor: isTaken ? 'not-allowed' : 'pointer',
                               opacity: isTaken ? 0.25 : 1,
                               transition: 'all 0.2s',
-                              boxShadow: isSelected ? `0 0 15px ${hero.color}` : 'none'
+                              boxShadow: isSelected ? `0 0 15px ${hero.color}` : 'none',
+                              position: 'relative',
+                              overflow: 'hidden'
                             }}
                             className={isTaken ? '' : 'hover:scale-105'}
                             title={isTaken ? `${hero.name} (Already Taken)` : hero.name}
                           >
-                            {hero.emoji}
+                            <ClassSymbol heroClass={hero.class} color={hero.color} size="85%" opacity={0.35} />
+                            <span style={{ position: 'relative', zIndex: 1 }}>{hero.emoji}</span>
                           </button>
                           <span
                             style={{
@@ -1648,7 +1820,17 @@ export default function App() {
                               letterSpacing: '0.5px'
                             }}
                           >
-{isMobile && hero.class.includes('/') ? (<>{hero.class.split('/')[0]}<br />{hero.class.split('/')[1]}</>) : hero.class}
+                            {isMobile ? (
+                              hero.class === 'Stoneshaping' ? (
+                                <>Stone<br/>Shaping</>
+                              ) : hero.class === 'Bonecraft' ? (
+                                <>Bone<br/>Crafting</>
+                              ) : hero.class === 'Dreamwalking' ? (
+                                <>Dream<br/>Walking</>
+                              ) : hero.class
+                            ) : (
+                              hero.class
+                            )}
                           </span>
 
                           {hoveredHeroIndex === idx && (() => {
@@ -1992,7 +2174,7 @@ export default function App() {
                 {/* SVG Render of Tile layout */}
                 <svg className="w-36 h-36 border border-gray-800 rounded bg-black" viewBox="0 0 100 100">
                   <g transform={`rotate(${rotation} 50 50)`}>
-                    {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF')}
+                    {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF', undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, self?.emoji)}
                   </g>
                 </svg>
               </div>
@@ -2217,6 +2399,7 @@ export default function App() {
               <h3 className="text-xs font-bold text-gray-400 m-0 uppercase tracking-widest">Ritual Feed</h3>
               <div style={{ position: 'relative', width: '100%' }}>
                 <div
+                  ref={desktopLogRef}
                   style={{
                     maxHeight: '160px',
                     overflowY: 'auto',
@@ -2326,6 +2509,7 @@ export default function App() {
             {gameState && gameState.gameLogs && gameState.gameLogs.length > 0 && (
               <div style={{ position: 'relative', flexGrow: 1, display: 'flex', minHeight: 0 }}>
                 <div
+                  ref={mobileLogRef}
                   style={{
                     width: '100%',
                     overflowY: 'auto',
@@ -2695,7 +2879,20 @@ export default function App() {
                     boxSizing: 'border-box'
                   }}
                 >
-                  <span style={{ fontSize: isMobile ? '20px' : '22px', lineHeight: '1' }}>{player.emoji}</span>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: isMobile ? '28px' : '32px', height: isMobile ? '28px' : '32px', flexShrink: 0 }}>
+                    {(() => {
+                      const heroDef = HEROES.find(h => h.emoji === player.emoji);
+                      if (heroDef) {
+                        return (
+                          <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '140%', height: '140%', zIndex: 0 }}>
+                            <ClassSymbol heroClass={heroDef.class} color={heroDef.color} size="100%" opacity={0.35} />
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <span style={{ fontSize: isMobile ? '20px' : '22px', lineHeight: '1', position: 'relative', zIndex: 1 }}>{player.emoji}</span>
+                  </div>
                   {!isMobile && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
@@ -2943,7 +3140,8 @@ export default function App() {
                           gameState.wallsState,
                           gameState.phase === 'GAMEPLAY',
                           targetingCardId,
-                          handleInteractWall
+                          handleInteractWall,
+                          gameState.players[tile.placedBy]?.emoji
                         )}
                       </g>
                     </svg>
@@ -3255,7 +3453,14 @@ export default function App() {
                                userSelect: 'none'
                              }}
                            >
-                             💎
+                             {(() => {
+                               const ownerHero = HEROES.find(h => h.emoji === owner?.emoji);
+                               if (ownerHero) {
+                                 return <ClassSymbol heroClass={ownerHero.class} color={ownerColor} opacity={0.6} size="24px" />;
+                               }
+                               return null;
+                             })()}
+                             <span style={{ position: 'relative', zIndex: 2 }}>💎</span>
                            </div>
                          );
                        }
@@ -3299,9 +3504,21 @@ export default function App() {
                                    position: 'absolute',
                                    bottom: '-4px',
                                    right: '-4px',
-                                   filter: `drop-shadow(0 0 4px ${gemColor})`
+                                   filter: `drop-shadow(0 0 4px ${gemColor})`,
+                                   display: 'flex',
+                                   alignItems: 'center',
+                                   justifyContent: 'center',
+                                   width: '14px',
+                                   height: '14px'
                                  }}>
-                                   💎
+                                   {(() => {
+                                     const gemOwnerHero = HEROES.find(h => h.emoji === gemOwner?.emoji);
+                                     if (gemOwnerHero) {
+                                       return <ClassSymbol heroClass={gemOwnerHero.class} color={gemColor} opacity={0.6} size="16px" />;
+                                     }
+                                     return null;
+                                   })()}
+                                   <span style={{ position: 'relative', zIndex: 2 }}>💎</span>
                                  </span>
                                );
                              })()}
@@ -3316,7 +3533,7 @@ export default function App() {
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.6 }}>
                     <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 100 100">
                       <g transform={`rotate(${rotation} 50 50)`}>
-                        {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF', { x, y })}
+                        {renderTileSvgContent(activeTileLayout, self?.color || '#00E5FF', { x, y }, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, self?.emoji)}
                       </g>
                     </svg>
                   </div>
