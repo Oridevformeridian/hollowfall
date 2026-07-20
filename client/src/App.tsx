@@ -1848,7 +1848,9 @@ export default function App() {
   };
 
   // isMobile is defined at top of component
-  const availableWidth = isMobile ? (dimensions.width - 64) : (dimensions.width - 320 - 80);
+  const availableWidth = isMobile
+    ? (dimensions.width - (gameState?.phase === 'PLACEMENT' ? 76 : 64))
+    : (dimensions.width - 320 - (gameState?.phase === 'PLACEMENT' ? 230 : 80));
   const bottomHUDHeight = gameState?.phase === 'GAMEPLAY' ? 220 : 0;
   const availableHeight = isMobile 
     ? (dimensions.height * 0.7 - (gameState?.phase === 'GAMEPLAY' ? 110 : 0) - 24)
@@ -2221,7 +2223,11 @@ export default function App() {
         style={{
           overflow: 'auto',
           paddingBottom: (isMobile || gameState.phase !== 'GAMEPLAY') ? '24px' : '220px',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          alignItems: gameState.phase === 'PLACEMENT' ? 'flex-start' : 'center',
+          justifyContent: gameState.phase === 'PLACEMENT' ? 'flex-start' : 'center',
+          paddingTop: gameState.phase === 'PLACEMENT' ? (isMobile ? '24px' : '48px') : undefined,
+          paddingLeft: gameState.phase === 'PLACEMENT' ? (isMobile ? '12px' : '48px') : undefined
         }}
       >
         {/* Targeting Banner */}
@@ -2532,8 +2538,8 @@ export default function App() {
             width: `${boardW * scaleFactor}px`,
             height: `${boardH * scaleFactor}px`,
             position: 'relative',
-            left: isMobile ? '-22px' : '0',
-            margin: 'auto',
+            left: (isMobile && gameState.phase !== 'PLACEMENT') ? '-22px' : '0',
+            margin: gameState.phase === 'PLACEMENT' ? '0' : 'auto',
             marginBottom: '24px',
             overflow: 'visible',
             flexShrink: 0
