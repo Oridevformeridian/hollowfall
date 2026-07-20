@@ -2760,7 +2760,7 @@ export default function App() {
           <div
             style={{
               position: 'absolute',
-              top: isMobile ? '56px' : '76px',
+              top: isMobile ? '44px' : '52px',
               right: isMobile ? '64px' : 'auto',
               left: isMobile ? 'auto' : '50%',
               transform: isMobile ? 'none' : 'translateX(-50%)',
