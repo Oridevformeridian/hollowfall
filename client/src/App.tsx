@@ -2450,7 +2450,9 @@ export default function App() {
           boxSizing: 'border-box',
           alignItems: gameState.phase === 'PLACEMENT' ? 'flex-start' : 'center',
           justifyContent: gameState.phase === 'PLACEMENT' ? 'flex-start' : 'center',
-          paddingTop: gameState.phase === 'PLACEMENT' ? (isMobile ? '24px' : '48px') : undefined,
+          paddingTop: gameState.phase === 'PLACEMENT' 
+            ? (isMobile ? '24px' : '48px') 
+            : (gameState.phase === 'GAMEPLAY' ? (isMobile ? '52px' : '72px') : undefined),
           paddingLeft: gameState.phase === 'PLACEMENT' ? (isMobile ? '12px' : '48px') : undefined
         }}
       >
@@ -2459,43 +2461,43 @@ export default function App() {
           <div
             style={{
               position: 'absolute',
-              top: isMobile ? '8px' : '20px',
+              top: isMobile ? '8px' : '16px',
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 90,
               display: 'flex',
               alignItems: 'center',
-              gap: isMobile ? '10px' : '20px',
+              gap: isMobile ? '8px' : '16px',
               backgroundColor: 'rgba(15, 23, 42, 0.9)',
               backdropFilter: 'blur(16px)',
               border: isActiveTurn 
                 ? `1.5px solid ${self.color}` 
                 : '1.5px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '24px',
-              padding: isMobile ? '6px 12px' : '10px 24px',
+              borderRadius: '16px',
+              padding: isMobile ? '4px 10px' : '6px 16px',
               boxShadow: isActiveTurn 
-                ? `0 8px 32px rgba(0,0,0,0.6), 0 0 15px ${self.color}33` 
-                : '0 8px 32px rgba(0,0,0,0.6)',
+                ? `0 6px 20px rgba(0,0,0,0.6), 0 0 10px ${self.color}22` 
+                : '0 6px 20px rgba(0,0,0,0.6)',
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               pointerEvents: 'auto',
               userSelect: 'none'
             }}
           >
             {/* Thread Stat (Left) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
-              <span style={{ fontSize: isMobile ? '16px' : '22px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}>🧵</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px' }}>
+              <span style={{ fontSize: isMobile ? '14px' : '18px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}>🧵</span>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={{ fontSize: isMobile ? '12px' : '18px', fontWeight: '900', color: 'white', lineHeight: '1.1' }}>
+                <span style={{ fontSize: isMobile ? '11px' : '15px', fontWeight: '900', color: 'white', lineHeight: '1.1' }}>
                   {self.thread}
                 </span>
-                <span style={{ fontSize: isMobile ? '7px' : '9px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <span style={{ fontSize: isMobile ? '6px' : '8px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Thread
                 </span>
               </div>
             </div>
 
             {/* Middle Divider */}
-            <div style={{ width: '1px', height: isMobile ? '16px' : '24px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+            <div style={{ width: '1px', height: isMobile ? '12px' : '18px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
 
             {/* Countdown Timer (Center Capsule) */}
             <div
@@ -2504,20 +2506,20 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '6px',
+                gap: '4px',
                 backgroundColor: timeLeft <= 9 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(0, 0, 0, 0.45)',
                 border: timeLeft <= 9 ? '2px solid rgba(239, 68, 68, 0.7)' : '1px solid rgba(255,255,255,0.08)',
-                padding: isMobile ? '6px 12px' : '10px 20px',
-                borderRadius: '20px',
-                minWidth: isMobile ? '65px' : '100px',
+                padding: isMobile ? '4px 8px' : '6px 12px',
+                borderRadius: '12px',
+                minWidth: isMobile ? '50px' : '75px',
                 transition: 'all 0.25s'
               }}
               title="Turn Timer"
             >
-              <span style={{ fontSize: isMobile ? '13px' : '20px' }}>⏱️</span>
+              <span style={{ fontSize: isMobile ? '11px' : '14px' }}>⏱️</span>
               <span
                 style={{
-                  fontSize: isMobile ? '14px' : '22px',
+                  fontSize: isMobile ? '11px' : '16px',
                   fontWeight: '900',
                   color: timeLeft <= 9 ? '#ff4d4d' : 'white',
                   fontFamily: 'monospace'
@@ -2528,19 +2530,19 @@ export default function App() {
             </div>
 
             {/* Middle Divider */}
-            <div style={{ width: '1px', height: isMobile ? '16px' : '24px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+            <div style={{ width: '1px', height: isMobile ? '12px' : '18px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
 
             {/* AP Stat (Right) */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '6px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                <span style={{ fontSize: isMobile ? '12px' : '18px', fontWeight: '900', color: 'var(--accent-cyan)', lineHeight: '1.1' }}>
+                <span style={{ fontSize: isMobile ? '11px' : '15px', fontWeight: '900', color: 'var(--accent-cyan)', lineHeight: '1.1' }}>
                   {self.ap}
                 </span>
-                <span style={{ fontSize: isMobile ? '7px' : '9px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <span style={{ fontSize: isMobile ? '6px' : '8px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   AP
                 </span>
               </div>
-              <span style={{ fontSize: isMobile ? '16px' : '22px', filter: 'drop-shadow(0 2px 4px rgba(0,229,255,0.3))' }}>⚡</span>
+              <span style={{ fontSize: isMobile ? '14px' : '18px', filter: 'drop-shadow(0 2px 4px rgba(0,229,255,0.3))' }}>⚡</span>
             </div>
           </div>
         )}
