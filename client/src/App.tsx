@@ -725,18 +725,19 @@ export default function App() {
       
       if (isActiveTurn && seconds === 10 && !hasPlayed10sWarningRef.current) {
         hasPlayed10sWarningRef.current = true;
+        console.log("10s warning triggered! Playing drum roll...");
         try {
-          const ctx = getAudioCtx();
-          if (ctx) {
-            if (ctx.state === 'suspended') ctx.resume();
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioContextClass) {
+            const ctx = new AudioContextClass();
             const now = ctx.currentTime;
-            const hitCount = 7; 
-            const interval = 0.035; // 35ms between hits (very fast 7-stroke roll)
+            const hitCount = 3; 
+            const interval = 0.04; // 40ms between hits
 
             for (let i = 0; i < hitCount; i++) {
               const time = now + (i * interval);
               const isLast = i === hitCount - 1;
-              const isAccent = i % 4 === 0 || isLast;
+              const isAccent = isLast;
               
               // Drum body (low punch)
               const osc = ctx.createOscillator();
@@ -746,14 +747,14 @@ export default function App() {
               osc.frequency.exponentialRampToValueAtTime(50, time + 0.05);
               
               oscGain.gain.setValueAtTime(0, time);
-              oscGain.gain.linearRampToValueAtTime(isLast ? 1.0 : (isAccent ? 0.6 : 0.3), time + 0.005);
+              oscGain.gain.linearRampToValueAtTime(isLast ? 1.0 : 0.5, time + 0.005);
               oscGain.gain.exponentialRampToValueAtTime(0.01, time + (isLast ? 0.2 : 0.05));
               
               osc.connect(oscGain);
               oscGain.connect(ctx.destination);
               
               // Snare rattle (noise)
-              const bufferSize = ctx.sampleRate * 0.1;
+              const bufferSize = Math.floor(ctx.sampleRate * 0.1);
               const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
               const data = buffer.getChannelData(0);
               for (let j = 0; j < bufferSize; j++) {
@@ -768,7 +769,7 @@ export default function App() {
               
               const noiseGain = ctx.createGain();
               noiseGain.gain.setValueAtTime(0, time);
-              noiseGain.gain.linearRampToValueAtTime(isLast ? 0.8 : (isAccent ? 0.5 : 0.2), time + 0.005);
+              noiseGain.gain.linearRampToValueAtTime(isLast ? 0.8 : 0.4, time + 0.005);
               noiseGain.gain.exponentialRampToValueAtTime(0.01, time + (isLast ? 0.2 : 0.05));
               
               noiseSource.connect(noiseFilter);
@@ -781,7 +782,7 @@ export default function App() {
             }
           }
         } catch (e) {
-          console.error(e);
+          console.error("10s warning audio failed:", e);
         }
       } else if (seconds > 10) {
         hasPlayed10sWarningRef.current = false;
