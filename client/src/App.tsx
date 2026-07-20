@@ -3534,378 +3534,536 @@ export default function App() {
             borderRadius: '24px',
             padding: '12px 16px',
             display: 'flex',
-            flexDirection: 'row',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 100,
             boxShadow: '0 15px 35px rgba(0,0,0,0.6)',
             boxSizing: 'border-box',
             maxWidth: '96vw',
-            width: 'auto'
+            width: isMobile ? '96vw' : 'auto'
           }}
         >
-          {/* Draw Pile Widget */}
-          <div
-            style={{
-              width: isMobile ? '50px' : '85px',
-              height: isMobile ? '70px' : '120px',
-              backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              border: (self.deck && self.deck.length > 0) 
-                ? '1.5px solid rgba(0, 229, 255, 0.4)' 
-                : '1.5px dashed rgba(255, 255, 255, 0.2)',
-              borderRadius: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              flexShrink: 0,
-              gap: isMobile ? '2px' : '6px',
-              boxShadow: (self.deck && self.deck.length > 0) ? '0 0 10px rgba(0, 229, 255, 0.15)' : 'none',
-              position: 'relative'
-            }}
-            title={`Draw Pile (${self.deck?.length ?? 0} cards)`}
-          >
-            <span style={{ fontSize: isMobile ? '16px' : '28px', opacity: (self.deck && self.deck.length > 0) ? 1 : 0.4 }}>🎴</span>
-            <span style={{ fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', color: 'white' }}>
-              {self.deck?.length ?? 0}
-            </span>
-            <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: isMobile ? 'none' : 'inline' }}>
-              Draw
-            </span>
-          </div>
+          {/* Mobile compact pile widgets row */}
+          {isMobile && (
+            <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', alignItems: 'center', width: '100%', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '6px', marginBottom: '2px' }}>
+              {/* Draw Pile (mobile layout) */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  border: (self.deck && self.deck.length > 0) 
+                    ? '1px solid rgba(0, 229, 255, 0.4)' 
+                    : '1px dashed rgba(255, 255, 255, 0.2)'
+                }}
+              >
+                <span style={{ fontSize: '14px' }}>🎴</span>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'white' }}>{self.deck?.length ?? 0}</span>
+                <span style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase' }}>Draw</span>
+              </div>
 
-          {/* Vertical Divider */}
-          <div style={{ width: '1px', height: '80%', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0 8px', flexShrink: 0 }} />
+              {/* Graveyard (mobile layout) */}
+              <div
+                onMouseEnter={() => setShowGraveyardTooltip(true)}
+                onMouseLeave={() => setShowGraveyardTooltip(false)}
+                onClick={() => self.graveyard && self.graveyard.length > 0 && setShowGraveyardTooltip(!showGraveyardTooltip)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  border: (self.graveyard && self.graveyard.length > 0)
+                    ? '1px solid rgba(168, 85, 247, 0.4)'
+                    : '1px solid rgba(255, 255, 255, 0.1)',
+                  cursor: (self.graveyard && self.graveyard.length > 0) ? 'pointer' : 'default',
+                  position: 'relative'
+                }}
+              >
+                <span style={{ fontSize: '14px' }}>🪦</span>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'white' }}>{self.graveyard?.length ?? 0}</span>
+                <span style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase' }}>Grave</span>
 
-          {/* Cards List (Centered horizontally, fully formed, extended all the way to the edge) */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '16px',
-              overflowX: 'auto',
-              pointerEvents: 'auto',
-              flexGrow: 1,
-              justifyContent: 'center',
-              alignItems: 'center'
-            }}
-          >
-            {clientHand.map((card) => {
-              const cardKey = card.clientId;
-              const isSelected = selectedCardId === cardKey;
-              const isHovered = hoveredCardId === cardKey;
+                {showGraveyardTooltip && self.graveyard && self.graveyard.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '36px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1.5px solid #a855f7',
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    width: '180px',
+                    maxHeight: '160px',
+                    overflowY: 'auto',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(168, 85, 247, 0.3)',
+                    zIndex: 200,
+                    textAlign: 'left'
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#a855f7', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
+                      Graveyard ({self.graveyard.length})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {(() => {
+                        const counts: Record<string, number> = {};
+                        self.graveyard.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
+                        return Object.entries(counts).map(([name, count]) => (
+                          <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                            <span>{name}</span>
+                            <span style={{ fontWeight: 'bold', color: '#a855f7' }}>{count}x</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-              const isBane = card.type === 'bane';
-              const isWard = card.type === 'ward';
-              const isWorking = card.type === 'working';
-              const isOffering = card.type === 'offering';
+              {/* Expend Pile (mobile layout) */}
+              <div
+                onMouseEnter={() => setShowExpendTooltip(true)}
+                onMouseLeave={() => setShowExpendTooltip(false)}
+                onClick={() => self.expendPile && self.expendPile.length > 0 && setShowExpendTooltip(!showExpendTooltip)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  border: (self.expendPile && self.expendPile.length > 0)
+                    ? '1px solid rgba(255, 109, 0, 0.4)'
+                    : '1px solid rgba(255, 255, 255, 0.1)',
+                  cursor: (self.expendPile && self.expendPile.length > 0) ? 'pointer' : 'default',
+                  position: 'relative'
+                }}
+              >
+                <span style={{ fontSize: '14px' }}>🔥</span>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'white' }}>{self.expendPile?.length ?? 0}</span>
+                <span style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase' }}>Expend</span>
 
-              const typeColor = isBane
-                ? '#ff1744'
-                : isWard
-                ? '#ffd600'
-                : isWorking
-                ? '#00e5ff'
-                : (isOffering || card.type === 'talisman')
-                ? '#00e676'
-                : '#94a3b8';
+                {showExpendTooltip && self.expendPile && self.expendPile.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '36px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1.5px solid #ff6d00',
+                    borderRadius: '12px',
+                    padding: '10px 14px',
+                    width: '180px',
+                    maxHeight: '160px',
+                    overflowY: 'auto',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(255, 109, 0, 0.3)',
+                    zIndex: 200,
+                    textAlign: 'left'
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#ff6d00', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
+                      Expended ({self.expendPile.length})
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {(() => {
+                        const counts: Record<string, number> = {};
+                        self.expendPile.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
+                        return Object.entries(counts).map(([name, count]) => (
+                          <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                            <span>{name}</span>
+                            <span style={{ fontWeight: 'bold', color: '#ff6d00' }}>{count}x</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
-              const canCast = isActiveTurn && self.ap > 0 && !isWard;
-              const noTargetNeeded = card.id === 'talisman_thorns' || card.id === 'ash_turn_aside' || card.id === 'ash_spirit_skin' || card.id === 'offering_deep_breath';
-
-              return (
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', width: '100%', flexGrow: 1 }}>
+            {/* Desktop Left Side Widgets */}
+            {!isMobile && (
+              <>
+                {/* Draw Pile Widget */}
                 <div
-                  key={cardKey}
-                  className="card-draw-animation"
-                  onMouseEnter={() => setHoveredCardId(cardKey)}
-                  onMouseLeave={() => setHoveredCardId(null)}
-                  onClick={() => {
-                    if (!canCast) {
+                  style={{
+                    width: '85px',
+                    height: '120px',
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    border: (self.deck && self.deck.length > 0) 
+                      ? '1.5px solid rgba(0, 229, 255, 0.4)' 
+                      : '1.5px dashed rgba(255, 255, 255, 0.2)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    flexShrink: 0,
+                    gap: '6px',
+                    boxShadow: (self.deck && self.deck.length > 0) ? '0 0 10px rgba(0, 229, 255, 0.15)' : 'none',
+                    position: 'relative'
+                  }}
+                  title={`Draw Pile (${self.deck?.length ?? 0} cards)`}
+                >
+                  <span style={{ fontSize: '28px', opacity: (self.deck && self.deck.length > 0) ? 1 : 0.4 }}>🎴</span>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+                    {self.deck?.length ?? 0}
+                  </span>
+                  <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Draw
+                  </span>
+                </div>
+
+                {/* Vertical Divider */}
+                <div style={{ width: '1px', height: '80%', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0 8px', flexShrink: 0 }} />
+              </>
+            )}
+
+            {/* Cards List (Centered horizontally, fully formed, extended all the way to the edge) */}
+            <div
+              style={{
+                display: 'flex',
+                gap: '12px',
+                overflowX: 'auto',
+                pointerEvents: 'auto',
+                flexGrow: 1,
+                justifyContent: (isMobile || clientHand.length > 4) ? 'flex-start' : 'center',
+                alignItems: 'center',
+                width: isMobile ? '100%' : 'auto',
+                padding: isMobile ? '4px 0' : '0'
+              }}
+            >
+              {clientHand.map((card) => {
+                const cardKey = card.clientId;
+                const isSelected = selectedCardId === cardKey;
+                const isHovered = hoveredCardId === cardKey;
+
+                const isBane = card.type === 'bane';
+                const isWard = card.type === 'ward';
+                const isWorking = card.type === 'working';
+                const isOffering = card.type === 'offering';
+
+                const typeColor = isBane
+                  ? '#ff1744'
+                  : isWard
+                  ? '#ffd600'
+                  : isWorking
+                  ? '#00e5ff'
+                  : (isOffering || card.type === 'talisman')
+                  ? '#00e676'
+                  : '#94a3b8';
+
+                const canCast = isActiveTurn && self.ap > 0 && !isWard;
+                const noTargetNeeded = card.id === 'talisman_thorns' || card.id === 'ash_turn_aside' || card.id === 'ash_spirit_skin' || card.id === 'offering_deep_breath';
+
+                return (
+                  <div
+                    key={cardKey}
+                    className="card-draw-animation"
+                    onMouseEnter={() => setHoveredCardId(cardKey)}
+                    onMouseLeave={() => setHoveredCardId(null)}
+                    onClick={() => {
+                      if (!canCast) {
+                        if (isMobile) {
+                          if (isSelected) {
+                            setSelectedCardId(null);
+                          } else {
+                            setSelectedCardId(cardKey);
+                          }
+                        }
+                        return;
+                      }
                       if (isMobile) {
                         if (isSelected) {
                           setSelectedCardId(null);
+                          setTargetingCardId(null);
                         } else {
                           setSelectedCardId(cardKey);
                         }
-                      }
-                      return;
-                    }
-                    if (isMobile) {
-                      if (isSelected) {
-                        setSelectedCardId(null);
-                        setTargetingCardId(null);
                       } else {
-                        setSelectedCardId(cardKey);
-                      }
-                    } else {
-                      if (isSelected) {
-                        if (noTargetNeeded) {
-                          handlePlayCard(card.id);
-                          setSelectedCardId(null);
+                        if (isSelected) {
+                          if (noTargetNeeded) {
+                            handlePlayCard(card.id);
+                            setSelectedCardId(null);
+                          } else {
+                            setTargetingCardId(null);
+                            setSelectedCardId(null);
+                          }
                         } else {
-                          setTargetingCardId(null);
-                          setSelectedCardId(null);
-                        }
-                      } else {
-                        setSelectedCardId(cardKey);
-                        if (!noTargetNeeded) {
-                          setTargetingCardId(card.id);
-                        } else {
-                          setTargetingCardId(null);
+                          setSelectedCardId(cardKey);
+                          if (!noTargetNeeded) {
+                            setTargetingCardId(card.id);
+                          } else {
+                            setTargetingCardId(null);
+                          }
                         }
                       }
-                    }
-                  }}
+                    }}
+                    style={{
+                      width: isMobile ? '65px' : '110px',
+                      height: isMobile ? '88px' : '165px',
+                      minWidth: isMobile ? '65px' : '110px',
+                      maxWidth: isMobile ? '65px' : '110px',
+                      minHeight: isMobile ? '88px' : '165px',
+                      maxHeight: isMobile ? '88px' : '165px',
+                      flexShrink: 0,
+                      backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                      border: isSelected 
+                        ? '2px solid var(--accent-cyan)' 
+                        : isHovered 
+                        ? `2px solid ${typeColor}` 
+                        : `1px solid ${typeColor}66`,
+                      borderRadius: '12px',
+                      boxShadow: isSelected 
+                        ? `0 0 20px var(--accent-cyan)` 
+                        : isHovered 
+                        ? `0 0 12px ${typeColor}` 
+                        : `0 0 6px ${typeColor}22`,
+                      padding: isMobile ? '4px' : '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      cursor: canCast ? 'pointer' : 'not-allowed',
+                      transition: 'all 0.15s ease-out',
+                      boxSizing: 'border-box',
+                      position: 'relative',
+                      opacity: (targetingCardId && !isSelected) ? 0.5 : 1
+                    }}
+                  >
+                    {isMobile ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', alignItems: 'center', width: '100%', overflow: 'hidden' }}>
+                        <span style={{ fontSize: '8px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
+                          {card.name}
+                        </span>
+                        <span style={{ fontSize: '26px', margin: 'auto 0' }}>
+                          {getCardTypeEmoji(card.id)}
+                        </span>
+                        <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: card.expend ? '#ff6d00' : typeColor }}>
+                          {card.expend ? '🔥 Expend' : card.type}
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                            <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                              {card.type}
+                            </span>
+                            {card.expend && (
+                              <span style={{
+                                fontSize: '7px',
+                                fontWeight: '900',
+                                backgroundColor: 'rgba(255, 109, 0, 0.15)',
+                                color: '#ff6d00',
+                                border: '1px solid rgba(255, 109, 0, 0.3)',
+                                borderRadius: '4px',
+                                padding: '1px 3px',
+                                letterSpacing: '0.5px',
+                                lineHeight: '1'
+                              }}>
+                                🔥 EXPEND
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
+                              {card.name}
+                            </span>
+                            <span style={{ fontSize: '13px', flexShrink: 0 }}>
+                              {getCardTypeEmoji(card.id)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{
+                          fontSize: '11px',
+                          color: '#94a3b8',
+                          lineHeight: '1.3',
+                          opacity: 1,
+                          flexGrow: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          marginTop: '4px'
+                        }}>
+                          {card.description}
+                        </div>
+
+                        <div style={{
+                          fontSize: '8px',
+                          fontWeight: 'bold',
+                          color: isSelected ? 'var(--accent-cyan)' : '#64748b',
+                          textAlign: 'center',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.5px',
+                          opacity: 1,
+                          marginTop: '2px'
+                        }}>
+                          {isWard
+                            ? '🛡️ Defense'
+                            : isSelected 
+                            ? (noTargetNeeded
+                              ? '➔ Click to Cast' 
+                              : '🎯 Target board') 
+                            : '⚡ Cast Rite'}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Right Side Piles */}
+            {!isMobile && (
+              <>
+                {/* Vertical Divider */}
+                <div style={{ width: '1px', height: '80%', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0 8px', flexShrink: 0 }} />
+
+                {/* Graveyard Widget */}
+                <div
+                  onMouseEnter={() => setShowGraveyardTooltip(true)}
+                  onMouseLeave={() => setShowGraveyardTooltip(false)}
                   style={{
-                    width: isMobile ? '65px' : '110px',
-                    height: isMobile ? '88px' : '165px',
-                    minWidth: isMobile ? '65px' : '110px',
-                    maxWidth: isMobile ? '65px' : '110px',
-                    minHeight: isMobile ? '88px' : '165px',
-                    maxHeight: isMobile ? '88px' : '165px',
-                    flexShrink: 0,
-                    backgroundColor: 'rgba(15, 23, 42, 0.98)',
-                    border: isSelected 
-                      ? '2px solid var(--accent-cyan)' 
-                      : isHovered 
-                      ? `2px solid ${typeColor}` 
-                      : `1px solid ${typeColor}66`,
+                    width: '85px',
+                    height: '120px',
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    border: (self.graveyard && self.graveyard.length > 0)
+                      ? '1.5px solid rgba(168, 85, 247, 0.4)'
+                      : '1.5px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '12px',
-                    boxShadow: isSelected 
-                      ? `0 0 20px var(--accent-cyan)` 
-                      : isHovered 
-                      ? `0 0 12px ${typeColor}` 
-                      : `0 0 6px ${typeColor}22`,
-                    padding: isMobile ? '4px' : '10px',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    cursor: canCast ? 'pointer' : 'not-allowed',
-                    transition: 'all 0.15s ease-out',
-                    boxSizing: 'border-box',
-                    position: 'relative',
-                    opacity: (targetingCardId && !isSelected) ? 0.5 : 1
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    flexShrink: 0,
+                    gap: '6px',
+                    boxShadow: (self.graveyard && self.graveyard.length > 0) ? '0 0 10px rgba(168, 85, 247, 0.15)' : 'none',
+                    cursor: (self.graveyard && self.graveyard.length > 0) ? 'pointer' : 'default',
+                    position: 'relative'
                   }}
                 >
-                  {isMobile ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', alignItems: 'center', width: '100%', overflow: 'hidden' }}>
-                      <span style={{ fontSize: '8px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>
-                        {card.name}
-                      </span>
-                      <span style={{ fontSize: '26px', margin: 'auto 0' }}>
-                        {getCardTypeEmoji(card.id)}
-                      </span>
-                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: card.expend ? '#ff6d00' : typeColor }}>
-                        {card.expend ? '🔥 Expend' : card.type}
-                      </span>
+                  <span style={{ fontSize: '28px', opacity: (self.graveyard && self.graveyard.length > 0) ? 1 : 0.4 }}>🪦</span>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+                    {self.graveyard?.length ?? 0}
+                  </span>
+                  <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Grave
+                  </span>
+
+                  {/* Graveyard Tooltip */}
+                  {showGraveyardTooltip && self.graveyard && self.graveyard.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '130px',
+                      right: '0',
+                      backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                      backdropFilter: 'blur(12px)',
+                      border: '1.5px solid #a855f7',
+                      borderRadius: '12px',
+                      padding: '10px 14px',
+                      width: '180px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(168, 85, 247, 0.3)',
+                      zIndex: 200,
+                      textAlign: 'left'
+                    }}>
+                      <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#a855f7', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
+                        Graveyard ({self.graveyard.length})
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {(() => {
+                          const counts: Record<string, number> = {};
+                          self.graveyard.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
+                          return Object.entries(counts).map(([name, count]) => (
+                            <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                              <span>{name}</span>
+                              <span style={{ fontWeight: 'bold', color: '#a855f7' }}>{count}x</span>
+                            </div>
+                          ));
+                        })()}
+                      </div>
                     </div>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                          <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
-                            {card.type}
-                          </span>
-                          {card.expend && (
-                            <span style={{
-                              fontSize: '7px',
-                              fontWeight: '900',
-                              backgroundColor: 'rgba(255, 109, 0, 0.15)',
-                              color: '#ff6d00',
-                              border: '1px solid rgba(255, 109, 0, 0.3)',
-                              borderRadius: '4px',
-                              padding: '1px 3px',
-                              letterSpacing: '0.5px',
-                              lineHeight: '1'
-                            }}>
-                              🔥 EXPEND
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
-                            {card.name}
-                          </span>
-                          <span style={{ fontSize: '13px', flexShrink: 0 }}>
-                            {getCardTypeEmoji(card.id)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div style={{
-                        fontSize: '11px',
-                        color: '#94a3b8',
-                        lineHeight: '1.3',
-                        opacity: 1,
-                        flexGrow: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        marginTop: '4px'
-                      }}>
-                        {card.description}
-                      </div>
-
-                      <div style={{
-                        fontSize: '8px',
-                        fontWeight: 'bold',
-                        color: isSelected ? 'var(--accent-cyan)' : '#64748b',
-                        textAlign: 'center',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        opacity: 1,
-                        marginTop: '2px'
-                      }}>
-                        {isWard
-                          ? '🛡️ Defense'
-                          : isSelected 
-                          ? (noTargetNeeded
-                            ? '➔ Click to Cast' 
-                            : '🎯 Target board') 
-                          : '⚡ Cast Rite'}
-                      </div>
-                    </>
                   )}
                 </div>
-              );
-            })}
-          </div>
 
-          {/* Vertical Divider */}
-          <div style={{ width: '1px', height: '80%', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0 8px', flexShrink: 0 }} />
+                {/* Expend Pile Widget */}
+                <div
+                  onMouseEnter={() => setShowExpendTooltip(true)}
+                  onMouseLeave={() => setShowExpendTooltip(false)}
+                  style={{
+                    width: '85px',
+                    height: '120px',
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    border: (self.expendPile && self.expendPile.length > 0)
+                      ? '1.5px solid rgba(255, 109, 0, 0.4)'
+                      : '1.5px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    flexShrink: 0,
+                    gap: '6px',
+                    boxShadow: (self.expendPile && self.expendPile.length > 0) ? '0 0 10px rgba(255, 109, 0, 0.15)' : 'none',
+                    cursor: (self.expendPile && self.expendPile.length > 0) ? 'pointer' : 'default',
+                    position: 'relative',
+                    marginLeft: '8px'
+                  }}
+                >
+                  <span style={{ fontSize: '28px', opacity: (self.expendPile && self.expendPile.length > 0) ? 1 : 0.4 }}>🔥</span>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>
+                    {self.expendPile?.length ?? 0}
+                  </span>
+                  <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Expend
+                  </span>
 
-          {/* Graveyard Widget */}
-          <div
-            onMouseEnter={() => setShowGraveyardTooltip(true)}
-            onMouseLeave={() => setShowGraveyardTooltip(false)}
-            style={{
-              width: isMobile ? '50px' : '85px',
-              height: isMobile ? '70px' : '120px',
-              backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              border: (self.graveyard && self.graveyard.length > 0)
-                ? '1.5px solid rgba(168, 85, 247, 0.4)'
-                : '1.5px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              flexShrink: 0,
-              gap: isMobile ? '2px' : '6px',
-              boxShadow: (self.graveyard && self.graveyard.length > 0) ? '0 0 10px rgba(168, 85, 247, 0.15)' : 'none',
-              cursor: (self.graveyard && self.graveyard.length > 0) ? 'pointer' : 'default',
-              position: 'relative'
-            }}
-          >
-            <span style={{ fontSize: isMobile ? '16px' : '28px', opacity: (self.graveyard && self.graveyard.length > 0) ? 1 : 0.4 }}>🪦</span>
-            <span style={{ fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', color: 'white' }}>
-              {self.graveyard?.length ?? 0}
-            </span>
-            <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: isMobile ? 'none' : 'inline' }}>
-              Grave
-            </span>
-
-            {/* Graveyard Tooltip */}
-            {showGraveyardTooltip && self.graveyard && self.graveyard.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                bottom: isMobile ? '80px' : '130px',
-                right: isMobile ? '-40px' : '0',
-                backgroundColor: 'rgba(15, 23, 42, 0.98)',
-                backdropFilter: 'blur(12px)',
-                border: '1.5px solid #a855f7',
-                borderRadius: '12px',
-                padding: '10px 14px',
-                width: '180px',
-                maxHeight: '200px',
-                overflowY: 'auto',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(168, 85, 247, 0.3)',
-                zIndex: 200,
-                textAlign: 'left'
-              }}>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#a855f7', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
-                  Graveyard ({self.graveyard.length})
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {(() => {
-                    const counts: Record<string, number> = {};
-                    self.graveyard.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
-                    return Object.entries(counts).map(([name, count]) => (
-                      <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
-                        <span>{name}</span>
-                        <span style={{ fontWeight: 'bold', color: '#a855f7' }}>{count}x</span>
+                  {/* Expend Tooltip */}
+                  {showExpendTooltip && self.expendPile && self.expendPile.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '130px',
+                      right: '0',
+                      backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                      backdropFilter: 'blur(12px)',
+                      border: '1.5px solid #ff6d00',
+                      borderRadius: '12px',
+                      padding: '10px 14px',
+                      width: '180px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(255, 109, 0, 0.3)',
+                      zIndex: 200,
+                      textAlign: 'left'
+                    }}>
+                      <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#ff6d00', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
+                        Expended ({self.expendPile.length})
                       </div>
-                    ));
-                  })()}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Expend Pile Widget */}
-          <div
-            onMouseEnter={() => setShowExpendTooltip(true)}
-            onMouseLeave={() => setShowExpendTooltip(false)}
-            style={{
-              width: isMobile ? '50px' : '85px',
-              height: isMobile ? '70px' : '120px',
-              backgroundColor: 'rgba(15, 23, 42, 0.95)',
-              border: (self.expendPile && self.expendPile.length > 0)
-                ? '1.5px solid rgba(255, 109, 0, 0.4)'
-                : '1.5px solid rgba(255, 255, 255, 0.1)',
-              borderRadius: '12px',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              flexShrink: 0,
-              gap: isMobile ? '2px' : '6px',
-              boxShadow: (self.expendPile && self.expendPile.length > 0) ? '0 0 10px rgba(255, 109, 0, 0.15)' : 'none',
-              cursor: (self.expendPile && self.expendPile.length > 0) ? 'pointer' : 'default',
-              position: 'relative',
-              marginLeft: '8px'
-            }}
-          >
-            <span style={{ fontSize: isMobile ? '16px' : '28px', opacity: (self.expendPile && self.expendPile.length > 0) ? 1 : 0.4 }}>🔥</span>
-            <span style={{ fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', color: 'white' }}>
-              {self.expendPile?.length ?? 0}
-            </span>
-            <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: isMobile ? 'none' : 'inline' }}>
-              Expend
-            </span>
-
-            {/* Expend Tooltip */}
-            {showExpendTooltip && self.expendPile && self.expendPile.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                bottom: isMobile ? '80px' : '130px',
-                right: '0',
-                backgroundColor: 'rgba(15, 23, 42, 0.98)',
-                backdropFilter: 'blur(12px)',
-                border: '1.5px solid #ff6d00',
-                borderRadius: '12px',
-                padding: '10px 14px',
-                width: '180px',
-                maxHeight: '200px',
-                overflowY: 'auto',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(255, 109, 0, 0.3)',
-                zIndex: 200,
-                textAlign: 'left'
-              }}>
-                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#ff6d00', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
-                  Expended ({self.expendPile.length})
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {(() => {
-                    const counts: Record<string, number> = {};
-                    self.expendPile.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
-                    return Object.entries(counts).map(([name, count]) => (
-                      <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
-                        <span>{name}</span>
-                        <span style={{ fontWeight: 'bold', color: '#ff6d00' }}>{count}x</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {(() => {
+                          const counts: Record<string, number> = {};
+                          self.expendPile.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
+                          return Object.entries(counts).map(([name, count]) => (
+                            <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                              <span>{name}</span>
+                              <span style={{ fontWeight: 'bold', color: '#ff6d00' }}>{count}x</span>
+                            </div>
+                          ));
+                        })()}
                       </div>
-                    ));
-                  })()}
+                    </div>
+                  )}
                 </div>
-              </div>
+              </>
             )}
           </div>
         </div>
