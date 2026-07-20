@@ -1464,7 +1464,50 @@ export default function App() {
             {/* Column 1: Connected Players (Now uses Room Code as Header) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <h3 className="text-sm font-semibold text-[var(--accent-cyan)] m-0 uppercase tracking-wider" style={{ textAlign: 'center' }}>Connecting Players</h3>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--accent-cyan)' }}>{gameState.roomCode}</span>
+                <button
+                  onClick={handleCopyRoomCode}
+                  title="Copy Room Code"
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: copied ? 'var(--accent-green)' : '#94a3b8',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'color 0.2s',
+                    position: 'relative'
+                  }}
+                >
+                  {copied ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    </svg>
+                  )}
+                  {copied && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-24px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      backgroundColor: '#00E676',
+                      color: 'black',
+                      fontSize: '9px',
+                      fontWeight: 'bold',
+                      padding: '2px 4px',
+                      borderRadius: '4px',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                      zIndex: 10
+                    }}>Copied!</span>
+                  )}
+                </button>
               </div>
 
               {/* Fixed 3x2 Grid layout for players & slots */}
