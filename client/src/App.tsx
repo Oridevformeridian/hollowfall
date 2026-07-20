@@ -1630,8 +1630,27 @@ export default function App() {
                                 style={{
                                   position: 'absolute',
                                   bottom: '110px',
-                                  left: '50%',
-                                  transform: 'translateX(-50%)',
+                                  left: isMobile 
+                                    ? ((idx % 5) === 0 
+                                        ? '-10px' 
+                                        : (idx % 5) === 1 
+                                        ? '-50px' 
+                                        : (idx % 5) === 2 
+                                        ? '50%' 
+                                        : 'auto') 
+                                    : '50%',
+                                  right: isMobile 
+                                    ? ((idx % 5) === 4 
+                                        ? '-10px' 
+                                        : (idx % 5) === 3 
+                                        ? '-50px' 
+                                        : 'auto') 
+                                    : 'auto',
+                                  transform: isMobile 
+                                    ? ((idx % 5) === 2 
+                                        ? 'translateX(-50%)' 
+                                        : 'none') 
+                                    : 'translateX(-50%)',
                                   zIndex: 300,
                                   backgroundColor: 'rgba(15, 23, 42, 0.98)',
                                   backdropFilter: 'blur(16px)',
