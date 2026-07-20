@@ -747,7 +747,7 @@ export default function App() {
               osc.frequency.exponentialRampToValueAtTime(50, time + 0.05);
               
               oscGain.gain.setValueAtTime(0, time);
-              oscGain.gain.linearRampToValueAtTime(isLast ? 1.0 : 0.5, time + 0.005);
+              oscGain.gain.linearRampToValueAtTime(isLast ? 0.3 : 0.15, time + 0.005);
               oscGain.gain.exponentialRampToValueAtTime(0.01, time + (isLast ? 0.2 : 0.05));
               
               osc.connect(oscGain);
@@ -769,7 +769,7 @@ export default function App() {
               
               const noiseGain = ctx.createGain();
               noiseGain.gain.setValueAtTime(0, time);
-              noiseGain.gain.linearRampToValueAtTime(isLast ? 0.8 : 0.4, time + 0.005);
+              noiseGain.gain.linearRampToValueAtTime(isLast ? 0.25 : 0.1, time + 0.005);
               noiseGain.gain.exponentialRampToValueAtTime(0.01, time + (isLast ? 0.2 : 0.05));
               
               noiseSource.connect(noiseFilter);
