@@ -154,7 +154,8 @@ export const BASIC_CARDS: Card[] = [
     id: 'ash_immolate',
     name: 'Immolate',
     type: 'bane',
-    description: 'Deals 6 fire damage to target in LOS. Deals 1 recoil fire damage to caster.'
+    description: 'Deals 6 fire damage to target in LOS. Deals 1 recoil fire damage to caster.',
+    expend: true
   },
   {
     id: 'ash_turn_aside',
@@ -202,6 +203,7 @@ export const BASIC_CARDS: Card[] = [
     id: 'offering_deep_breath',
     name: 'Deep Breath',
     type: 'offering',
-    description: 'Offering: Instantly gain +2 Action Points (AP).'
+    description: 'Offering: Instantly gain +2 Action Points (AP).',
+    expend: true
   }
 ];

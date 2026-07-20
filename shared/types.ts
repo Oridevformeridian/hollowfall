@@ -27,6 +27,8 @@ export interface Player {
   hasSpiritSkin?: boolean;
   thorns?: number;
   spiritSkin?: number;
+  graveyard?: Card[];
+  expendPile?: Card[];
 }
 
 export interface Treasure {
@@ -44,6 +46,7 @@ export interface Card {
   name: string;
   type: 'bane' | 'ward' | 'working' | 'talisman' | 'offering';
   description: string;
+  expend?: boolean;
 }
 
 export interface Coordinate {

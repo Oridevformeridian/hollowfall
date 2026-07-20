@@ -637,6 +637,8 @@ export default function App() {
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showGraveyardTooltip, setShowGraveyardTooltip] = useState(false);
+  const [showExpendTooltip, setShowExpendTooltip] = useState(false);
   const [flingingCardId, setFlingingCardId] = useState<string | null>(null);
   const [clientHand, setClientHand] = useState<{ id: string; name: string; type: string; description: string; clientId: string }[]>([]);
   const handClientIdsRef = React.useRef<{ id: string; clientId: string }[]>([]);
@@ -2466,9 +2468,27 @@ export default function App() {
                     {player.hasAttackedThisTurn ? 'Used' : player.isFirstTurnOfMatch ? 'Forbidden' : 'Ready'}
                   </span>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px', marginTop: '2px' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>🎴 Deck:</span>
+                  <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>
+                    {player.deck?.length ?? 0} cards
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>🪦 Graveyard:</span>
+                  <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold' }}>
+                    {player.graveyard?.length ?? 0} cards
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>🔥 Expended:</span>
+                  <span style={{ fontSize: '11px', color: '#ff6d00', fontWeight: 'bold' }}>
+                    {player.expendPile?.length ?? 0} cards
+                  </span>
+                </div>
                 {/* Active Auras */}
                 {((player as any).hasTurnAside || (player as any).hasSpiritSkin || (player as any).hasThorns) && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px', marginTop: '2px' }}>
                     <span style={{ fontSize: '11px', color: '#94a3b8' }}>🛡️ Auras:</span>
                     <span style={{ fontSize: '11px', color: 'white', fontWeight: 'bold', display: 'flex', gap: '4px' }}>
                       {(player as any).hasTurnAside && <span title="Turn Aside Aura" style={{ color: 'var(--accent-cyan)' }}>🛡️</span>}
@@ -3505,6 +3525,39 @@ export default function App() {
             width: 'auto'
           }}
         >
+          {/* Draw Pile Widget */}
+          <div
+            style={{
+              width: isMobile ? '50px' : '85px',
+              height: isMobile ? '70px' : '120px',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              border: (self.deck && self.deck.length > 0) 
+                ? '1.5px solid rgba(0, 229, 255, 0.4)' 
+                : '1.5px dashed rgba(255, 255, 255, 0.2)',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexShrink: 0,
+              gap: isMobile ? '2px' : '6px',
+              boxShadow: (self.deck && self.deck.length > 0) ? '0 0 10px rgba(0, 229, 255, 0.15)' : 'none',
+              position: 'relative'
+            }}
+            title={`Draw Pile (${self.deck?.length ?? 0} cards)`}
+          >
+            <span style={{ fontSize: isMobile ? '16px' : '28px', opacity: (self.deck && self.deck.length > 0) ? 1 : 0.4 }}>🎴</span>
+            <span style={{ fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', color: 'white' }}>
+              {self.deck?.length ?? 0}
+            </span>
+            <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: isMobile ? 'none' : 'inline' }}>
+              Draw
+            </span>
+          </div>
+
+          {/* Vertical Divider */}
+          <div style={{ width: '1px', height: '80%', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0 8px', flexShrink: 0 }} />
+
           {/* Cards List (Centered horizontally, fully formed, extended all the way to the edge) */}
           <div
             style={{
@@ -3678,6 +3731,146 @@ export default function App() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Vertical Divider */}
+          <div style={{ width: '1px', height: '80%', backgroundColor: 'rgba(255,255,255,0.06)', margin: '0 8px', flexShrink: 0 }} />
+
+          {/* Graveyard Widget */}
+          <div
+            onMouseEnter={() => setShowGraveyardTooltip(true)}
+            onMouseLeave={() => setShowGraveyardTooltip(false)}
+            style={{
+              width: isMobile ? '50px' : '85px',
+              height: isMobile ? '70px' : '120px',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              border: (self.graveyard && self.graveyard.length > 0)
+                ? '1.5px solid rgba(168, 85, 247, 0.4)'
+                : '1.5px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexShrink: 0,
+              gap: isMobile ? '2px' : '6px',
+              boxShadow: (self.graveyard && self.graveyard.length > 0) ? '0 0 10px rgba(168, 85, 247, 0.15)' : 'none',
+              cursor: (self.graveyard && self.graveyard.length > 0) ? 'pointer' : 'default',
+              position: 'relative'
+            }}
+          >
+            <span style={{ fontSize: isMobile ? '16px' : '28px', opacity: (self.graveyard && self.graveyard.length > 0) ? 1 : 0.4 }}>🪦</span>
+            <span style={{ fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', color: 'white' }}>
+              {self.graveyard?.length ?? 0}
+            </span>
+            <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: isMobile ? 'none' : 'inline' }}>
+              Grave
+            </span>
+
+            {/* Graveyard Tooltip */}
+            {showGraveyardTooltip && self.graveyard && self.graveyard.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                bottom: isMobile ? '80px' : '130px',
+                right: isMobile ? '-40px' : '0',
+                backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                backdropFilter: 'blur(12px)',
+                border: '1.5px solid #a855f7',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                width: '180px',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(168, 85, 247, 0.3)',
+                zIndex: 200,
+                textAlign: 'left'
+              }}>
+                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#a855f7', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
+                  Graveyard ({self.graveyard.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {(() => {
+                    const counts: Record<string, number> = {};
+                    self.graveyard.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
+                    return Object.entries(counts).map(([name, count]) => (
+                      <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                        <span>{name}</span>
+                        <span style={{ fontWeight: 'bold', color: '#a855f7' }}>{count}x</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Expend Pile Widget */}
+          <div
+            onMouseEnter={() => setShowExpendTooltip(true)}
+            onMouseLeave={() => setShowExpendTooltip(false)}
+            style={{
+              width: isMobile ? '50px' : '85px',
+              height: isMobile ? '70px' : '120px',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              border: (self.expendPile && self.expendPile.length > 0)
+                ? '1.5px solid rgba(255, 109, 0, 0.4)'
+                : '1.5px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '12px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexShrink: 0,
+              gap: isMobile ? '2px' : '6px',
+              boxShadow: (self.expendPile && self.expendPile.length > 0) ? '0 0 10px rgba(255, 109, 0, 0.15)' : 'none',
+              cursor: (self.expendPile && self.expendPile.length > 0) ? 'pointer' : 'default',
+              position: 'relative',
+              marginLeft: '8px'
+            }}
+          >
+            <span style={{ fontSize: isMobile ? '16px' : '28px', opacity: (self.expendPile && self.expendPile.length > 0) ? 1 : 0.4 }}>🔥</span>
+            <span style={{ fontSize: isMobile ? '9px' : '13px', fontWeight: 'bold', color: 'white' }}>
+              {self.expendPile?.length ?? 0}
+            </span>
+            <span style={{ fontSize: '8px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', display: isMobile ? 'none' : 'inline' }}>
+              Expend
+            </span>
+
+            {/* Expend Tooltip */}
+            {showExpendTooltip && self.expendPile && self.expendPile.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                bottom: isMobile ? '80px' : '130px',
+                right: '0',
+                backgroundColor: 'rgba(15, 23, 42, 0.98)',
+                backdropFilter: 'blur(12px)',
+                border: '1.5px solid #ff6d00',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                width: '180px',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                boxShadow: '0 8px 30px rgba(0,0,0,0.8), 0 0 12px rgba(255, 109, 0, 0.3)',
+                zIndex: 200,
+                textAlign: 'left'
+              }}>
+                <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#ff6d00', textTransform: 'uppercase', marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px' }}>
+                  Expended ({self.expendPile.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {(() => {
+                    const counts: Record<string, number> = {};
+                    self.expendPile.forEach(c => { counts[c.name] = (counts[c.name] || 0) + 1; });
+                    return Object.entries(counts).map(([name, count]) => (
+                      <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#cbd5e1' }}>
+                        <span>{name}</span>
+                        <span style={{ fontWeight: 'bold', color: '#ff6d00' }}>{count}x</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
