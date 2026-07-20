@@ -2499,27 +2499,27 @@ export default function App() {
 
             {/* Countdown Timer (Center Capsule) */}
             <div
+              className={timeLeft <= 9 ? 'pulse-warning-timer' : 'pulse-normal-timer'}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '4px',
-                backgroundColor: timeLeft <= 10 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0, 0, 0, 0.3)',
-                border: timeLeft <= 10 ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(255,255,255,0.05)',
-                padding: isMobile ? '4px 10px' : '6px 16px',
-                borderRadius: '16px',
-                minWidth: isMobile ? '55px' : '80px',
-                transition: 'all 0.25s',
-                animation: timeLeft <= 10 ? 'pulseGlow 1s infinite ease-in-out' : 'none'
+                gap: '6px',
+                backgroundColor: timeLeft <= 9 ? 'rgba(239, 68, 68, 0.25)' : 'rgba(0, 0, 0, 0.45)',
+                border: timeLeft <= 9 ? '2px solid rgba(239, 68, 68, 0.7)' : '1px solid rgba(255,255,255,0.08)',
+                padding: isMobile ? '6px 12px' : '10px 20px',
+                borderRadius: '20px',
+                minWidth: isMobile ? '65px' : '100px',
+                transition: 'all 0.25s'
               }}
               title="Turn Timer"
             >
-              <span style={{ fontSize: isMobile ? '12px' : '15px' }}>⏱️</span>
+              <span style={{ fontSize: isMobile ? '13px' : '20px' }}>⏱️</span>
               <span
                 style={{
-                  fontSize: isMobile ? '12px' : '16px',
+                  fontSize: isMobile ? '14px' : '22px',
                   fontWeight: '900',
-                  color: timeLeft <= 10 ? '#ef4444' : 'white',
+                  color: timeLeft <= 9 ? '#ff4d4d' : 'white',
                   fontFamily: 'monospace'
                 }}
               >
