@@ -1304,8 +1304,7 @@ export default function App() {
             flexDirection: 'column',
             gap: '24px',
             alignItems: 'center',
-            textAlign: 'center',
-            boxSizing: 'border-box'
+            textAlign: 'center'
           }}
         >
           <div>
@@ -1428,68 +1427,13 @@ export default function App() {
         <div
           className="glass-panel"
           style={{
-            width: '100%',
-            maxWidth: '768px',
-            padding: isMobile ? '16px' : '32px',
+            padding: isMobile ? '12px' : '32px',
             display: 'flex',
             flexDirection: 'column',
-            gap: isMobile ? '16px' : '24px',
+            gap: isMobile ? '10px' : '24px',
             boxSizing: 'border-box'
           }}
         >
-          <div className="flex flex-col items-center justify-center border-b border-[var(--border-light)] pb-4 text-center gap-1.5">
-            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-              <h2 className="text-2xl font-bold text-[var(--accent-cyan)] m-0">Lobby Room: {gameState.roomCode}</h2>
-              <button
-                onClick={handleCopyRoomCode}
-                title="Copy Room Code"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: copied ? 'var(--accent-green)' : '#94a3b8',
-                  padding: '4px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'color 0.2s',
-                  position: 'relative'
-                }}
-              >
-                {copied ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
-                )}
-                {copied && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '-24px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    backgroundColor: '#00E676',
-                    color: 'black',
-                    fontSize: '10px',
-                    fontWeight: 'bold',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
-                  }}>
-                    Copied!
-                  </span>
-                )}
-              </button>
-            </div>
-            <p className="text-gray-400 text-xs m-0">Waiting for players to ready up...</p>
-            {isHost && <span className="text-xs bg-[var(--accent-gold)] text-black px-2.5 py-1 rounded font-bold mt-1">LOBBY HOST</span>}
-          </div>
-
           {error && (
             <div
               style={{
@@ -1512,34 +1456,80 @@ export default function App() {
             style={{
               display: 'grid',
               gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-              gap: isMobile ? '16px' : '32px',
+              gap: isMobile ? '12px' : '32px',
               alignItems: 'center',
               width: '100%'
             }}
           >
-            {/* Column 1: Connected Players */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider" style={{ textAlign: 'center' }}>
-                Connected Players ({playersList.length}/6)
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {playersList.map(player => (
-                  <div
-                    key={player.id}
-                    className={`flex justify-between items-center bg-[rgba(255,255,255,0.03)] ${isMobile ? 'p-2 rounded-lg' : 'p-4 rounded-xl'} border border-gray-800`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={isMobile ? 'w-2 h-2 rounded-full' : 'w-3.5 h-3.5 rounded-full'} style={{ backgroundColor: player.color }} />
-                      <span className="font-semibold text-white" style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '12px' }}>
-                        <span style={{ fontSize: isMobile ? '24px' : '48px', lineHeight: '1' }}>{player.emoji}</span>
-                        <span style={{ fontSize: isMobile ? '12px' : '14px' }}>{player.username} {player.id === socket?.id && '(You)'}</span>
-                      </span>
-                    </div>
-                    <span className={`${isMobile ? 'text-[10px] px-2 py-1' : 'text-xs px-3 py-1.5'} rounded-full font-bold ${player.isReady ? 'bg-[rgba(0,230,118,0.15)] text-[var(--accent-green)]' : 'bg-gray-800 text-gray-400'}`}>
-                      {player.isReady ? 'READY' : 'NOT READY'}
-                    </span>
-                  </div>
-                ))}
+            {/* Column 1: Connected Players (Now uses Room Code as Header) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <h3 className="text-sm font-semibold text-[var(--accent-cyan)] m-0 uppercase tracking-wider" style={{ textAlign: 'center' }}>Connecting Players</h3>
+              </div>
+
+              {/* Fixed 3x2 Grid layout for players & slots */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gridTemplateRows: 'repeat(3, 1fr)',
+                  gap: isMobile ? '6px' : '10px',
+                  width: '100%',
+                  boxSizing: 'border-box'
+                }}
+              >
+                {Array.from({ length: 6 }).map((_, i) => {
+                  const player = playersList[i];
+                  if (player) {
+                    return (
+                      <div
+                        key={player.id}
+                        className={`flex justify-between items-center bg-[rgba(255,255,255,0.03)] ${isMobile ? 'p-1.5 rounded-lg' : 'p-3 rounded-xl'} border border-gray-800`}
+                        style={{ height: isMobile ? '38px' : '56px', boxSizing: 'border-box' }}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0" style={{ flexGrow: 1 }}>
+                          <div className={isMobile ? 'w-1.5 h-1.5 rounded-full' : 'w-2.5 h-2.5 rounded-full'} style={{ backgroundColor: player.color, flexShrink: 0 }} />
+                          <span className="font-semibold text-white truncate" style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px', minWidth: 0 }}>
+                            <span style={{ fontSize: isMobile ? '16px' : '28px', lineHeight: '1', flexShrink: 0 }}>{player.emoji}</span>
+                            <span style={{ fontSize: isMobile ? '10px' : '13px' }} className="truncate">
+                              {player.username} {player.id === socket?.id && '(You)'}
+                            </span>
+                          </span>
+                        </div>
+                        <span 
+                          className={`${isMobile ? 'text-[8px] px-1.5 py-0.5' : 'text-xs px-2.5 py-1'} rounded-full font-bold`}
+                          style={{
+                            flexShrink: 0,
+                            backgroundColor: player.isReady ? 'rgba(0,230,118,0.15)' : 'rgba(255,255,255,0.05)',
+                            color: player.isReady ? 'var(--accent-green)' : '#94a3b8'
+                          }}
+                        >
+                          {player.isReady ? 'READY' : 'WAIT'}
+                        </span>
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div
+                        key={`empty-slot-${i}`}
+                        className={`${isMobile ? 'p-1.5 rounded-lg' : 'p-3 rounded-xl'} border border-dashed border-gray-800/40`}
+                        style={{
+                          height: isMobile ? '38px' : '56px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#475569',
+                          fontSize: isMobile ? '10px' : '13px',
+                          fontStyle: 'italic',
+                          backgroundColor: 'rgba(255,255,255,0.01)',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        Open Slot
+                      </div>
+                    );
+                  }
+                })}
               </div>
             </div>
 
@@ -1549,13 +1539,13 @@ export default function App() {
                 .filter(p => p.id !== socket?.id)
                 .map(p => p.emoji);
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '6px' : '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '4px' : '12px' }}>
                   <h3 className="text-sm font-semibold text-gray-400 m-0 uppercase tracking-wider font-bold text-center">Choose Your Hero</h3>
                   <div
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: isMobile ? 'repeat(5, 58px)' : 'repeat(5, 90px)',
-                      gap: isMobile ? '6px' : '16px',
+                      gridTemplateColumns: isMobile ? 'repeat(5, 46px)' : 'repeat(5, 90px)',
+                      gap: isMobile ? '4px' : '16px',
                       justifyContent: 'center'
                     }}
                   >
@@ -1580,9 +1570,9 @@ export default function App() {
                             onClick={() => !isTaken && handleSelectHero(hero.emoji)}
                             disabled={isTaken}
                             style={{
-                              fontSize: isMobile ? '30px' : '48px',
-                              width: isMobile ? '50px' : '80px',
-                              height: isMobile ? '50px' : '80px',
+                              fontSize: isMobile ? '24px' : '48px',
+                              width: isMobile ? '42px' : '80px',
+                              height: isMobile ? '42px' : '80px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -1591,7 +1581,7 @@ export default function App() {
                                 : isTaken
                                 ? '1.5px dashed #334155'
                                 : '2px solid var(--border-light)',
-                              borderRadius: isMobile ? '10px' : '16px',
+                              borderRadius: isMobile ? '8px' : '16px',
                               backgroundColor: isSelected
                                 ? `${hero.color}22`
                                 : 'rgba(0, 0, 0, 0.2)',
@@ -1634,7 +1624,7 @@ export default function App() {
                                     ? ((idx % 5) === 0 
                                         ? '-10px' 
                                         : (idx % 5) === 1 
-                                        ? '-50px' 
+                                        ? '-40px' 
                                         : (idx % 5) === 2 
                                         ? '50%' 
                                         : 'auto') 
@@ -1643,7 +1633,7 @@ export default function App() {
                                     ? ((idx % 5) === 4 
                                         ? '-10px' 
                                         : (idx % 5) === 3 
-                                        ? '-50px' 
+                                        ? '-40px' 
                                         : 'auto') 
                                     : 'auto',
                                   transform: isMobile 
@@ -1705,9 +1695,9 @@ export default function App() {
           {/* Match Settings Panel */}
           <div
             style={{
-              marginTop: isMobile ? '16px' : '24px',
+              marginTop: isMobile ? '8px' : '24px',
               borderTop: '1px solid var(--border-light)',
-              paddingTop: isMobile ? '16px' : '24px',
+              paddingTop: isMobile ? '8px' : '24px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -1719,13 +1709,13 @@ export default function App() {
               style={{
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '10px',
+                gap: '8px',
                 width: '100%',
                 maxWidth: '440px',
                 backgroundColor: 'rgba(255, 255, 255, 0.02)',
                 border: '1px solid rgba(255, 255, 255, 0.05)',
-                borderRadius: '16px',
-                padding: '16px',
+                borderRadius: '12px',
+                padding: isMobile ? '10px' : '16px',
                 boxSizing: 'border-box'
               }}
             >
@@ -1756,13 +1746,13 @@ export default function App() {
                         }}
                         style={{
                           flex: 1,
-                          padding: '10px',
-                          borderRadius: '10px',
+                          padding: isMobile ? '6px' : '10px',
+                          borderRadius: '8px',
                           border: isSelected ? '2px solid var(--accent-cyan)' : '1px solid var(--border-light)',
                           backgroundColor: isSelected ? 'rgba(0, 229, 255, 0.15)' : 'rgba(0,0,0,0.3)',
                           color: isSelected ? 'var(--accent-cyan)' : '#cbd5e1',
                           fontWeight: 'bold',
-                          fontSize: '12px',
+                          fontSize: '11px',
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           boxSizing: 'border-box',
@@ -1790,15 +1780,42 @@ export default function App() {
               )}
             </div>
           </div>
+<div style={{display: 'flex', justifyContent: 'center', marginTop: isMobile ? '8px' : '12px'}}>
+  <button
+    onClick={handleCopyRoomCode}
+    title="Copy Room Code"
+    style={{
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      color: copied ? 'var(--accent-green)' : '#94a3b8',
+      padding: '4px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: 'color 0.2s',
+    }}
+  >
+    {copied ? (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    ) : (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      </svg>
+    )}
+  </button>
+</div>
 
           {/* Centered Ready/Start buttons below both elements */}
           <div
             style={{
               display: 'flex',
-              gap: isMobile ? '10px' : '16px',
-              marginTop: isMobile ? '16px' : '24px',
+              gap: isMobile ? '8px' : '16px',
+              marginTop: isMobile ? '8px' : '24px',
               borderTop: '1px solid var(--border-light)',
-              paddingTop: isMobile ? '16px' : '24px',
+              paddingTop: isMobile ? '8px' : '24px',
               justifyContent: 'center',
               width: '100%',
               maxWidth: '440px',
@@ -1828,7 +1845,7 @@ export default function App() {
           </div>
 
           {/* Spacing boundary box spacer */}
-          <div style={{ height: '1.2rem' }} />
+          <div style={{ height: isMobile ? '4px' : '1.2rem' }} />
         </div>
       </div>
     );
