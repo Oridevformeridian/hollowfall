@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, checkBoundFateEliminations, isValidMiststepTarget, calculateScores } from './validation';
+import { validateTilePlacement, rotateBorderCoordinate, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, checkBoundFateEliminations, isValidMiststepTarget, isValidStoneGlideTarget, calculateScores } from './validation';
 import { PlacedTile, TokenPosition } from './types';
 
 describe('validateTilePlacement', () => {
@@ -714,6 +714,48 @@ describe('isValidMiststepTarget', () => {
     const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
     const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
     expect(isValidMiststepTarget(from, to, placedTiles)).toBe(false);
+  });
+});
+
+describe('isValidStoneGlideTarget', () => {
+  const placedTiles: Record<string, PlacedTile> = {
+    '0,0': { tileId: 1, position: { x: 0, y: 0 }, rotation: 0, placedBy: 'p1' },
+    '1,0': { tileId: 2, position: { x: 1, y: 0 }, rotation: 0, placedBy: 'p2' }
+  };
+  const doorsState = {};
+
+  it('should return true for orthogonal and diagonal moves of distance 1 or 2', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 1, c: 0 };
+    
+    // Dist 1
+    expect(isValidStoneGlideTarget(from, { tileX: 0, tileY: 0, r: 1, c: 1 }, placedTiles, doorsState)).toBe(true);
+    // Dist 2 orthogonal
+    expect(isValidStoneGlideTarget(from, { tileX: 0, tileY: 0, r: 1, c: 2 }, placedTiles, doorsState)).toBe(true);
+    // Dist 2 diagonal
+    expect(isValidStoneGlideTarget(from, { tileX: 0, tileY: 0, r: 2, c: 1 }, placedTiles, doorsState)).toBe(true);
+  });
+
+  it('should return true even if there is a Raised Stone wall in the way', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 3 };
+    const wallsState = { '0,0:2,2:V': true }; // Raised stone wall between (2,2) and (2,3)
+    
+    expect(isValidStoneGlideTarget(from, to, placedTiles, doorsState, wallsState)).toBe(true);
+  });
+
+  it('should return false for regular wall blockage', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 2 };
+    // Tile 1 has a horizontal wall at r=2, c=2 (Horizontal wall between (2,2) and (3,2))
+    // Wait! Horizontal wall between (r, c) and (r+1, c) means horizontal wall between row 2 and 3 at col 2: w.r === 2 && w.c === 2.
+    // Yes! Let's verify it blocks:
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 3, c: 2 };
+    expect(isValidStoneGlideTarget(from, to, placedTiles, doorsState)).toBe(false);
+  });
+
+  it('should return false for distance > 2', () => {
+    const from: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 1 };
+    const to: TokenPosition = { tileX: 0, tileY: 0, r: 2, c: 4 }; // Dist = 3
+    expect(isValidStoneGlideTarget(from, to, placedTiles, doorsState)).toBe(false);
   });
 });
 

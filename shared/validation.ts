@@ -540,6 +540,61 @@ export function isValidMiststepTarget(
   return dist > 0 && dist <= 3;
 }
 
+/**
+ * Validates if the target cell is a valid Stone Glide destination.
+ * Stone Glide allows moving up to 2 cells in any direction ignoring Raised Stone walls.
+ */
+export function isValidStoneGlideTarget(
+  from: TokenPosition,
+  to: TokenPosition,
+  placedTiles: Record<string, PlacedTile>,
+  doorsState: Record<string, 'OPEN' | 'CLOSED'>,
+  _wallsState?: Record<string, boolean>
+): boolean {
+  const fromTile = placedTiles[`${from.tileX},${from.tileY}`];
+  const toTile = placedTiles[`${to.tileX},${to.tileY}`];
+  if (!fromTile || !toTile) return false;
+
+  const dist = getWrappingManhattanDistance(from, to, placedTiles);
+  if (dist === 0 || dist > 2) return false;
+
+  // Bypass Raised Stone walls by passing an empty wallsState
+  const emptyWallsState: Record<string, boolean> = {};
+
+  if (dist === 1) {
+    const check = validateTokenMove(from, to, placedTiles, doorsState, emptyWallsState);
+    return check.valid;
+  }
+
+  // Find if there is any orthogonally adjacent intermediate cell that forms a valid path
+  const keys = Object.keys(placedTiles);
+  const neighbors: TokenPosition[] = [];
+
+  for (const key of keys) {
+    const [tx, ty] = key.split(',').map(Number);
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        const candidate = { tileX: tx, tileY: ty, r, c };
+        if (getWrappingManhattanDistance(from, candidate, placedTiles) === 1) {
+          neighbors.push(candidate);
+        }
+      }
+    }
+  }
+
+  for (const mid of neighbors) {
+    if (getWrappingManhattanDistance(mid, to, placedTiles) === 1) {
+      const step1 = validateTokenMove(from, mid, placedTiles, doorsState, emptyWallsState);
+      const step2 = validateTokenMove(mid, to, placedTiles, doorsState, emptyWallsState);
+      if (step1.valid && step2.valid) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 
 
 /**

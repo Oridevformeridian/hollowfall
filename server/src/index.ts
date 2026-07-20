@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, Card } from '../../shared/types';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget, calculateScores } from '../../shared/validation';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget, isValidStoneGlideTarget, calculateScores } from '../../shared/validation';
 import { HEROES, BASIC_CARDS } from '../../shared/constants';
 import { buildDeckForEmoji, shuffle } from '../../shared/deck';
 
@@ -1099,6 +1099,56 @@ io.on('connection', (socket) => {
             };
 
             broadcastSystemMessage(currentRoomCode, `${player.username} cast Miststep, teleporting to Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
+
+            const animMsg: ServerMessage = {
+              event: 'PLAY_CARD_ANIMATION',
+              payload: { cardId: card.id, casterId: playerId, target }
+            };
+            io.to(currentRoomCode).emit('message', JSON.stringify(animMsg));
+
+          } else if (card.id === 'working_stone_glide') {
+            if (!target) {
+              sendError(socket, 'Stone Glide requires a target cell.');
+              return;
+            }
+            const targetTile = room.placedTiles[`${target.tileX},${target.tileY}`];
+            if (!targetTile) {
+              sendError(socket, 'Target cell must be on a placed tile.');
+              return;
+            }
+            const isOccupied = Object.values(room.tokenPositions).some(pos => {
+              return pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
+            });
+            if (isOccupied) {
+              sendError(socket, 'Target cell is already occupied by another player.');
+              return;
+            }
+            const from = room.tokenPositions[playerId];
+            if (!from) return;
+            if (!isValidStoneGlideTarget(from, target, room.placedTiles, room.doorsState, room.wallsState)) {
+              sendError(socket, 'Stone Glide must target a cell up to 2 cells away reachable ignoring only stone walls.');
+              return;
+            }
+            room.tokenPositions[playerId] = {
+              tileX: target.tileX,
+              tileY: target.tileY,
+              r: target.r,
+              c: target.c
+            };
+
+            if (room.treasures) {
+              for (const treasureId of Object.keys(room.treasures)) {
+                const treasure = room.treasures[treasureId];
+                if (treasure.carrierId === playerId) {
+                  treasure.tileX = target.tileX;
+                  treasure.tileY = target.tileY;
+                  treasure.r = target.r;
+                  treasure.c = target.c;
+                }
+              }
+            }
+
+            broadcastSystemMessage(currentRoomCode, `${player.username} cast Stone Glide, sliding to Sector (${target.tileX}, ${target.tileY}) cell [${target.r}, ${target.c}].`);
 
             const animMsg: ServerMessage = {
               event: 'PLAY_CARD_ANIMATION',

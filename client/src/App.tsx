@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
-import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget } from './shared/validation.ts';
+import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget, isValidStoneGlideTarget } from './shared/validation.ts';
 import { buildDeckForEmoji } from './shared/deck.ts';
 
 const renderTileSvgContent = (
@@ -601,7 +601,7 @@ function generateLobbyName(): string {
 const getCardTypeEmoji = (cardId: string) => {
   if (cardId === 'ash_kindle_storm' || cardId === 'ash_fireball' || cardId === 'ash_immolate') return '⚔️';
   if (cardId === 'talisman_thorns') return '🌵';
-  if (cardId === 'working_miststep' || cardId === 'working_don_wolf') return '🌀';
+  if (cardId === 'working_miststep' || cardId === 'working_don_wolf' || cardId === 'working_stone_glide') return '🌀';
   if (cardId === 'working_shift_spirit') return '↔️';
   if (cardId === 'offering_deep_breath') return '🏥';
   if (cardId === 'ash_turn_aside' || cardId === 'ash_spirit_skin') return '🛡️';
@@ -890,6 +890,10 @@ export default function App() {
             } else if (cardId === 'working_miststep') {
               if (target) {
                 spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '✨ Miststep', 'effect', 200);
+              }
+            } else if (cardId === 'working_stone_glide') {
+              if (target) {
+                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '⛰️ Stone Glide', 'effect', 200);
               }
             } else if (cardId === 'working_don_wolf') {
               if (target) {
@@ -2707,6 +2711,12 @@ export default function App() {
                             isMiststepTarget = isValidMiststepTarget(myTokenPos, targetPos, gameState.placedTiles) && !occupiedPlayerId;
                           }
 
+                          // 3.1. Stone Glide targeting
+                          let isStoneGlideTarget = false;
+                          if (targetingCardId === 'working_stone_glide' && isActiveTurn && myTokenPos) {
+                            isStoneGlideTarget = isValidStoneGlideTarget(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState) && !occupiedPlayerId;
+                          }
+
                           // 3.5. Don the Wolf targeting
                           let isDonWolfTarget = false;
                           if (targetingCardId === 'working_don_wolf' && isActiveTurn && myTokenPos) {
@@ -2748,6 +2758,9 @@ export default function App() {
                                   } else if (isMiststepTarget) {
                                     e.stopPropagation();
                                     handlePlayCard('working_miststep', targetPos);
+                                  } else if (isStoneGlideTarget) {
+                                    e.stopPropagation();
+                                    handlePlayCard('working_stone_glide', targetPos);
                                   } else if (isDonWolfTarget) {
                                     e.stopPropagation();
                                     handlePlayCard('working_don_wolf', targetPos);
@@ -2768,21 +2781,21 @@ export default function App() {
                               }}
                               style={{
                                 position: 'relative',
-                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget)
+                                cursor: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isStoneGlideTarget || isDonWolfTarget || isShiftSpiritTarget)
                                   ? 'pointer'
                                   : cellTreasure
                                   ? 'help'
                                   : occupiedPlayerId
                                   ? 'pointer'
                                   : 'default',
-                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isDonWolfTarget || isShiftSpiritTarget || isRaiseStoneCell || occupiedPlayerId || !!cellTreasure) ? 'auto' : 'none',
+                                pointerEvents: (isValidMove || lashablePlayer || isKindleTarget || isMiststepTarget || isStoneGlideTarget || isDonWolfTarget || isShiftSpiritTarget || isRaiseStoneCell || occupiedPlayerId || !!cellTreasure) ? 'auto' : 'none',
                                 border: lashablePlayer
                                   ? '2px solid var(--accent-crimson)'
                                   : isValidMove
                                   ? '1.5px dashed var(--accent-green)'
                                   : isKindleTarget
                                   ? '2px solid var(--accent-crimson)'
-                                  : (isMiststepTarget || isDonWolfTarget)
+                                  : (isMiststepTarget || isStoneGlideTarget || isDonWolfTarget)
                                   ? '1.5px dashed var(--accent-cyan)'
                                   : isShiftSpiritTarget
                                   ? '2px solid var(--accent-cyan)'

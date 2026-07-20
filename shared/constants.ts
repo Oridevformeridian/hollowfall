@@ -124,14 +124,14 @@ export interface Hero {
 export const HEROES: Hero[] = [
   // Row 1 (top selection of the 2x5 grid)
   { emoji: '🧙‍♂️', color: '#00E5FF', name: 'Man Mage', class: 'Ashwalk', signatureCards: ['Immolate'] },       // Col 1, Top
-  { emoji: '🧝‍♂️', color: '#00E676', name: 'Man Elf', class: 'Stoneshaping', signatureCards: ['Raise Stone'] },       // Col 2, Top
+  { emoji: '🧝‍♂️', color: '#00E676', name: 'Man Elf', class: 'Stoneshaping', signatureCards: ['Raise Stone', 'Stone Glide'] },       // Col 2, Top
   { emoji: '🤴', color: '#FFD600', name: 'Prince', class: 'Bonecraft', signatureCards: ['Thorns'] },         // Col 3, Top
   { emoji: '🧚‍♂️', color: '#FF6D00', name: 'Man Fairy', class: 'Dreamwalking', signatureCards: ['Shift Spirit'] },      // Col 4, Top
   { emoji: '🧞', color: '#D500F9', name: 'Genie', class: 'Beast Paths', signatureCards: ['Don the Wolf'] },          // Col 5, Top
 
   // Row 2 (bottom selection of the 2x5 grid)
   { emoji: '🧙‍♀️', color: '#E0F7FA', name: 'Woman Mage', class: 'Ashwalk', signatureCards: ['Immolate'] },     // Col 1, Bottom
-  { emoji: '🧝‍♀️', color: '#B9F6CA', name: 'Woman Elf', class: 'Stoneshaping', signatureCards: ['Raise Stone'] },     // Col 2, Bottom
+  { emoji: '🧝‍♀️', color: '#B9F6CA', name: 'Woman Elf', class: 'Stoneshaping', signatureCards: ['Raise Stone', 'Stone Glide'] },     // Col 2, Bottom
   { emoji: '👸', color: '#F50057', name: 'Princess', class: 'Bonecraft', signatureCards: ['Thorns'] },       // Col 3, Bottom
   { emoji: '🧚‍♀️', color: '#FFAB40', name: 'Woman Fairy', class: 'Dreamwalking', signatureCards: ['Shift Spirit'] },    // Col 4, Bottom
   { emoji: '🦄', color: '#E2E8F0', name: 'Unicorn', class: 'Beast Paths', signatureCards: ['Don the Wolf'] }         // Col 5, Bottom
@@ -209,6 +209,13 @@ export const BASIC_CARDS: Card[] = [
     name: 'Deep Breath',
     type: 'offering',
     description: 'Offering: Instantly gain +2 Action Points (AP).',
+    expend: true
+  },
+  {
+    id: 'working_stone_glide',
+    name: 'Stone Glide',
+    type: 'working',
+    description: 'Move up to 2 cells in any direction, ignoring any stone walls in your way.',
     expend: true
   }
 ];

@@ -31,8 +31,9 @@ describe('Deck Logic', () => {
       return acc;
     }, {});
 
-    // Elves get 8 class + 5 common = 13 Raise Stones
-    expect(counts['working_raise_stone']).toBe(13);
+    // Elves get 8 Raise Stones and 5 Stone Glides
+    expect(counts['working_raise_stone']).toBe(8);
+    expect(counts['working_stone_glide']).toBe(5);
     expect(counts['ash_kindle_storm']).toBe(5);
     expect(counts['ash_fireball']).toBe(5);
     expect(counts['ash_turn_aside']).toBe(5);
