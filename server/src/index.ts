@@ -124,6 +124,55 @@ function handlePlayedCard(player: Player, card: Card, isConsumption = false) {
   }
 }
 
+const roomTimers = new Map<string, NodeJS.Timeout>();
+
+function clearTurnTimer(roomCode: string) {
+  const timer = roomTimers.get(roomCode);
+  if (timer) {
+    clearTimeout(timer);
+    roomTimers.delete(roomCode);
+  }
+}
+
+function startTurnTimer(roomCode: string, room: GameState) {
+  clearTurnTimer(roomCode);
+
+  if (room.phase !== 'GAMEPLAY') {
+    delete room.turnStartedAt;
+    delete room.turnExpiresAt;
+    return;
+  }
+
+  const duration = 45000; // 45 seconds
+  room.turnStartedAt = Date.now();
+  room.turnExpiresAt = Date.now() + duration;
+
+  const timer = setTimeout(() => {
+    handleTimerExpiration(roomCode);
+  }, duration);
+
+  roomTimers.set(roomCode, timer);
+}
+
+function handleTimerExpiration(roomCode: string) {
+  const room = rooms.get(roomCode);
+  if (!room || room.phase !== 'GAMEPLAY') {
+    clearTurnTimer(roomCode);
+    return;
+  }
+
+  const currentPid = room.turnOrder[room.activePlayerIndex];
+  const endingPlayer = room.players[currentPid];
+  if (endingPlayer) {
+    if (!room.gameLogs) room.gameLogs = [];
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    room.gameLogs.push(`[${timestamp}] ⏱️ ${endingPlayer.username}'s turn timer expired.`);
+  }
+
+  passTurn(room);
+  broadcastState(roomCode, room);
+}
+
 function passTurn(room: GameState) {
   const currentPid = room.turnOrder[room.activePlayerIndex];
   const endingPlayer = room.players[currentPid];
@@ -164,6 +213,8 @@ function passTurn(room: GameState) {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     room.gameLogs.push(`[${timestamp}] ➔ ${nextPlayer.username}'s turn began.`);
   }
+
+  startTurnTimer(room.roomCode, room);
 }
 
 function recalculatePoints(room: GameState) {
@@ -704,6 +755,9 @@ io.on('connection', (socket) => {
               room.players[firstActivePid].ap = 3;
             }
             recalculatePoints(room);
+            if (room.phase === 'GAMEPLAY') {
+              startTurnTimer(currentRoomCode, room);
+            }
           } else {
             // Cycle active player turn
             room.activePlayerIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
@@ -1834,13 +1888,18 @@ const roomMetadata = new Map<string, {
   secondaryTiles: Record<PlayerId, number>;
 }>();
 
-const broadcastState = (roomCode: string, state: GameState) => {
+function broadcastState(roomCode: string, state: GameState) {
+  if (state.phase !== 'GAMEPLAY') {
+    clearTurnTimer(roomCode);
+    delete state.turnStartedAt;
+    delete state.turnExpiresAt;
+  }
   const msg: ServerMessage = {
     event: 'STATE_UPDATE',
     payload: state
   };
   io.to(roomCode).emit('message', JSON.stringify(msg));
-};
+}
 
 const sendError = (socket: any, message: string) => {
   const msg: ServerMessage = {

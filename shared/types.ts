@@ -82,6 +82,8 @@ export interface GameState {
   treasures: Record<string, Treasure>;
   gameLogs?: string[];
   victoryPointsTarget?: number;
+  turnStartedAt?: number;
+  turnExpiresAt?: number;
 }
 
 export type ClientMessage =

@@ -643,6 +643,27 @@ export default function App() {
   const [clientHand, setClientHand] = useState<{ id: string; name: string; type: string; description: string; clientId: string; expend?: boolean }[]>([]);
   const handClientIdsRef = React.useRef<{ id: string; clientId: string }[]>([]);
 
+  const [timeLeft, setTimeLeft] = useState<number>(45);
+
+  useEffect(() => {
+    if (gameState?.phase !== 'GAMEPLAY' || !gameState?.turnExpiresAt) {
+      setTimeLeft(45);
+      return;
+    }
+
+    const updateTimer = () => {
+      const expires = gameState.turnExpiresAt || 0;
+      const diff = expires - Date.now();
+      const seconds = Math.max(0, Math.ceil(diff / 1000));
+      setTimeLeft(seconds);
+    };
+
+    updateTimer(); // Initial call
+    const timerId = setInterval(updateTimer, 500);
+
+    return () => clearInterval(timerId);
+  }, [gameState?.turnExpiresAt, gameState?.phase]);
+
   const [combatPopups, setCombatPopups] = useState<{
     id: string;
     tileX: number;
@@ -2414,12 +2435,103 @@ export default function App() {
           paddingLeft: gameState.phase === 'PLACEMENT' ? (isMobile ? '12px' : '48px') : undefined
         }}
       >
+        {/* Top Center Turn Timer & Player HUD Stats */}
+        {gameState.phase === 'GAMEPLAY' && self && (
+          <div
+            style={{
+              position: 'absolute',
+              top: isMobile ? '8px' : '20px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 90,
+              display: 'flex',
+              alignItems: 'center',
+              gap: isMobile ? '10px' : '20px',
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              backdropFilter: 'blur(16px)',
+              border: isActiveTurn 
+                ? `1.5px solid ${self.color}` 
+                : '1.5px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '24px',
+              padding: isMobile ? '6px 12px' : '10px 24px',
+              boxShadow: isActiveTurn 
+                ? `0 8px 32px rgba(0,0,0,0.6), 0 0 15px ${self.color}33` 
+                : '0 8px 32px rgba(0,0,0,0.6)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              pointerEvents: 'auto',
+              userSelect: 'none'
+            }}
+          >
+            {/* Thread Stat (Left) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
+              <span style={{ fontSize: isMobile ? '16px' : '22px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}>🧵</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: isMobile ? '12px' : '18px', fontWeight: '900', color: 'white', lineHeight: '1.1' }}>
+                  {self.thread}
+                </span>
+                <span style={{ fontSize: isMobile ? '7px' : '9px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Thread
+                </span>
+              </div>
+            </div>
+
+            {/* Middle Divider */}
+            <div style={{ width: '1px', height: isMobile ? '16px' : '24px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+
+            {/* Countdown Timer (Center Capsule) */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                backgroundColor: timeLeft <= 10 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0, 0, 0, 0.3)',
+                border: timeLeft <= 10 ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(255,255,255,0.05)',
+                padding: isMobile ? '4px 10px' : '6px 16px',
+                borderRadius: '16px',
+                minWidth: isMobile ? '55px' : '80px',
+                transition: 'all 0.25s',
+                animation: timeLeft <= 10 ? 'pulseGlow 1s infinite ease-in-out' : 'none'
+              }}
+              title="Turn Timer"
+            >
+              <span style={{ fontSize: isMobile ? '12px' : '15px' }}>⏱️</span>
+              <span
+                style={{
+                  fontSize: isMobile ? '12px' : '16px',
+                  fontWeight: '900',
+                  color: timeLeft <= 10 ? '#ef4444' : 'white',
+                  fontFamily: 'monospace'
+                }}
+              >
+                {timeLeft}s
+              </span>
+            </div>
+
+            {/* Middle Divider */}
+            <div style={{ width: '1px', height: isMobile ? '16px' : '24px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+
+            {/* AP Stat (Right) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                <span style={{ fontSize: isMobile ? '12px' : '18px', fontWeight: '900', color: 'var(--accent-cyan)', lineHeight: '1.1' }}>
+                  {self.ap}
+                </span>
+                <span style={{ fontSize: isMobile ? '7px' : '9px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  AP
+                </span>
+              </div>
+              <span style={{ fontSize: isMobile ? '16px' : '22px', filter: 'drop-shadow(0 2px 4px rgba(0,229,255,0.3))' }}>⚡</span>
+            </div>
+          </div>
+        )}
+
         {/* Targeting Banner */}
         {targetingCardId && (
           <div
             style={{
               position: 'absolute',
-              top: isMobile ? '12px' : '24px',
+              top: isMobile ? '56px' : '76px',
               right: isMobile ? '64px' : 'auto',
               left: isMobile ? 'auto' : '50%',
               transform: isMobile ? 'none' : 'translateX(-50%)',
