@@ -1116,6 +1116,9 @@ export default function App() {
     : null;
   const isActiveTurn = !!(socket && activePlayerId === socket.id);
   const myTokenPos = socket?.id && gameState ? gameState.tokenPositions[socket.id] : null;
+  const myCarriedTreasure = gameState?.treasures
+    ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
+    : null;
 
   useEffect(() => {
     if (!self) {
@@ -2112,28 +2115,57 @@ export default function App() {
               }}
             >
               <h3 className="text-xs font-bold text-gray-400 m-0 uppercase tracking-widest">Ritual Feed</h3>
-              <div
-                style={{
-                  maxHeight: '160px',
-                  overflowY: 'auto',
-                  backgroundColor: 'rgba(0,0,0,0.2)',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  border: '1px solid rgba(255,255,255,0.03)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
-                  color: '#94a3b8',
-                  lineHeight: '1.4'
-                }}
-              >
-                {gameState.gameLogs.map((log, idx) => (
-                  <div key={`log-${idx}`} style={{ wordBreak: 'break-all' }}>
-                    {log}
-                  </div>
-                ))}
+              <div style={{ position: 'relative', width: '100%' }}>
+                <div
+                  style={{
+                    maxHeight: '160px',
+                    overflowY: 'auto',
+                    backgroundColor: 'rgba(0,0,0,0.2)',
+                    borderRadius: '8px',
+                    padding: '8px',
+                    border: '1px solid rgba(255,255,255,0.03)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    color: '#94a3b8',
+                    lineHeight: '1.4',
+                    paddingRight: (isActiveTurn && myCarriedTreasure) ? '120px' : '8px'
+                  }}
+                >
+                  {gameState.gameLogs.map((log, idx) => (
+                    <div key={`log-${idx}`} style={{ wordBreak: 'break-all' }}>
+                      {log}
+                    </div>
+                  ))}
+                </div>
+                {isActiveTurn && myCarriedTreasure && (
+                  <button
+                    onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: myCarriedTreasure.id } })}
+                    className="btn-secondary pulse-glow"
+                    style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      borderColor: 'var(--accent-gold)',
+                      color: 'var(--accent-gold)',
+                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                      fontWeight: 'bold',
+                      fontSize: '10px',
+                      padding: '6px 12px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      zIndex: 30,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    📤 Drop Mask (Free)
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -2144,28 +2176,57 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', gap: '8px', width: '100%', boxSizing: 'border-box' }}>
             {/* Small Ritual Feed without a title */}
             {gameState && gameState.gameLogs && gameState.gameLogs.length > 0 && (
-              <div
-                style={{
-                  flexGrow: 1,
-                  overflowY: 'auto',
-                  backgroundColor: 'rgba(0,0,0,0.2)',
-                  borderRadius: '8px',
-                  padding: '8px',
-                  border: '1px solid rgba(255,255,255,0.03)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px',
-                  fontFamily: 'monospace',
-                  fontSize: '11px',
-                  color: '#94a3b8',
-                  lineHeight: '1.4'
-                }}
-              >
-                {gameState.gameLogs.map((log, idx) => (
-                  <div key={`log-${idx}`} style={{ wordBreak: 'break-all' }}>
-                    {log}
-                  </div>
-                ))}
+              <div style={{ position: 'relative', flexGrow: 1, display: 'flex', minHeight: 0 }}>
+                <div
+                  style={{
+                    width: '100%',
+                    overflowY: 'auto',
+                    backgroundColor: 'rgba(0,0,0,0.2)',
+                    borderRadius: '8px',
+                    padding: '8px',
+                    border: '1px solid rgba(255,255,255,0.03)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '4px',
+                    fontFamily: 'monospace',
+                    fontSize: '11px',
+                    color: '#94a3b8',
+                    lineHeight: '1.4',
+                    paddingRight: (isActiveTurn && myCarriedTreasure) ? '110px' : '8px'
+                  }}
+                >
+                  {gameState.gameLogs.map((log, idx) => (
+                    <div key={`log-${idx}`} style={{ wordBreak: 'break-all' }}>
+                      {log}
+                    </div>
+                  ))}
+                </div>
+                {isActiveTurn && myCarriedTreasure && (
+                  <button
+                    onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: myCarriedTreasure.id } })}
+                    className="btn-secondary pulse-glow"
+                    style={{
+                      position: 'absolute',
+                      bottom: '6px',
+                      right: '6px',
+                      borderColor: 'var(--accent-gold)',
+                      color: 'var(--accent-gold)',
+                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                      fontWeight: 'bold',
+                      fontSize: '9px',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      zIndex: 30,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    📤 Drop Mask (Free)
+                  </button>
+                )}
               </div>
             )}
             
@@ -3405,7 +3466,6 @@ export default function App() {
 
           let hasContent = false;
           let sameCellTreasures: any[] = [];
-          let carriedTr: any = null;
 
           if (gameState.phase === 'PLACEMENT' && activeTileLayout) {
             hasContent = true;
@@ -3421,12 +3481,7 @@ export default function App() {
               : [];
             const hasPickup = sameCellTreasures.length > 0 && self && self.ap > 0;
 
-            carriedTr = gameState.treasures
-              ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
-              : null;
-            const hasDrop = !!carriedTr;
-
-            if (hasPickup || hasDrop) {
+            if (hasPickup) {
               hasContent = true;
             }
           }
@@ -3494,23 +3549,7 @@ export default function App() {
                     );
                   })}
 
-                  {/* Drop Treasure Button */}
-                  {carriedTr && (
-                    <button
-                      onClick={() => sendEvent({ event: 'DROP_TREASURE', payload: { treasureId: carriedTr.id } })}
-                      className="btn-secondary"
-                      style={{
-                        width: '100%',
-                        borderColor: 'var(--accent-gold)',
-                        color: 'var(--accent-gold)',
-                        fontWeight: 'bold',
-                        fontSize: '11px',
-                        padding: '8px 0'
-                      }}
-                    >
-                      📤 Drop Mask (Free Action)
-                    </button>
-                  )}
+
                 </>
               )}
             </div>
