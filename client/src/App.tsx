@@ -640,7 +640,7 @@ export default function App() {
   const [showGraveyardTooltip, setShowGraveyardTooltip] = useState(false);
   const [showExpendTooltip, setShowExpendTooltip] = useState(false);
   const [flingingCardId, setFlingingCardId] = useState<string | null>(null);
-  const [clientHand, setClientHand] = useState<{ id: string; name: string; type: string; description: string; clientId: string }[]>([]);
+  const [clientHand, setClientHand] = useState<{ id: string; name: string; type: string; description: string; clientId: string; expend?: boolean }[]>([]);
   const handClientIdsRef = React.useRef<{ id: string; clientId: string }[]>([]);
 
   const [combatPopups, setCombatPopups] = useState<{
@@ -3675,16 +3675,33 @@ export default function App() {
                       <span style={{ fontSize: '26px', margin: 'auto 0' }}>
                         {getCardTypeEmoji(card.id)}
                       </span>
-                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: typeColor }}>
-                        {card.type}
+                      <span style={{ fontSize: '8px', fontWeight: 'bold', textTransform: 'uppercase', color: card.expend ? '#ff6d00' : typeColor }}>
+                        {card.expend ? '🔥 Expend' : card.type}
                       </span>
                     </div>
                   ) : (
                     <>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
-                          {card.type}
-                        </span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                          <span style={{ fontSize: '9px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '1px', color: typeColor }}>
+                            {card.type}
+                          </span>
+                          {card.expend && (
+                            <span style={{
+                              fontSize: '7px',
+                              fontWeight: '900',
+                              backgroundColor: 'rgba(255, 109, 0, 0.15)',
+                              color: '#ff6d00',
+                              border: '1px solid rgba(255, 109, 0, 0.3)',
+                              borderRadius: '4px',
+                              padding: '1px 3px',
+                              letterSpacing: '0.5px',
+                              lineHeight: '1'
+                            }}>
+                              🔥 EXPEND
+                            </span>
+                          )}
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
                           <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexGrow: 1 }}>
                             {card.name}
