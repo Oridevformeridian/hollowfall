@@ -737,7 +737,6 @@ export default function App() {
             for (let i = 0; i < hitCount; i++) {
               const time = now + (i * interval);
               const isLast = i === hitCount - 1;
-              const isAccent = isLast;
               
               // Drum body (low punch)
               const osc = ctx.createOscillator();
