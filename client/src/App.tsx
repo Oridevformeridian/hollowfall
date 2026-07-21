@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { io, Socket } from 'socket.io-client';
-import { GameState, ClientMessage, ServerMessage } from './shared/types.ts';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from './firebase';
+import { GameState, ClientMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget, isValidStoneGlideTarget } from './shared/validation.ts';
 import { buildDeckForEmoji } from './shared/deck.ts';
@@ -661,20 +662,20 @@ const ClassSymbol = ({ heroClass, color, size = '100%', opacity = 0.4 }: { heroC
 };
 
 export default function App() {
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetingCardId, setTargetingCardId] = useState<string | null>(null);
   const [hoveredHeroIndex, setHoveredHeroIndex] = useState<number | null>(null);
   const [playedGameOverSound, setPlayedGameOverSound] = useState(false);
-  const [activeAnimation, setActiveAnimation] = useState<{
+  const [activeAnimation] = useState<{
     cardId: string;
     casterId: string;
     from: { tileX: number; tileY: number; r: number; c: number };
     to?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' };
     countered?: 'turn_aside' | 'spirit_skin' | null;
   } | null>(null);
-  const [activeLashAnimation, setActiveLashAnimation] = useState<{
+  const [activeLashAnimation] = useState<{
     attackerId: string;
     targetPlayerId?: string;
     targetWall?: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' };
@@ -728,7 +729,7 @@ export default function App() {
       }
       setTimeLeft(seconds);
 
-      const isActiveTurn = gameState.turnOrder && socket?.id && gameState.turnOrder[gameState.activePlayerIndex] === socket.id;
+      const isActiveTurn = gameState.turnOrder && myPlayerId && gameState.turnOrder[gameState.activePlayerIndex] === myPlayerId;
       
       if (isActiveTurn && seconds === 10 && !hasPlayed10sWarningRef.current) {
         hasPlayed10sWarningRef.current = true;
@@ -799,38 +800,10 @@ export default function App() {
     const timerId = setInterval(updateTimer, 500);
 
     return () => clearInterval(timerId);
-  }, [gameState?.turnExpiresAt, gameState?.phase, gameState?.turnOrder, gameState?.activePlayerIndex, socket?.id, gameState?.isTurnPaused, gameState?.turnPausedRemainingMs]);
+  }, [gameState?.turnExpiresAt, gameState?.phase, gameState?.turnOrder, gameState?.activePlayerIndex, myPlayerId, gameState?.isTurnPaused, gameState?.turnPausedRemainingMs]);
 
-  const [combatPopups, setCombatPopups] = useState<{
-    id: string;
-    tileX: number;
-    tileY: number;
-    r: number;
-    c: number;
-    direction?: 'H' | 'V';
-    text: string;
-    type: 'damage' | 'heal' | 'blocked' | 'countered' | 'effect';
-  }[]>([]);
-
-  const spawnPopup = (
-    tileX: number,
-    tileY: number,
-    r: number,
-    c: number,
-    direction: 'H' | 'V' | undefined,
-    text: string,
-    type: 'damage' | 'heal' | 'blocked' | 'countered' | 'effect',
-    delay = 0
-  ) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setTimeout(() => {
-      setCombatPopups(prev => [...prev, { id, tileX, tileY, r, c, direction, text, type }]);
-      setTimeout(() => {
-        setCombatPopups(prev => prev.filter(p => p.id !== id));
-      }, 1400);
-    }, delay);
-  };
-
+  
+  
   const gameStateRef = React.useRef(gameState);
   useEffect(() => {
     gameStateRef.current = gameState;
@@ -858,7 +831,7 @@ export default function App() {
         ? current.turnOrder[current.activePlayerIndex]
         : null;
 
-      if (currentActiveId && socket?.id && currentActiveId === socket.id) {
+      if (currentActiveId && myPlayerId && currentActiveId === myPlayerId) {
         if (!wasGameplay || currentActiveId !== prevActiveId) {
           playTurnStartRiff();
         }
@@ -944,197 +917,47 @@ export default function App() {
   const [hoverCoord, setHoverCoord] = useState<{ x: number; y: number } | null>(null);
   const [rotation, setRotation] = useState<0 | 90 | 180 | 270>(0);
 
-  // Initialize socket connection
+  // Initialize Firebase Listener
   useEffect(() => {
-    const token = localStorage.getItem('hollowfall_auth_token');
-    const s = io({
-      auth: { token }
-    });
-    setSocket(s);
-
-    s.on('connect', () => {
-      console.log('Connected to server');
-      setError(null);
-
-      // Auto-rejoin check
-      const savedRoom = sessionStorage.getItem('hollowfall_active_room');
-      const savedUsername = sessionStorage.getItem('hollowfall_active_username');
-      if (savedRoom && savedUsername) {
-        const cleanRoom = savedRoom.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
-        const cleanUsername = savedUsername.trim().toLowerCase();
-        const sessionToken = localStorage.getItem(`hollowfall_session_${cleanRoom}_${cleanUsername}`) || undefined;
-
-        console.log(`Auto-rejoining room ${cleanRoom} as ${savedUsername}...`);
-        s.emit('message', JSON.stringify({
-          event: 'JOIN_ROOM',
-          payload: { username: savedUsername, roomCode: cleanRoom, color: '', emoji: '', sessionToken }
-        }));
+    if (!roomCode) return;
+    const matchRef = doc(db, 'matches', roomCode);
+    const unsubscribe = onSnapshot(matchRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const state = docSnap.data() as GameState;
+        setGameState(state);
+        
+        
       }
     });
+    return () => unsubscribe();
+  }, [roomCode]);
 
-    s.on('message', (messageStr: string) => {
-      try {
-        const msg: ServerMessage = JSON.parse(messageStr);
-        if (msg.event === 'STATE_UPDATE') {
-          setGameState(msg.payload);
-          setError(null);
-          
-          // Store session token for reconnection resilience
-          const currentUsername = usernameRef.current || sessionStorage.getItem('hollowfall_active_username') || '';
-          if (currentUsername) {
-            const myPlayer = Object.values(msg.payload.players).find(
-              (p: any) => p.username.toLowerCase() === currentUsername.toLowerCase()
-            );
-            if (myPlayer && myPlayer.sessionToken) {
-              const cleanRoom = msg.payload.roomCode.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
-              localStorage.setItem(`hollowfall_session_${cleanRoom}_${myPlayer.username.toLowerCase()}`, myPlayer.sessionToken);
-              
-              // Keep sessionStorage and React state in sync
-              sessionStorage.setItem('hollowfall_active_room', msg.payload.roomCode);
-              sessionStorage.setItem('hollowfall_active_username', myPlayer.username);
-              if (!usernameRef.current) setUsername(myPlayer.username);
-              if (!roomCodeRef.current) setRoomCode(msg.payload.roomCode);
-            }
-          }
-        } else if (msg.event === 'PLAY_CARD_ANIMATION') {
-          const { cardId, casterId, target, countered } = msg.payload;
-          const casterPos = gameStateRef.current?.tokenPositions[casterId];
-          if (casterPos) {
-            setActiveAnimation({
-              cardId,
-              casterId,
-              from: { ...casterPos },
-              to: target ? { ...target } : undefined,
-              countered
-            });
-            setTimeout(() => {
-              setActiveAnimation(null);
-            }, 2500);
-
-            // Spawn unified combat popups for spells
-            if (cardId === 'ash_kindle_storm' || cardId === 'ash_fireball' || cardId === 'ash_immolate') {
-              if (target) {
-                let damage = 3;
-                if (cardId === 'ash_fireball') damage = 4;
-                else if (cardId === 'ash_immolate') damage = 6;
-
-                // Target damage popup
-                if (countered === 'turn_aside') {
-                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, '🛡️ Turn Aside', 'countered', 800);
-                } else if (countered === 'spirit_skin') {
-                  const finalDmg = Math.max(0, damage - 2);
-                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, `-${finalDmg}`, 'damage', 800);
-                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, '🛡️ Spirit Skin -2', 'blocked', 800);
-                } else {
-                  spawnPopup(target.tileX, target.tileY, target.r, target.c, target.direction, `-${damage}`, 'damage', 800);
-                }
-              }
-
-              // Recoil damage for Immolate
-              if (cardId === 'ash_immolate') {
-                spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '-1 Recoil', 'damage', 800);
-              }
-
-              // Thorns retaliation check
-              if (target) {
-                const targetPlayerId = Object.keys(gameStateRef.current?.tokenPositions || {}).find(pId => {
-                  const pos = gameStateRef.current?.tokenPositions[pId];
-                  return pos && pos.tileX === target.tileX && pos.tileY === target.tileY && pos.r === target.r && pos.c === target.c;
-                });
-                if (targetPlayerId) {
-                  const targetPlayer = gameStateRef.current?.players[targetPlayerId];
-                  if (targetPlayer && targetPlayer.hasThorns && countered !== 'turn_aside') {
-                    spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '-1 Thorns', 'damage', 950);
-                  }
-                }
-              }
-            } else if (cardId === 'working_miststep') {
-              if (target) {
-                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '✨ Miststep', 'effect', 200);
-              }
-            } else if (cardId === 'working_stone_glide') {
-              if (target) {
-                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '⛰️ Stone Glide', 'effect', 200);
-              }
-            } else if (cardId === 'working_don_wolf') {
-              if (target) {
-                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '🐺 Wolf Leap', 'effect', 200);
-              }
-            } else if (cardId === 'working_shift_spirit') {
-              if (target) {
-                spawnPopup(target.tileX, target.tileY, target.r, target.c, undefined, '🔄 Swap Spirit', 'effect', 200);
-                spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🔄 Swap Spirit', 'effect', 200);
-              }
-            } else if (cardId === 'talisman_thorns') {
-              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🌿 Thorns Aura', 'effect', 100);
-            } else if (cardId === 'offering_deep_breath') {
-              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '💨 Deep Breath', 'effect', 100);
-            } else if (cardId === 'ash_spirit_skin') {
-              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🛡️ Spirit Skin', 'effect', 100);
-            } else if (cardId === 'working_turn_aside') {
-              spawnPopup(casterPos.tileX, casterPos.tileY, casterPos.r, casterPos.c, undefined, '🛡️ Turn Aside', 'effect', 100);
-            }
-          }
-        } else if (msg.event === 'LASH_ATTACK_ANIMATION') {
-          const { attackerId, targetPlayerId, targetWall, damageDealt, blockedBySpiritSkin } = msg.payload;
-          const attackerPos = gameStateRef.current?.tokenPositions[attackerId];
-          let targetPos: { tileX: number; tileY: number; r: number; c: number } | undefined = undefined;
-          if (targetPlayerId) {
-            targetPos = gameStateRef.current?.tokenPositions[targetPlayerId];
-          } else if (targetWall) {
-            targetPos = { tileX: targetWall.tileX, tileY: targetWall.tileY, r: targetWall.r, c: targetWall.c };
-          }
-          if (attackerPos && targetPos) {
-            setActiveLashAnimation({
-              attackerId,
-              targetPlayerId,
-              targetWall,
-              from: { ...attackerPos },
-              to: { ...targetPos },
-              damageDealt,
-              blockedBySpiritSkin
-            });
-            setTimeout(() => {
-              setActiveLashAnimation(null);
-            }, 2000);
-
-            // Unified lash popup
-            const text = blockedBySpiritSkin ? '🛡️ Blocked!' : `-${damageDealt}`;
-            const type = blockedBySpiritSkin ? 'blocked' : 'damage';
-            spawnPopup(
-              targetPos.tileX,
-              targetPos.tileY,
-              targetPos.r,
-              targetPos.c,
-              targetWall?.direction,
-              text,
-              type,
-              150
-            );
-          }
-        } else if (msg.event === 'ERROR') {
-          setError(msg.payload.message);
-          // If auto-rejoin failed (e.g. room deleted), clear sessionStorage to prevent boot loops
-          sessionStorage.removeItem('hollowfall_active_room');
-          sessionStorage.removeItem('hollowfall_active_username');
-        }
-      } catch (err) {
-        console.error('Failed to parse server message', err);
-      }
-    });
-
-    s.on('connect_error', () => {
-      setError('Connection to backend server failed. Make sure server is running.');
-    });
-
-    return () => {
-      s.disconnect();
+  const sendEvent = async (event: ClientMessage) => {
+    const endpointMap: Record<string, string> = {
+      'JOIN_ROOM': 'join',
+      'PLACE_TOKENS': 'place-tokens',
+      'PLAY_CARD': 'play-card',
+      'MOVE_TOKEN': 'move-token',
+      'RESOLVE_ATTACK': 'attack',
+      'END_TURN': 'end-turn',
+      'CONCEDE': 'concede',
+      'RESTART_GAME': 'restart'
     };
-  }, []);
-
-  const sendEvent = (event: ClientMessage) => {
-    if (socket) {
-      socket.emit('message', JSON.stringify(event));
+    const action = endpointMap[event.event];
+    if (!action) return;
+    try {
+      const token = localStorage.getItem('hollowfall_auth_token');
+      const res = await fetch(`/api/match/${roomCode}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ ...( 'payload' in event ? event.payload : {} ), playerId: myPlayerId })
+      });
+      const data = await res.json();
+      if (action === 'join' && data.playerId) {
+        setMyPlayerId(data.playerId);
+      }
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -1269,16 +1092,16 @@ export default function App() {
   };
 
   // Helper selectors
-  const self = socket?.id && gameState ? gameState.players[socket.id] : null;
+  const self = myPlayerId && gameState ? gameState.players[myPlayerId] : null;
   const isHost = self?.isHost || false;
   const playersList = gameState ? Object.values(gameState.players) : [];
   const activePlayerId = gameState?.turnOrder && gameState.activePlayerIndex !== undefined
     ? gameState.turnOrder[gameState.activePlayerIndex]
     : null;
-  const isActiveTurn = !!(socket && activePlayerId === socket.id);
-  const myTokenPos = socket?.id && gameState ? gameState.tokenPositions[socket.id] : null;
+  const isActiveTurn = !!(myPlayerId && activePlayerId === myPlayerId);
+  const myTokenPos = myPlayerId && gameState ? gameState.tokenPositions[myPlayerId] : null;
   const myCarriedTreasure = gameState?.treasures
-    ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
+    ? Object.values(gameState.treasures).find(t => t.carrierId === myPlayerId)
     : null;
 
   const sameCellTreasures = gameState?.treasures && myTokenPos
@@ -1293,8 +1116,8 @@ export default function App() {
 
   const hasPickupableMask = !!(self && self.ap > 0 && sameCellTreasures.some(t => {
     let isOwnDefault = false;
-    if (t.ownerId === socket?.id && gameState?.placedTiles && socket?.id) {
-      const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === socket.id);
+    if (t.ownerId === myPlayerId && gameState?.placedTiles && myPlayerId) {
+      const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === myPlayerId);
       if (ownerTile) {
         const isOwnerTile = t.tileX === ownerTile.position.x && t.tileY === ownerTile.position.y;
         const isCorner = (t.r === 0 || t.r === 4) && (t.c === 0 || t.c === 4);
@@ -1712,7 +1535,7 @@ export default function App() {
                           <span className="font-semibold text-white truncate" style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px', minWidth: 0 }}>
                             <span style={{ fontSize: isMobile ? '16px' : '28px', lineHeight: '1', flexShrink: 0 }}>{player.emoji}</span>
                             <span style={{ fontSize: isMobile ? '10px' : '13px' }} className="truncate">
-                              {player.username} {player.id === socket?.id && '(You)'}
+                              {player.username} {player.id === myPlayerId && '(You)'}
                             </span>
                           </span>
                         </div>
@@ -1758,7 +1581,7 @@ export default function App() {
             {/* Column 2: Choose Your Hero Picker */}
             {(() => {
               const takenEmojis = playersList
-                .filter(p => p.id !== socket?.id)
+                .filter(p => p.id !== myPlayerId)
                 .map(p => p.emoji);
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '4px' : '12px' }}>
@@ -2165,7 +1988,7 @@ export default function App() {
     if (!isActiveTurn || gameState.phase !== 'PLACEMENT') return false;
     const tileIndex = self?.assignedTileIndex;
     if (tileIndex === null || tileIndex === undefined) return false;
-    return validateTilePlacement(x, y, tileIndex, socket?.id || '', gameState.placedTiles, gameState.turnOrder.length).valid;
+    return validateTilePlacement(x, y, tileIndex, myPlayerId || '', gameState.placedTiles, gameState.turnOrder.length).valid;
   };
 
   return (
@@ -2222,8 +2045,8 @@ export default function App() {
 
                         // Check if it's player's own mask at default position
                         let isOwnDefault = false;
-                        if (t.ownerId === socket?.id) {
-                          const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === socket.id);
+                        if (t.ownerId === myPlayerId) {
+                          const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === myPlayerId);
                           if (ownerTile) {
                             const isOwnerTile = t.tileX === ownerTile.position.x && t.tileY === ownerTile.position.y;
                             const isCorner = (t.r === 0 || t.r === 4) && (t.c === 0 || t.c === 4);
@@ -2264,7 +2087,7 @@ export default function App() {
                   {/* Drop Treasure Button */}
                   {(() => {
                     const carriedTr = gameState.treasures
-                      ? Object.values(gameState.treasures).find(t => t.carrierId === socket?.id)
+                      ? Object.values(gameState.treasures).find(t => t.carrierId === myPlayerId)
                       : null;
                     if (carriedTr) {
                       return (
@@ -2294,7 +2117,7 @@ export default function App() {
                   {(() => {
                     const lashable = gameState && myTokenPos && self && self.ap > 0 && !self.hasAttackedThisTurn && !self.isFirstTurnOfMatch
                       ? Object.values(gameState.players).filter(p => {
-                          if (p.id === socket?.id || p.thread <= 0) return false;
+                          if (p.id === myPlayerId || p.thread <= 0) return false;
                           const toPos = gameState.tokenPositions[p.id];
                           if (!toPos) return false;
                           
@@ -2467,8 +2290,8 @@ export default function App() {
 
                         // Check if it's player's own mask at default position
                         let isOwnDefault = false;
-                        if (t.ownerId === socket?.id) {
-                          const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === socket.id);
+                        if (t.ownerId === myPlayerId) {
+                          const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === myPlayerId);
                           if (ownerTile) {
                             const isOwnerTile = t.tileX === ownerTile.position.x && t.tileY === ownerTile.position.y;
                             const isCorner = (t.r === 0 || t.r === 4) && (t.c === 0 || t.c === 4);
@@ -2577,8 +2400,8 @@ export default function App() {
 
                         // Check if it's player's own mask at default position
                         let isOwnDefault = false;
-                        if (t.ownerId === socket?.id) {
-                          const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === socket.id);
+                        if (t.ownerId === myPlayerId) {
+                          const ownerTile = Object.values(gameState.placedTiles).find(tile => tile.placedBy === myPlayerId);
                           if (ownerTile) {
                             const isOwnerTile = t.tileX === ownerTile.position.x && t.tileY === ownerTile.position.y;
                             const isCorner = (t.r === 0 || t.r === 4) && (t.c === 0 || t.c === 4);
@@ -2906,7 +2729,7 @@ export default function App() {
                   {!isMobile && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
-                        {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && (
+                        {player.username} {pId === myPlayerId && '(You)'} {player.isDisconnected && (
                           <span style={{ color: '#facc15' }}>
                             {player.concessionExpiresAt ? `(Conceding in ${Math.max(0, Math.ceil((player.concessionExpiresAt - now) / 1000))}s)` : '(Offline)'}
                           </span>
@@ -2966,7 +2789,7 @@ export default function App() {
           if (!player) return null;
           const apCount = player.ap || 0;
           const apIcons = '⚡'.repeat(apCount) + '⚪'.repeat(Math.max(0, 3 - apCount));
-          const isMe = hoveredPlayerId === socket?.id;
+          const isMe = hoveredPlayerId === myPlayerId;
           const isActive = hoveredPlayerId === activePlayerId;
 
           return (
@@ -3226,7 +3049,7 @@ export default function App() {
                           });
 
                           // Check if this cell contains a lashable player
-                          const lashablePlayer = !targetingCardId && gameState && myTokenPos && self && isActiveTurn && self.ap > 0 && !self.hasAttackedThisTurn && !self.isFirstTurnOfMatch && occupiedPlayerId && occupiedPlayerId !== socket?.id
+                          const lashablePlayer = !targetingCardId && gameState && myTokenPos && self && isActiveTurn && self.ap > 0 && !self.hasAttackedThisTurn && !self.isFirstTurnOfMatch && occupiedPlayerId && occupiedPlayerId !== myPlayerId
                             ? (() => {
                                 const p = gameState.players[occupiedPlayerId];
                                 if (!p || p.thread <= 0) return null;
@@ -3265,7 +3088,7 @@ export default function App() {
                           ).valid;
 
                           // 2. Kindle the Storm, Fireball, and Immolate targeting
-                          const isKindleTarget = (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') && isActiveTurn && !!occupiedPlayerId && occupiedPlayerId !== socket?.id;
+                          const isKindleTarget = (targetingCardId === 'ash_kindle_storm' || targetingCardId === 'ash_fireball' || targetingCardId === 'ash_immolate') && isActiveTurn && !!occupiedPlayerId && occupiedPlayerId !== myPlayerId;
 
                           // 3. Miststep targeting
                           let isMiststepTarget = false;
@@ -3290,7 +3113,7 @@ export default function App() {
                           let isShiftSpiritTarget = false;
                           if (targetingCardId === 'working_shift_spirit' && isActiveTurn && myTokenPos) {
                             const p = occupiedPlayerId ? gameState.players[occupiedPlayerId] : null;
-                            if (p && p.thread > 0 && occupiedPlayerId !== socket?.id) {
+                            if (p && p.thread > 0 && occupiedPlayerId !== myPlayerId) {
                               isShiftSpiritTarget = hasLineOfSight(myTokenPos, targetPos, gameState.placedTiles, gameState.doorsState, gameState.wallsState);
                             }
                           }
@@ -3951,26 +3774,7 @@ export default function App() {
           })()}
 
           {/* Unified Combat Popups Overlay */}
-          {combatPopups.map(popup => {
-            const p = popup.direction
-              ? getBorderCoords(popup.tileX, popup.tileY, popup.r, popup.c, popup.direction)
-              : getCellCoords(popup.tileX, popup.tileY, popup.r, popup.c);
-            return (
-              <div
-                key={popup.id}
-                className={`combat-popup ${popup.type}`}
-                style={{
-                  position: 'absolute',
-                  left: `${p.x}px`,
-                  top: `${p.y}px`,
-                  pointerEvents: 'none',
-                  zIndex: 150
-                }}
-              >
-                {popup.text}
-              </div>
-            );
-          })}
+          
         </div>
       </div>
 

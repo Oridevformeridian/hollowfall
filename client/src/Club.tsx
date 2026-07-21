@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { ref, onValue, set, onDisconnect, remove } from 'firebase/database';
+import { rtdb } from './firebase';
 import { HEROES } from './shared/constants';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id.apps.googleusercontent.com';
@@ -14,20 +16,29 @@ export default function Club() {
   useEffect(() => {
     if (view !== 'park') return undefined;
 
-    const fetchStats = async () => {
-        try {
-          const res = await fetch('/api/stats');
-          if (res.ok) {
-            const data = await res.json();
-            setOnlineCount(data.onlineCount || 0);
-          }
-        } catch (e) {
-          // silently ignore fetch stats errors
-        }
-      };
-      fetchStats();
-      const interval = setInterval(fetchStats, 5000);
-      return () => clearInterval(interval);
+    // Generate a random session ID for presence
+    const sessionId = Math.random().toString(36).substring(2, 15);
+    const userRef = ref(rtdb, `presence/${sessionId}`);
+    const presenceRef = ref(rtdb, 'presence');
+
+    // Set ourselves as online and schedule removal on disconnect
+    set(userRef, true);
+    onDisconnect(userRef).remove();
+
+    // Listen to global presence count
+    const unsubscribe = onValue(presenceRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setOnlineCount(Object.keys(data).length);
+      } else {
+        setOnlineCount(0);
+      }
+    });
+
+    return () => {
+      remove(userRef);
+      unsubscribe();
+    };
   }, [view]);
 
   const handleLoginSuccess = async (credentialResponse: any) => {
