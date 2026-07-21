@@ -18,6 +18,7 @@ COPY server/package*.json ./server/
 RUN cd server && npm ci
 
 COPY server ./server
+RUN cd server && npx prisma generate
 RUN cd server && npm run build
 
 # Final production image
