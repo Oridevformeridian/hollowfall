@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { HEROES } from './shared/constants';
 
@@ -9,6 +9,26 @@ export default function Club() {
   const [displayName, setDisplayName] = useState<string>('');
   const [emoji, setEmoji] = useState<string>(HEROES[0].emoji);
   const [view, setView] = useState<'login' | 'setup' | 'park'>(token ? 'setup' : 'login');
+  const [onlineCount, setOnlineCount] = useState<number>(0);
+
+  useEffect(() => {
+    if (view !== 'park') return undefined;
+
+    const fetchStats = async () => {
+        try {
+          const res = await fetch('/api/stats');
+          if (res.ok) {
+            const data = await res.json();
+            setOnlineCount(data.onlineCount || 0);
+          }
+        } catch (e) {
+          // silently ignore fetch stats errors
+        }
+      };
+      fetchStats();
+      const interval = setInterval(fetchStats, 5000);
+      return () => clearInterval(interval);
+  }, [view]);
 
   const handleLoginSuccess = async (credentialResponse: any) => {
     try {
@@ -106,22 +126,27 @@ export default function Club() {
           <button 
             className="park-label"
             onClick={() => alert('Central Park coming soon!')}
-            style={{ top: '55%', left: '50%', background: 'rgba(0, 229, 255, 0.85)', color: 'black', boxShadow: '0 0 20px rgba(0, 229, 255, 0.5)' }}
+            style={{ 
+              top: '55%', left: '50%', 
+              background: `rgba(0, 229, 255, ${Math.min(0.85 + (onlineCount * 0.05), 1)})`, 
+              color: 'black', 
+              boxShadow: `0 0 ${20 + (onlineCount * 10)}px rgba(0, 229, 255, ${Math.min(0.5 + (onlineCount * 0.1), 1)})` 
+            }}
           >
-            ⛲ Central Park
+            ⛲ Central Park ({onlineCount} {onlineCount === 1 ? 'Walker' : 'Walkers'})
           </button>
 
-          {/* Settings (Top Right Ferris Wheel) */}
+          {/* Profile (Top Right Ferris Wheel) */}
           <button 
             className="park-label"
-            onClick={() => alert('Settings coming soon!')}
+            onClick={() => setView('setup')}
             style={{ top: '25%', left: '80%', background: 'rgba(213, 0, 249, 0.85)', color: 'white', boxShadow: '0 0 20px rgba(213, 0, 249, 0.5)' }}
           >
             <svg style={{ animation: 'spin 4s linear infinite' }} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
-            Settings
+            Profile
           </button>
 
           {/* Custom Match - Lobby (Bottom Right Haunted House) */}

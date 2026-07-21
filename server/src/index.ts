@@ -145,6 +145,11 @@ const io = new Server(server, {
   }
 });
 
+// Stats Route
+app.get('/api/stats', (req, res) => {
+  res.json({ onlineCount: io.engine.clientsCount });
+});
+
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) {
