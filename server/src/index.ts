@@ -48,7 +48,7 @@ app.post('/api/auth/google', async (req, res) => {
     const displayName = payload.name || 'Unknown Wanderer'; // No email used!
     
     // Check if identity exists
-    let identity = await prisma.linkedIdentity.findUnique({
+    const identity = await prisma.linkedIdentity.findUnique({
       where: {
         provider_providerId: {
           provider: 'google',
