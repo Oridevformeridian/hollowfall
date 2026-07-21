@@ -10,7 +10,9 @@ import { buildDeckForEmoji, shuffle } from '../../shared/deck';
 import { PrismaClient } from '@prisma/client';
 import { OAuth2Client } from 'google-auth-library';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasourceUrl: process.env.DATABASE_URL || 'postgresql://dummy:dummy@localhost:5432/hollowfall_db'
+});
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const app = express();

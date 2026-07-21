@@ -24,6 +24,8 @@ RUN cd server && npm run build
 # Final production image
 FROM node:20-alpine
 
+RUN apk add --no-cache openssl
+
 WORKDIR /usr/src/app
 
 # Set production environment
