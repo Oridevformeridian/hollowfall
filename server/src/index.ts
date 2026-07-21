@@ -7,17 +7,26 @@ import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, 
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget, isValidStoneGlideTarget, calculateScores } from '../../shared/validation';
 import { HEROES, BASIC_CARDS } from '../../shared/constants';
 import { buildDeckForEmoji, shuffle } from '../../shared/deck';
-import { PrismaClient } from '@prisma/client';
+import { Firestore } from '@google-cloud/firestore';
 import { OAuth2Client } from 'google-auth-library';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 
-const prisma = new PrismaClient({
-  datasourceUrl: process.env.DATABASE_URL || 'postgresql://dummy:dummy@localhost:5432/hollowfall_db'
+const JWT_SECRET = process.env.JWT_SECRET || 'hollowfall_dev_secret';
+
+const firestore = new Firestore({
+  projectId: process.env.GOOGLE_CLOUD_PROJECT || 'hollowfall-game'
 });
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use('/api', (req, res, next) => {
+  console.log(`[API] ${req.method} ${req.url}`);
+  next();
+});
 
 // Serve client build in production
 if (process.env.NODE_ENV === 'production') {
@@ -49,42 +58,36 @@ app.post('/api/auth/google', async (req, res) => {
     const providerId = payload.sub; // The opaque unique subject ID
     const displayName = payload.name || 'Unknown Wanderer'; // No email used!
     
-    // Check if identity exists
-    const identity = await prisma.linkedIdentity.findUnique({
-      where: {
-        provider_providerId: {
-          provider: 'google',
-          providerId: providerId
-        }
-      },
-      include: {
-        playerAccount: true
-      }
-    });
+    // Check if identity exists in Firestore
+    const playersRef = firestore.collection('players');
+    const snapshot = await playersRef.where('identities.google', '==', providerId).limit(1).get();
 
-    let playerAccount;
+    let playerAccount: any;
 
-    if (identity) {
-      playerAccount = identity.playerAccount;
+    if (!snapshot.empty) {
+      const doc = snapshot.docs[0];
+      playerAccount = { id: doc.id, ...doc.data() };
     } else {
-      // Create new account and identity
-      playerAccount = await prisma.playerAccount.create({
-        data: {
-          displayName,
-          identities: {
-            create: {
-              provider: 'google',
-              providerId: providerId
-            }
-          }
-        }
-      });
+      // Create new account
+      const newPlayerRef = playersRef.doc(crypto.randomUUID());
+      const newPlayerData = {
+        createdAt: new Date().toISOString(),
+        displayName,
+        identities: {
+          google: providerId
+        },
+        unlockedClasses: []
+      };
+      await newPlayerRef.set(newPlayerData);
+      playerAccount = { id: newPlayerRef.id, ...newPlayerData };
     }
 
-    // TODO: In Phase 1a step 2, we should sign a JWT here. 
-    // For now, we return the abstract player ID.
+    // Sign a JWT token for the user
+    const token = jwt.sign({ playerId: playerAccount.id }, JWT_SECRET, { expiresIn: '7d' });
+
     res.json({ 
       success: true, 
+      token,
       playerId: playerAccount.id,
       displayName: playerAccount.displayName
     });
@@ -95,12 +98,69 @@ app.post('/api/auth/google', async (req, res) => {
   }
 });
 
+// Middleware to authenticate JWT for REST endpoints
+const authenticateJWT = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, JWT_SECRET, (err, user: any) => {
+      if (err) {
+        return res.sendStatus(403);
+      }
+      (req as any).user = user;
+      next();
+    });
+  } else {
+    res.sendStatus(401);
+  }
+};
+
+// Profile Configuration Route
+app.post('/api/player/profile', authenticateJWT, async (req: express.Request, res: express.Response) => {
+  const { displayName, emoji } = req.body;
+  const playerId = (req as any).user.playerId;
+
+  if (!displayName) {
+    return res.status(400).json({ error: 'displayName is required' });
+  }
+
+  try {
+    const playerRef = firestore.collection('players').doc(playerId);
+    await playerRef.update({
+      displayName,
+      emoji: emoji || null
+    });
+    res.json({ success: true, displayName, emoji });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: '*', // Allow all origins for the prototype
     methods: ['GET', 'POST']
   }
+});
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) {
+    // We allow connection without token for now so existing prototype doesn't break instantly,
+    // but in a strict implementation, we would block this. 
+    // We will attach a guest ID if no token is provided to allow guest lobby play.
+    (socket as any).playerId = `guest_${crypto.randomUUID()}`;
+    return next();
+  }
+  jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
+    if (err) {
+      return next(new Error('Authentication error: Invalid token'));
+    }
+    (socket as any).playerId = decoded.playerId;
+    next();
+  });
 });
 
 // In-memory store for game rooms
@@ -2029,6 +2089,10 @@ const broadcastSystemMessage = (roomCode: string, message: string) => {
 };
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+  });
+}
+
+export { app, server, io };

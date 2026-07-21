@@ -946,7 +946,10 @@ export default function App() {
 
   // Initialize socket connection
   useEffect(() => {
-    const s = io();
+    const token = localStorage.getItem('hollowfall_auth_token');
+    const s = io({
+      auth: { token }
+    });
     setSocket(s);
 
     s.on('connect', () => {
