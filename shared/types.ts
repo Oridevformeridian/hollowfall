@@ -22,6 +22,7 @@ export interface Player {
   hasConceded?: boolean;
   sessionToken?: string;
   isDisconnected?: boolean;
+  concessionExpiresAt?: number; // timestamp when the player will automatically concede due to disconnect
   hasThorns?: boolean;
   hasTurnAside?: boolean;
   hasSpiritSkin?: boolean;
@@ -84,6 +85,8 @@ export interface GameState {
   victoryPointsTarget?: number;
   turnStartedAt?: number;
   turnExpiresAt?: number;
+  isTurnPaused?: boolean;
+  turnPausedRemainingMs?: number;
   gameStartedAt?: number;
   gameEndedAt?: number;
 }

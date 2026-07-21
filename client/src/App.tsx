@@ -708,17 +708,24 @@ export default function App() {
   }, [gameState?.gameLogs]);
   const [timeLeft, setTimeLeft] = useState<number>(45);
 
+  const [now, setNow] = useState<number>(Date.now());
+
   useEffect(() => {
-    if (gameState?.phase !== 'GAMEPLAY' || !gameState?.turnExpiresAt) {
+    if (gameState?.phase !== 'GAMEPLAY') {
       setTimeLeft(45);
       hasPlayed10sWarningRef.current = false;
       return;
     }
 
     const updateTimer = () => {
-      const expires = gameState.turnExpiresAt || 0;
-      const diff = expires - Date.now();
-      const seconds = Math.max(0, Math.ceil(diff / 1000));
+      setNow(Date.now());
+      let seconds = 45;
+      if (gameState.isTurnPaused && gameState.turnPausedRemainingMs !== undefined) {
+        seconds = Math.max(0, Math.ceil(gameState.turnPausedRemainingMs / 1000));
+      } else if (gameState.turnExpiresAt) {
+        const diff = gameState.turnExpiresAt - Date.now();
+        seconds = Math.max(0, Math.ceil(diff / 1000));
+      }
       setTimeLeft(seconds);
 
       const isActiveTurn = gameState.turnOrder && socket?.id && gameState.turnOrder[gameState.activePlayerIndex] === socket.id;
@@ -792,7 +799,7 @@ export default function App() {
     const timerId = setInterval(updateTimer, 500);
 
     return () => clearInterval(timerId);
-  }, [gameState?.turnExpiresAt, gameState?.phase, gameState?.turnOrder, gameState?.activePlayerIndex, socket?.id]);
+  }, [gameState?.turnExpiresAt, gameState?.phase, gameState?.turnOrder, gameState?.activePlayerIndex, socket?.id, gameState?.isTurnPaused, gameState?.turnPausedRemainingMs]);
 
   const [combatPopups, setCombatPopups] = useState<{
     id: string;
@@ -2728,16 +2735,16 @@ export default function App() {
               }}
               title="Turn Timer"
             >
-              <span style={{ fontSize: isMobile ? '16px' : '20px' }}>⏱️</span>
+              <span style={{ fontSize: isMobile ? '16px' : '20px' }}>{gameState?.isTurnPaused ? '⏸️' : '⏱️'}</span>
               <span
                 style={{
                   fontSize: isMobile ? '18px' : '24px',
                   fontWeight: '900',
-                  color: timeLeft <= 9 ? '#ff4d4d' : 'white',
+                  color: gameState?.isTurnPaused ? '#facc15' : timeLeft <= 9 ? '#ff4d4d' : 'white',
                   fontFamily: 'monospace'
                 }}
               >
-                {timeLeft}s
+                {gameState?.isTurnPaused ? 'PAUSED' : `${timeLeft}s`}
               </span>
             </div>
 
@@ -2896,7 +2903,11 @@ export default function App() {
                   {!isMobile && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                       <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
-                        {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && ' (Offline)'}
+                        {player.username} {pId === socket?.id && '(You)'} {player.isDisconnected && (
+                          <span style={{ color: '#facc15' }}>
+                            {player.concessionExpiresAt ? `(Conceding in ${Math.max(0, Math.ceil((player.concessionExpiresAt - now) / 1000))}s)` : '(Offline)'}
+                          </span>
+                        )}
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#94a3b8' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
@@ -2981,7 +2992,11 @@ export default function App() {
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <span style={{ fontSize: '13px', fontWeight: 'bold', color: player.isDisconnected ? '#ef4444' : 'white' }}>
-                      {player.username} {isMe && '(You)'} {player.isDisconnected && ' (Offline)'}
+                      {player.username} {isMe && '(You)'} {player.isDisconnected && (
+                        <span style={{ color: '#facc15' }}>
+                          {player.concessionExpiresAt ? `(Conceding in ${Math.max(0, Math.ceil((player.concessionExpiresAt - now) / 1000))}s)` : '(Offline)'}
+                        </span>
+                      )}
                     </span>
                   </div>
                   <span style={{ fontSize: '10px', color: player.isDisconnected ? '#ef4444' : '#64748b' }}>

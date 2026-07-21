@@ -209,18 +209,22 @@ function clearTurnTimer(roomCode: string) {
   }
 }
 
-function startTurnTimer(roomCode: string, room: GameState) {
+function startTurnTimer(roomCode: string, room: GameState, durationOverride?: number) {
   clearTurnTimer(roomCode);
 
   if (room.phase !== 'GAMEPLAY') {
     delete room.turnStartedAt;
     delete room.turnExpiresAt;
+    delete room.isTurnPaused;
+    delete room.turnPausedRemainingMs;
     return;
   }
 
-  const duration = 45000; // 45 seconds
+  const duration = durationOverride !== undefined ? durationOverride : 45000; // 45 seconds default
   room.turnStartedAt = Date.now();
   room.turnExpiresAt = Date.now() + duration;
+  room.isTurnPaused = false;
+  room.turnPausedRemainingMs = 0;
 
   const timer = setTimeout(() => {
     handleTimerExpiration(roomCode);
@@ -509,6 +513,7 @@ io.on('connection', (socket) => {
             // Map this connection's playerId variable to the new ID
             playerId = newPlayerId;
             existingReconnectingPlayer.isDisconnected = false;
+            delete existingReconnectingPlayer.concessionExpiresAt;
 
             // Clear any active disconnect timer for this player
             const timerKey = `${targetRoomCode}:${existingReconnectingPlayer.username}`;
@@ -516,6 +521,13 @@ io.on('connection', (socket) => {
               clearTimeout(disconnectTimers.get(timerKey));
               disconnectTimers.delete(timerKey);
               console.log(`Cleared disconnect timer for reconnecting player: ${existingReconnectingPlayer.username}`);
+            }
+
+            // Resume turn timer if it was paused and this player is the active player
+            if (room.isTurnPaused && room.turnOrder[room.activePlayerIndex] === newPlayerId) {
+              const remaining = room.turnPausedRemainingMs || 45000;
+              console.log(`Resuming paused turn timer for ${existingReconnectingPlayer.username} with ${remaining}ms remaining`);
+              startTurnTimer(targetRoomCode, room, remaining);
             }
 
             currentRoomCode = targetRoomCode;
@@ -1889,10 +1901,24 @@ io.on('connection', (socket) => {
         const player = room.players[playerId];
 
         if (room.phase === 'PLACEMENT' || room.phase === 'GAMEPLAY') {
-          // Game is active: mark player as disconnected. Wait 10 minutes for reconnection before auto-conceding.
+          // Game is active: mark player as disconnected. Wait 2 minutes for reconnection before auto-conceding.
           if (player) {
             player.isDisconnected = true;
-            broadcastSystemMessage(currentRoomCode, `${player.username} disconnected.`);
+            const concedeDuration = 2 * 60 * 1000; // 2 minutes
+            player.concessionExpiresAt = Date.now() + concedeDuration;
+            
+            // If it's this player's turn, pause the turn timer
+            if (room.turnOrder[room.activePlayerIndex] === playerId) {
+              const remaining = (room.turnExpiresAt || Date.now()) - Date.now();
+              room.turnPausedRemainingMs = Math.max(0, remaining);
+              room.isTurnPaused = true;
+              clearTurnTimer(currentRoomCode);
+              // Leave turnExpiresAt intact so clients can optionally see what time it paused at, or clear it
+              delete room.turnExpiresAt;
+              console.log(`Paused turn timer for disconnected active player ${player.username}. Remaining: ${room.turnPausedRemainingMs}ms`);
+            }
+
+            broadcastSystemMessage(currentRoomCode, `${player.username} disconnected. Waiting for them to reconnect...`);
 
             const roomCode = currentRoomCode;
             const timerKey = `${roomCode}:${player.username}`;
@@ -1905,12 +1931,12 @@ io.on('connection', (socket) => {
               if (r) {
                 const p = Object.values(r.players).find(pl => pl.username === player.username);
                 if (p && p.isDisconnected) {
-                  broadcastSystemMessage(roomCode, `${p.username} has been auto-conceded due to 10 minutes of inactivity.`);
+                  broadcastSystemMessage(roomCode, `${p.username} has been auto-conceded due to 2 minutes of disconnect inactivity.`);
                   concedePlayer(roomCode, p.id);
                   broadcastState(roomCode, r);
                 }
               }
-            }, 10 * 60 * 1000); // 10 minutes
+            }, concedeDuration);
             disconnectTimers.set(timerKey, timer);
             
             // Check if all players in the room are now disconnected
