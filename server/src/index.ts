@@ -7,9 +7,15 @@ import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, 
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget, isValidStoneGlideTarget, calculateScores } from '../../shared/validation';
 import { HEROES, BASIC_CARDS } from '../../shared/constants';
 import { buildDeckForEmoji, shuffle } from '../../shared/deck';
+import { PrismaClient } from '@prisma/client';
+import { OAuth2Client } from 'google-auth-library';
+
+const prisma = new PrismaClient();
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 // Serve client build in production
 if (process.env.NODE_ENV === 'production') {
@@ -20,6 +26,72 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+// Authentication Route
+app.post('/api/auth/google', async (req, res) => {
+  const { idToken } = req.body;
+  if (!idToken) {
+    return res.status(400).json({ error: 'idToken is required' });
+  }
+
+  try {
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
+    if (!payload || !payload.sub) {
+      return res.status(400).json({ error: 'Invalid Google token payload' });
+    }
+
+    const providerId = payload.sub; // The opaque unique subject ID
+    const displayName = payload.name || 'Unknown Wanderer'; // No email used!
+    
+    // Check if identity exists
+    let identity = await prisma.linkedIdentity.findUnique({
+      where: {
+        provider_providerId: {
+          provider: 'google',
+          providerId: providerId
+        }
+      },
+      include: {
+        playerAccount: true
+      }
+    });
+
+    let playerAccount;
+
+    if (identity) {
+      playerAccount = identity.playerAccount;
+    } else {
+      // Create new account and identity
+      playerAccount = await prisma.playerAccount.create({
+        data: {
+          displayName,
+          identities: {
+            create: {
+              provider: 'google',
+              providerId: providerId
+            }
+          }
+        }
+      });
+    }
+
+    // TODO: In Phase 1a step 2, we should sign a JWT here. 
+    // For now, we return the abstract player ID.
+    res.json({ 
+      success: true, 
+      playerId: playerAccount.id,
+      displayName: playerAccount.displayName
+    });
+
+  } catch (error) {
+    console.error('Error verifying Google token:', error);
+    res.status(401).json({ error: 'Unauthorized' });
+  }
+});
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -69,6 +141,7 @@ function concedePlayer(roomCode: string, pId: string) {
   if (nonConcededPlayers.length <= 1) {
     // End the game
     room.phase = 'GAME_OVER';
+    room.gameEndedAt = Date.now();
     // Give victory points to the remaining player if there is one
     if (nonConcededPlayers.length === 1) {
       const winner = nonConcededPlayers[0];
@@ -242,6 +315,7 @@ function recalculatePoints(room: GameState) {
     const p = room.players[pId];
     if (p.points >= (room.victoryPointsTarget || 2)) {
       room.phase = 'GAME_OVER';
+      room.gameEndedAt = Date.now();
     }
   }
 }
@@ -313,6 +387,7 @@ function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: str
   
   if (alivePlayers.length <= 1) {
     room.phase = 'GAME_OVER';
+    room.gameEndedAt = Date.now();
     if (alivePlayers.length === 1) {
       const winner = alivePlayers[0];
       broadcastSystemMessage(roomCode, `Game Over! ${winner.username} is victorious!`);
@@ -676,6 +751,7 @@ io.on('connection', (socket) => {
           const newPlacedCount = Object.keys(room.placedTiles).length;
           if (newPlacedCount === room.turnOrder.length) {
             room.phase = 'GAMEPLAY'; // Board finalized, start gameplay phase
+            room.gameStartedAt = Date.now();
             
             // Set initial token positions to player Lairs
             // Player 1 spawn at their tile's center (2, 2)
@@ -1118,6 +1194,7 @@ io.on('connection', (socket) => {
             recalculatePoints(room);
             if (player.points >= (room.victoryPointsTarget || 2)) {
               room.phase = 'GAME_OVER';
+              room.gameEndedAt = Date.now();
             }
 
           } else if (card.id === 'working_miststep') {

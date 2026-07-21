@@ -2669,7 +2669,7 @@ export default function App() {
           justifyContent: gameState.phase === 'PLACEMENT' ? 'flex-start' : 'center',
           paddingTop: gameState.phase === 'PLACEMENT' 
             ? (isMobile ? '24px' : '48px') 
-            : (gameState.phase === 'GAMEPLAY' ? (isMobile ? '36px' : '52px') : undefined),
+            : (gameState.phase === 'GAMEPLAY' ? (isMobile ? '80px' : '100px') : undefined),
           paddingLeft: gameState.phase === 'PLACEMENT' ? (isMobile ? '12px' : '48px') : undefined
         }}
       >
@@ -2678,20 +2678,20 @@ export default function App() {
           <div
             style={{
               position: 'absolute',
-              top: isMobile ? '4px' : '8px',
+              top: isMobile ? '12px' : '20px',
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 90,
               display: 'flex',
               alignItems: 'center',
-              gap: isMobile ? '6px' : '10px',
-              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              gap: isMobile ? '10px' : '16px',
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
               backdropFilter: 'blur(16px)',
               border: isActiveTurn 
-                ? `1.5px solid ${self.color}` 
-                : '1.5px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '8px',
-              padding: isMobile ? '2px 6px' : '4px 10px',
+                ? `2px solid ${self.color}` 
+                : '2px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '4px 4px 40px 40px',
+              padding: isMobile ? '8px 24px 12px 24px' : '12px 32px 18px 32px',
               boxShadow: isActiveTurn 
                 ? `0 4px 12px rgba(0,0,0,0.6), 0 0 8px ${self.color}22` 
                 : '0 4px 12px rgba(0,0,0,0.6)',
@@ -2728,10 +2728,10 @@ export default function App() {
               }}
               title="Turn Timer"
             >
-              <span style={{ fontSize: isMobile ? '11px' : '14px' }}>⏱️</span>
+              <span style={{ fontSize: isMobile ? '16px' : '20px' }}>⏱️</span>
               <span
                 style={{
-                  fontSize: isMobile ? '13px' : '18px',
+                  fontSize: isMobile ? '18px' : '24px',
                   fontWeight: '900',
                   color: timeLeft <= 9 ? '#ff4d4d' : 'white',
                   fontFamily: 'monospace'
@@ -4609,6 +4609,12 @@ export default function App() {
             <span style={{ fontSize: '56px', display: 'block', marginBottom: '16px', filter: 'drop-shadow(0 0 12px var(--accent-gold))' }}>🏆</span>
             <h2 style={{ color: 'var(--accent-gold)', fontSize: '32px', fontWeight: '900', margin: '0 0 8px 0', letterSpacing: '3px', textTransform: 'uppercase', textShadow: '0 0 10px rgba(255,214,0,0.3)' }}>MATCH COMPLETE</h2>
             
+            {gameState.gameStartedAt && gameState.gameEndedAt && (
+              <div style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '20px', letterSpacing: '1px' }}>
+                MATCH DURATION: {Math.floor((gameState.gameEndedAt - gameState.gameStartedAt) / 60000)}m {Math.floor(((gameState.gameEndedAt - gameState.gameStartedAt) % 60000) / 1000)}s
+              </div>
+            )}
+
             {(() => {
               const target = gameState.victoryPointsTarget || 2;
               let winner = Object.values(gameState.players).find(p => p.points >= target);

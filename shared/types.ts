@@ -84,6 +84,8 @@ export interface GameState {
   victoryPointsTarget?: number;
   turnStartedAt?: number;
   turnExpiresAt?: number;
+  gameStartedAt?: number;
+  gameEndedAt?: number;
 }
 
 export type ClientMessage =
