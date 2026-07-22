@@ -124,3 +124,43 @@ describe('turn FSM: removeSeatFromTurnOrder keeps activePlayerIndex valid', () =
     expect(room.turnOrder[room.activePlayerIndex]).toBe('B');
   });
 });
+
+describe('gameplay flow: setup -> GAMEPLAY -> turn pass (through real endpoints)', () => {
+  beforeEach(() => store.clear());
+  const sess: Record<string, string> = { A: 'sA', B: 'sB' };
+  const send = (action: string, seatId: string, body: any = {}) =>
+    request(app).post(`/api/match/${ROOM}/${action}`).send({ seatId, sessionId: sess[seatId], roomCode: ROOM, ...body });
+
+  it('final tile transitions to GAMEPLAY with an armed timer; end-turn advances + re-arms', async () => {
+    await send('join', 'A', { username: 'alice' });
+    await send('join', 'B', { username: 'bob' });
+    await send('toggle-ready', 'A');
+    await send('toggle-ready', 'B');
+    expect((await send('start', 'A')).status).toBe(200);
+
+    let m = store.get(`matches/${ROOM}`);
+    expect(m.phase).toBe('PLACEMENT');
+
+    // tile 1 at (0,0) by the active seat
+    let active = m.turnOrder[m.activePlayerIndex];
+    expect((await send('place-tile', active, { x: 0, y: 0, rotation: 0 })).status).toBe(200);
+    m = store.get(`matches/${ROOM}`);
+    expect(m.phase).toBe('PLACEMENT'); // one tile still to place
+
+    // tile 2 at (1,0) by the next active seat -> triggers GAMEPLAY (the "second tile" bug)
+    active = m.turnOrder[m.activePlayerIndex];
+    expect((await send('place-tile', active, { x: 1, y: 0, rotation: 0 })).status).toBe(200);
+    m = store.get(`matches/${ROOM}`);
+    expect(m.phase).toBe('GAMEPLAY');
+    expect(typeof m.turnExpiresAt).toBe('number');       // timer armed (the "instant turns" bug)
+    expect(m.turnExpiresAt).toBeGreaterThan(Date.now());
+
+    // end-turn advances to the next seat AND re-arms the timer
+    const prevActiveIdx = m.activePlayerIndex;
+    active = m.turnOrder[m.activePlayerIndex];
+    expect((await send('end-turn', active, { discardHand: false })).status).toBe(200);
+    m = store.get(`matches/${ROOM}`);
+    expect(m.activePlayerIndex).not.toBe(prevActiveIdx); // turn advanced
+    expect(m.turnExpiresAt).toBeGreaterThan(Date.now());  // re-armed for the next player
+  });
+});
