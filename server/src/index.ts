@@ -22,7 +22,14 @@ initializeApp({
 const rtdb = getDatabase();
 
 const firestore = new Firestore({
-  projectId: PROJECT_ID
+  projectId: PROJECT_ID,
+  // Firestore throws on any `undefined` field value. Several code paths intentionally
+  // clear fields by assigning undefined (e.g. startTurnTimer clearing
+  // turnPausedRemainingMs, or clearing concessionExpiresAt on reconnect). Without this,
+  // those writes throw and roll back the whole transaction — which is why placing the
+  // final setup tile (it triggers the GAMEPLAY transition -> startTurnTimer -> t.set)
+  // silently failed. Ignoring undefined makes those clears drop the field instead.
+  ignoreUndefinedProperties: true
 });
 
 const activePresence = new Map<string, Set<string>>();
