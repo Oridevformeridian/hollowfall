@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import { ref, onValue, set, onDisconnect, remove } from 'firebase/database';
+import { ref, set, onDisconnect, remove } from 'firebase/database';
 import { rtdb } from './firebase';
 import { HEROES } from './shared/constants';
 
