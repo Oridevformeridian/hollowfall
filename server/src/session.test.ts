@@ -32,7 +32,7 @@ vi.mock('@google-cloud/firestore', () => {
   };
 });
 
-import { app, removeSeatFromTurnOrder, reconcileMatchConnectivity } from './index';
+import { app, removeSeatFromTurnOrder, reconcileMatchConnectivity, startPlacement } from './index';
 
 const ROOM = 'SESSIONTEST';
 const join = (seatId: string, sessionId: string, username: string) =>
@@ -296,5 +296,23 @@ describe('reconcileMatchConnectivity (game loop per-tick logic)', () => {
     reconcileMatchConnectivity(room, Date.now(), online('B')); // A now out of turnOrder
     expect(room.turnOrder).toEqual(['B']);
     expect(room.gameLogs.filter((l: string) => /forfeited/.test(l)).length).toBe(1);
+  });
+});
+
+describe('startPlacement (shared LOBBY -> PLACEMENT setup)', () => {
+  it('sets PLACEMENT, seeds turnOrder from players, and hands each player one tile', () => {
+    const room: any = {
+      roomCode: 'X', phase: 'LOBBY',
+      players: { A: { id: 'A', username: 'A', assignedTileIndex: null }, B: { id: 'B', username: 'B', assignedTileIndex: null } },
+      turnOrder: [], activePlayerIndex: 5, systemMessages: []
+    };
+    startPlacement(room);
+    expect(room.phase).toBe('PLACEMENT');
+    expect(room.activePlayerIndex).toBe(0);
+    expect([...room.turnOrder].sort()).toEqual(['A', 'B']);
+    for (const id of room.turnOrder) {
+      expect(room.players[id].assignedTileIndex).toBeGreaterThanOrEqual(0);
+      expect(room.players[id].assignedTileIndex).toBeLessThanOrEqual(3);
+    }
   });
 });

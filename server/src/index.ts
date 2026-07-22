@@ -492,6 +492,22 @@ export function reconcileMatchConnectivity(room: GameState, now: number, isOnlin
   return changed;
 }
 
+// Transition a room whose players are set (heroes chosen, ready) from LOBBY into PLACEMENT:
+// randomize turn order and hand each player one starting tile. Shared setup used by the
+// host-start flow and (Q2) the casual queue's createMatch, so there's one setup path.
+export function startPlacement(room: GameState) {
+  room.phase = 'PLACEMENT';
+  broadcastSystemMessage(room, `Match started! Placement phase has begun.`);
+  const playerIds = Object.keys(room.players);
+  room.turnOrder = playerIds.sort(() => random() - 0.5);
+  room.activePlayerIndex = 0;
+  // Shuffled indexes 0..3 map to FIXED_TILES; one tile per player.
+  const tileIndices = [0, 1, 2, 3].sort(() => random() - 0.5);
+  for (let i = 0; i < room.turnOrder.length; i++) {
+    room.players[room.turnOrder[i]].assignedTileIndex = tileIndices[i % 4];
+  }
+}
+
 function recalculatePoints(room: GameState) {
   // Check for Bound Fate eliminations
   const toEliminate = checkBoundFateEliminations(room);
@@ -855,25 +871,7 @@ app.post('/api/match/:matchId/start', (req, res, next) => {
             return;
           }
 
-          // Transition to DRAFT & distribution
-          room.phase = 'PLACEMENT';
-          broadcastSystemMessage(room, `Match started! Placement phase has begun.`);
-          
-          // Randomize turn order
-          const playerIds = Object.keys(room.players);
-          room.turnOrder = playerIds.sort(() => random() - 0.5);
-          room.activePlayerIndex = 0;
-
-          // Distribute 1 starting tile to each player
-          // Shuffled indexes: 0, 1, 2, 3 correspond to FIXED_TILES
-          const tileIndices = [0, 1, 2, 3].sort(() => random() - 0.5);
-          for (let i = 0; i < room.turnOrder.length; i++) {
-            const pId = room.turnOrder[i];
-            room.players[pId].assignedTileIndex = tileIndices[i % 4];
-          }
-
-          
-          
+          startPlacement(room);
 }));
 
 app.post('/api/match/:matchId/set-victory-points', (req, res, next) => {
