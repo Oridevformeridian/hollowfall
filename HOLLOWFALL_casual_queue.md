@@ -65,14 +65,19 @@ Wire the **existing casual-match button** (do not add a new one). On click:
 1. Enqueue (`queue/join`) and write **queue presence** `queuePresence/{seatId}/{sessionId}=true`
    (RTDB, `onDisconnect().remove()` + `.info/connected` re-register — same pattern as match
    presence). Disconnect while searching → presence drops → the sweep removes the entry (no ghost).
-2. Show a **VS screen**: current player on the **left**, challenger on the **right**, each as their
-   **character icon (profile emoji) with their name beneath**. While still searching the right side
-   is a "Searching for an opponent…" placeholder with a **Cancel** button (`queue/leave`).
-3. Listen on `casualQueue/{seatId}`; when `matched`, fill the challenger side from the match doc
-   (both players' `emoji` + `username` are already there), then auto-navigate into `matchId`.
+2. Show a **VS screen**: current player on the **left**, challenger on the **right**.
+   - **Searching state:** left = current player's name (+ a placeholder where the hero reveal will
+     land); right = "Searching for an opponent…" with a **Cancel** button (`queue/leave`).
+   - **Matched state (reveal):** each side shows that player's **randomly-assigned MATCH hero icon**
+     with their name beneath. This is the hero `createMatch` picked for the match (`players[seatId].emoji`
+     in the match doc) — NOT the player's profile/preferred hero. Both heroes are unknown until
+     `matched`, so the icons appear as the matchup reveal.
+3. Listen on `casualQueue/{seatId}`; when `matched`, read the match doc (`players[].emoji` = each
+   player's random hero, `players[].username` = name), reveal both sides, then auto-navigate into
+   `matchId`.
 
 **MMR/rank is NOT shown here.** Rank/MMR is displayed only on the **GAME_OVER screen** (ties into
-the Club/MMR work, task #7). The VS/matchmaking screen shows icons + names only.
+the Club/MMR work, task #7). The VS/matchmaking screen shows the random-hero icons + names only.
 
 ## 8. Hero-selection seam (draft later)
 
