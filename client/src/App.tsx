@@ -669,6 +669,13 @@ export default function App() {
   const [sessionSuperseded, setSessionSuperseded] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Transient action-rejection toast (e.g. "you already attacked", "not your turn").
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return undefined;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
   const [targetingCardId, setTargetingCardId] = useState<string | null>(null);
   const [hoveredHeroIndex, setHoveredHeroIndex] = useState<number | null>(null);
   const [playedGameOverSound, setPlayedGameOverSound] = useState(false);
@@ -1007,6 +1014,11 @@ export default function App() {
       }
       const data = await res.json();
       console.log(`[sendEvent] Fetch response data:`, data);
+      if (!res.ok) {
+        // Action rejected by the server (e.g. "It is not your turn.", "No AP remaining.").
+        setToast(data?.error || 'That action isn’t allowed right now.');
+        return;
+      }
       if (action === 'join' && data.playerId && data.gameState) {
         setMyPlayerId(data.playerId);
         const myPlayer = data.gameState.players[data.playerId];
@@ -2142,6 +2154,20 @@ export default function App() {
 
   return (
     <div className="app-layout">
+      {/* Transient action-rejection toast */}
+      {toast && (
+        <div
+          onClick={() => setToast(null)}
+          style={{
+            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 4000,
+            background: 'rgba(180, 30, 40, 0.96)', color: 'white', padding: '10px 18px', borderRadius: 10,
+            fontWeight: 600, maxWidth: '90vw', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+            cursor: 'pointer', border: '1px solid rgba(255,255,255,0.25)'
+          }}
+        >
+          {toast}
+        </div>
+      )}
       {/* Sidebar - Players & Game Phase Info */}
       <div className="sidebar">
         {!isMobile ? (
