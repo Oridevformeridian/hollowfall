@@ -20,6 +20,7 @@ export default function Club() {
   );
   
   const [onlineCount, setOnlineCount] = useState<number>(0);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const latestRoom = localStorage.getItem('hollowfall_latest_room');
   const latestUsername = localStorage.getItem('hollowfall_latest_username');
@@ -151,7 +152,7 @@ export default function Club() {
         <div style={{ position: 'relative', width: '80%', maxWidth: '900px', borderRadius: '16px', overflow: 'hidden', border: '4px solid #333' }}>
           <img src="/club_park_map.jpg" alt="Amusement Park Map" style={{ width: '100%', display: 'block' }} />
           
-          {/* Active Game Reconnect */}
+          {/* Active Game Reconnect (Supercedes everything if active) */}
           {latestRoom && latestUsername && (
             <button 
               className="park-label"
@@ -161,7 +162,7 @@ export default function Club() {
                 window.location.href = '/lobby';
               }}
               style={{ 
-                top: '15%', left: '50%', 
+                top: '20%', left: '50%', 
                 background: 'linear-gradient(45deg, #FF0055, #FF9900)', 
                 color: 'white', 
                 boxShadow: '0 0 30px rgba(255, 0, 85, 0.8)',
@@ -173,64 +174,149 @@ export default function Club() {
             </button>
           )}
 
-          {/* Competitive Arena (Top Left Coaster) */}
+          {/* =========================================================
+              CENTER CROSS (5 BUTTONS) 
+             ========================================================= */}
+          
+          {/* 1. Casual Match (Top of Center) */}
           <button 
             className="park-label"
-            onClick={() => alert('Competitive Arena coming soon!')}
-            style={{ top: '25%', left: '25%', background: 'rgba(255, 109, 0, 0.85)', color: 'white', boxShadow: '0 0 20px rgba(255, 109, 0, 0.5)' }}
+            onClick={() => alert('Casual Match coming soon!')}
+            style={{ top: '35%', left: '50%', background: 'rgba(0, 200, 83, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(0, 200, 83, 0.5)' }}
           >
-            🎢 Competitive Arena
+            ⚔️ Casual Match
           </button>
 
-          {/* Central Park - Social (Middle Fountain) */}
+          {/* 2. Practice Match (Left of Center) */}
+          <button 
+            className="park-label"
+            onClick={() => alert('Practice Match (CPU) coming soon!')}
+            style={{ top: '50%', left: '30%', background: 'rgba(96, 125, 139, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(96, 125, 139, 0.5)' }}
+          >
+            🤖 Practice (CPU)
+          </button>
+
+          {/* 3. Central Park (Center) */}
           <button 
             className="park-label"
             onClick={() => alert('Central Park coming soon!')}
             style={{ 
-              top: '55%', left: '50%', 
+              top: '50%', left: '50%', 
               background: `rgba(0, 229, 255, ${Math.min(0.85 + (onlineCount * 0.05), 1)})`, 
               color: 'black', 
               boxShadow: `0 0 ${20 + (onlineCount * 10)}px rgba(0, 229, 255, ${Math.min(0.5 + (onlineCount * 0.1), 1)})` 
             }}
           >
-            ⛲ Central Park ({onlineCount} {onlineCount === 1 ? 'Walker' : 'Walkers'})
+            ⛲ Central Park ({onlineCount})
           </button>
 
-          {/* Profile (Top Right Ferris Wheel) */}
+          {/* 4. Competitive Arena (Right of Center) */}
           <button 
             className="park-label"
-            onClick={() => setView('setup')}
-            style={{ top: '25%', left: '80%', background: 'rgba(213, 0, 249, 0.85)', color: 'white', boxShadow: '0 0 20px rgba(213, 0, 249, 0.5)' }}
+            onClick={() => alert('Competitive Arena coming soon!')}
+            style={{ top: '50%', left: '70%', background: 'rgba(255, 109, 0, 0.85)', color: 'white', boxShadow: '0 0 20px rgba(255, 109, 0, 0.5)' }}
           >
-            <svg style={{ animation: 'spin 4s linear infinite' }} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            Profile
+            🎢 Competitive Arena
           </button>
 
-          {/* Custom Match - Lobby (Bottom Right Haunted House) */}
+          {/* 5. Custom Match (Bottom of Center) */}
           <button 
             className="park-label"
             onClick={() => window.location.href = '/lobby'}
-            style={{ top: '80%', left: '75%', background: 'rgba(0, 230, 118, 0.85)', color: 'black', boxShadow: '0 0 20px rgba(0, 230, 118, 0.5)' }}
+            style={{ top: '65%', left: '50%', background: 'rgba(213, 0, 249, 0.85)', color: 'white', boxShadow: '0 0 20px rgba(213, 0, 249, 0.5)' }}
           >
             🎲 Custom Match
           </button>
 
-          {/* Sign Out (Bottom Left) */}
+
+          {/* =========================================================
+              THE 4 CORNERS
+             ========================================================= */}
+
+          {/* Top Left: Store */}
           <button 
             className="park-label"
-            onClick={() => {
-              localStorage.removeItem('hollowfall_auth_token');
-              localStorage.removeItem('hollowfall_setup_complete');
-              localStorage.removeItem('hollowfall_display_name');
-              window.location.reload();
-            }}
-            style={{ top: '90%', left: '15%', background: 'rgba(50, 50, 50, 0.85)', color: 'white', border: '1px solid #666', fontSize: '0.8rem' }}
+            onClick={() => alert('Store coming soon!')}
+            style={{ top: '15%', left: '15%', background: 'rgba(255, 214, 0, 0.85)', color: 'black', boxShadow: '0 0 15px rgba(255, 214, 0, 0.5)' }}
           >
-            🚪 Sign Out
+            🏪 Store
           </button>
+
+          {/* Top Right: Friends/Invite */}
+          <button 
+            className="park-label"
+            onClick={() => alert('Friends & Invites coming soon!')}
+            style={{ top: '15%', left: '85%', background: 'rgba(41, 121, 255, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(41, 121, 255, 0.5)' }}
+          >
+            👥 Friends
+          </button>
+
+          {/* Bottom Left: Achievements */}
+          <button 
+            className="park-label"
+            onClick={() => alert('Achievements coming soon!')}
+            style={{ top: '85%', left: '15%', background: 'rgba(255, 145, 0, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(255, 145, 0, 0.5)' }}
+          >
+            🏆 Achievements
+          </button>
+
+          {/* Bottom Right: Settings & Logout */}
+          <div style={{ position: 'absolute', top: '85%', left: '85%', transform: 'translate(-50%, -50%)', zIndex: 30 }}>
+            <button 
+              onClick={() => setShowSettings(!showSettings)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                fontSize: '1.25rem',
+                fontWeight: 'bold',
+                borderRadius: '50px',
+                border: '2px solid rgba(255, 255, 255, 0.2)',
+                cursor: 'pointer',
+                background: 'rgba(50, 50, 50, 0.85)', 
+                color: 'white', 
+                boxShadow: '0 0 15px rgba(50, 50, 50, 0.5)',
+                backdropFilter: 'blur(4px)'
+              }}
+            >
+              ⚙️ Settings
+            </button>
+            {showSettings && (
+              <div style={{
+                position: 'absolute',
+                bottom: '120%',
+                right: '0',
+                background: 'rgba(20, 20, 20, 0.95)',
+                border: '1px solid #444',
+                borderRadius: '12px',
+                padding: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                minWidth: '150px'
+              }}>
+                <button 
+                  onClick={() => setView('setup')}
+                  style={{ background: 'transparent', color: 'white', border: 'none', padding: '8px', textAlign: 'left', cursor: 'pointer', borderRadius: '4px' }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  👤 Edit Profile
+                </button>
+                <button 
+                  onClick={() => {
+                    localStorage.removeItem('hollowfall_auth_token');
+                    localStorage.removeItem('hollowfall_setup_complete');
+                    localStorage.removeItem('hollowfall_display_name');
+                    window.location.reload();
+                  }}
+                  style={{ background: 'transparent', color: '#ff4444', border: 'none', padding: '8px', textAlign: 'left', cursor: 'pointer', borderRadius: '4px' }}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,68,68,0.1)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+                >
+                  🚪 Sign Out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
