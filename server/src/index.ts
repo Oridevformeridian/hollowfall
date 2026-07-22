@@ -28,10 +28,12 @@ function broadcastSystemMessage(room: any, message: string) {
   if (room.systemMessages.length > 50) room.systemMessages.shift();
 }
 
-function startTurnTimer(_roomCode: string, _room: any) {
-  // timers removed in stateless pivot
+function startTurnTimer(_roomCode: string, room: any) {
+  const duration = room.isTurnPaused && room.turnPausedRemainingMs ? room.turnPausedRemainingMs : 45000;
+  room.turnExpiresAt = Date.now() + duration;
+  room.isTurnPaused = false;
+  room.turnPausedRemainingMs = undefined;
 }
-
 
 app.use('/api', (req, res, next) => {
   console.log(`[API] ${req.method} ${req.url}`);
