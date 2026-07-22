@@ -29,8 +29,18 @@ resource "google_cloud_run_v2_service" "app" {
 
 
   template {
-    # Socket.io connection stability is improved by session affinity
+    # Session affinity keeps a client pinned to an instance.
     session_affinity = true
+
+    # The authoritative game loop is a single always-on setInterval (turn timers,
+    # disconnect detection). It MUST NOT scale to zero (loop dies -> every match freezes)
+    # and MUST be a single instance (avoid duplicate loops double-ticking). cpu_idle=false
+    # below keeps CPU alive between requests so the loop actually runs. Pinning here makes
+    # that guarantee explicit rather than an accidental leftover in the live config.
+    scaling {
+      min_instance_count = 1
+      max_instance_count = 1
+    }
 
     containers {
       image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.repo.repository_id}/${var.app_name}:${var.image_tag}"
