@@ -153,17 +153,30 @@ setInterval(async () => {
               changed = true;
             }
             
-            // Check concession
-            if (p.isDisconnected && p.concessionExpiresAt && p.concessionExpiresAt <= now) {
-               // They forfeit
-               const activeId = currentRoom.turnOrder[currentRoom.activePlayerIndex];
-               if (activeId === p.id) {
+            // Check concession. The `includes` guard stops an already-forfeited player
+            // (still in players{} but out of turnOrder) from being re-processed every tick.
+            if (p.isDisconnected && p.concessionExpiresAt && p.concessionExpiresAt <= now && currentRoom.turnOrder.includes(p.id)) {
+               // If the forfeiting player is the active one, advance the turn first
+               // (this also re-arms the timer for whoever is next).
+               if (currentRoom.turnOrder[currentRoom.activePlayerIndex] === p.id) {
                  passTurn(currentRoom);
                }
+
+               // Capture who is active NOW, remove the forfeiter, then re-align the index
+               // to that same player. Filtering shifts indices, so activePlayerIndex must be
+               // recomputed — otherwise it points at the wrong player or off the end, which
+               // silently rejects the real active player's actions (the "stuck" bug).
+               const currentTurnPlayerId = currentRoom.turnOrder[currentRoom.activePlayerIndex];
                currentRoom.turnOrder = currentRoom.turnOrder.filter(id => id !== p.id);
+               const newIndex = currentRoom.turnOrder.indexOf(currentTurnPlayerId);
+               currentRoom.activePlayerIndex = newIndex !== -1 ? newIndex : 0;
+
+               // Stop this player from being forfeited again on subsequent ticks.
+               p.concessionExpiresAt = undefined;
+
                currentRoom.gameLogs = currentRoom.gameLogs || [];
                currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} forfeited due to disconnect.`);
-               
+
                if (currentRoom.turnOrder.length === 1) {
                  const remainingPlayerId = currentRoom.turnOrder[0];
                  const remainingPlayer = currentRoom.players[remainingPlayerId];
