@@ -20,6 +20,13 @@ export default function Club() {
   );
   
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const latestRoom = localStorage.getItem('hollowfall_latest_room');
   const latestUsername = localStorage.getItem('hollowfall_latest_username');
@@ -138,8 +145,8 @@ export default function Club() {
           `}
         </style>
 
-        <div style={{ position: 'relative', width: '80%', maxWidth: '900px', borderRadius: '16px', overflow: 'hidden', border: '4px solid #333' }}>
-          <img src="/club_park_map.jpg" alt="Amusement Park Map" style={{ width: '100%', display: 'block' }} />
+        <div style={{ position: 'relative', width: isMobile ? '100%' : '80%', maxWidth: '900px', borderRadius: '16px', overflow: 'hidden', border: '4px solid #333' }}>
+          <img src={isMobile ? "/club_park_map_mobile.jpg" : "/club_park_map.jpg"} alt="Amusement Park Map" style={{ width: '100%', display: 'block' }} />
           
           {/* Active Game Reconnect (Supercedes everything if active) */}
           {latestRoom && latestUsername && (
