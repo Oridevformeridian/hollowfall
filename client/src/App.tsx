@@ -7,6 +7,30 @@ import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget, isValidStoneGlideTarget } from './shared/validation.ts';
 import { buildDeckForEmoji } from './shared/deck.ts';
 
+// --- Durable identity + per-tab session (see HOLLOWFALL_match_session_architecture.md) ---
+const uuid = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+
+// Durable guest seat id — persists across reloads so a guest re-claims the same seat.
+// (Authenticated users get their seat from the server via their JWT; this is the guest fallback.)
+function getGuestSeatId(): string {
+  let id = localStorage.getItem('hollowfall_guest_seat_id');
+  if (!id) { id = `guest_${uuid()}`; localStorage.setItem('hollowfall_guest_seat_id', id); }
+  return id;
+}
+const GUEST_SEAT_ID = getGuestSeatId();
+
+// Per-tab session id (fencing token). sessionStorage = one per browser tab, survives reload;
+// a second tab gets its own id and, being the newer session, takes over — the old tab is fenced.
+function getSessionId(): string {
+  let id = sessionStorage.getItem('hollowfall_session_id');
+  if (!id) { id = uuid(); sessionStorage.setItem('hollowfall_session_id', id); }
+  return id;
+}
+const SESSION_ID = getSessionId();
+
 const getClassShapeSvg = (heroClass: string, color: string, addGlow: boolean = false) => {
   const glowStyle = addGlow ? { filter: `drop-shadow(0 0 5px ${color})` } : {};
   switch (heroClass) {
@@ -664,6 +688,7 @@ const ClassSymbol = ({ heroClass, color, size = '100%', opacity = 0.4 }: { heroC
 
 export default function App() {
   const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
+  const [sessionSuperseded, setSessionSuperseded] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetingCardId, setTargetingCardId] = useState<string | null>(null);
@@ -988,9 +1013,19 @@ export default function App() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
-        body: JSON.stringify({ ...( 'payload' in event ? event.payload : {} ), playerId: myPlayerId })
+        body: JSON.stringify({
+          ...( 'payload' in event ? event.payload : {} ),
+          seatId: myPlayerId || GUEST_SEAT_ID,
+          playerId: myPlayerId || GUEST_SEAT_ID,
+          sessionId: SESSION_ID
+        })
       });
       console.log(`[sendEvent] Fetch response status:`, res.status);
+      if (res.status === 409) {
+        // Fenced out: another session (e.g. this account opened in another tab/device) took over.
+        setSessionSuperseded(true);
+        return;
+      }
       const data = await res.json();
       console.log(`[sendEvent] Fetch response data:`, data);
       if (action === 'join' && data.playerId && data.gameState) {
@@ -1019,8 +1054,6 @@ export default function App() {
     const savedUsername = sessionStorage.getItem('hollowfall_active_username');
     if (savedRoom && savedUsername && !roomCode) {
       const cleanRoom = savedRoom.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
-      const cleanUsername = savedUsername.trim().toLowerCase();
-      const sessionToken = localStorage.getItem(`hollowfall_session_${cleanRoom}_${cleanUsername}`) || undefined;
 
       console.log(`Auto-rejoining room ${cleanRoom} as ${savedUsername}...`);
       setUsername(savedUsername);
@@ -1028,16 +1061,20 @@ export default function App() {
       
       const doRejoin = async () => {
         try {
+          const token = localStorage.getItem('hollowfall_auth_token');
           const res = await fetch(`/api/match/${cleanRoom}/join`, {
             method: 'POST',
             credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: savedUsername, roomCode: cleanRoom, color: '', emoji: '', sessionToken })
+            headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+            body: JSON.stringify({
+              username: savedUsername, roomCode: cleanRoom, color: '', emoji: '',
+              seatId: GUEST_SEAT_ID, sessionId: SESSION_ID
+            })
           });
+          if (res.status === 409) { setSessionSuperseded(true); return; }
           const data = await res.json();
           if (data.playerId && data.gameState) {
              setMyPlayerId(data.playerId);
-             // We could update localStorage again here, but it's redundant
           }
         } catch (e) {
           console.error("Auto-rejoin failed", e);
@@ -2106,6 +2143,23 @@ export default function App() {
     if (tileIndex === null || tileIndex === undefined) return false;
     return validateTilePlacement(x, y, tileIndex, myPlayerId || '', gameState.placedTiles, gameState.turnOrder.length).valid;
   };
+
+  if (sessionSuperseded) {
+    return (
+      <div className="app-layout" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', textAlign: 'center', padding: 24 }}>
+        <div style={{ maxWidth: 420 }}>
+          <h2>Session opened elsewhere</h2>
+          <p>This game is now active in another tab or on another device, so this window is read-only.</p>
+          <button
+            className="btn-primary"
+            onClick={() => { sessionStorage.removeItem('hollowfall_session_id'); window.location.reload(); }}
+          >
+            Play here instead
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-layout">

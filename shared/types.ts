@@ -21,6 +21,7 @@ export interface Player {
   form: 'normal' | 'wolf';
   hasConceded?: boolean;
   sessionToken?: string;
+  activeSessionId?: string | null; // fencing token: the one live session allowed to act as this seat
   isDisconnected?: boolean;
   concessionExpiresAt?: number; // timestamp when the player will automatically concede due to disconnect
   hasThorns?: boolean;

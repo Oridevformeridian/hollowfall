@@ -598,21 +598,25 @@ const withMatchTransaction = (actionName: string, handler: (room: GameState, req
     try {
       const matchId = req.params.matchId.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
       if (!matchId) throw new Error("Match ID is required.");
-      
-      let playerId = (req as any).user?.playerId || req.body.playerId;
+
+      // Identity seam: authed users get their durable userId (JWT); guests supply a durable
+      // seatId (client-persisted uuid). `playerId` here IS the durable seatId — never rewritten.
+      let playerId = (req as any).user?.playerId || req.body.seatId || req.body.playerId;
       if (!playerId && actionName === 'JOIN_ROOM') {
          playerId = `guest_${crypto.randomUUID()}`;
       } else if (!playerId) {
-         throw new Error("Player ID is required (must be authenticated or provide playerId).");
+         throw new Error("Seat ID is required (must be authenticated or provide seatId).");
       }
+      const sessionId: string | undefined = req.body.sessionId;
 
       let returnedRoom: GameState | null = null;
+      let superseded = false;
 
       await firestore.runTransaction(async (t) => {
         const matchRef = firestore.collection('matches').doc(matchId);
         const doc = await t.get(matchRef);
         let room: GameState;
-        
+
         if (!doc.exists) {
           if (actionName === 'JOIN_ROOM') {
             room = {
@@ -637,12 +641,25 @@ const withMatchTransaction = (actionName: string, handler: (room: GameState, req
           room = doc.data() as GameState;
         }
 
+        // Session fence: JOIN claims/takes over the session; every other action must come
+        // from the seat's current live session. A superseded (old tab / stale) session is
+        // rejected without writing. Legacy seats without an activeSessionId are exempt.
+        if (actionName !== 'JOIN_ROOM') {
+          const seat = room.players[playerId];
+          if (seat && seat.activeSessionId && seat.activeSessionId !== sessionId) {
+            superseded = true;
+            return;
+          }
+        }
+
         await handler(room, req, playerId);
         t.set(matchRef, room);
         returnedRoom = room;
       });
 
-      if (actionName === 'JOIN_ROOM') {
+      if (superseded) {
+        res.status(409).json({ error: 'SESSION_SUPERSEDED' });
+      } else if (actionName === 'JOIN_ROOM') {
         res.json({ success: true, playerId, gameState: returnedRoom });
       } else {
         res.json({ success: true });
@@ -670,7 +687,8 @@ app.post('/api/match/:matchId/join', (req, res, next) => {
   }
 }, withMatchTransaction('JOIN_ROOM', async (room, req, playerId) => {
 
-          const { username, color, emoji, sessionToken } = req.body;
+          const { username, color, emoji } = req.body;
+          const sessionId: string | undefined = req.body.sessionId;
           
 
           if (!room.roomCode) {
@@ -683,76 +701,22 @@ app.post('/api/match/:matchId/join', (req, res, next) => {
           const existingPlayers = Object.values(room.players);
           const requestedName = username.trim() || `Player_${playerId.substring(0, 4)}`;
 
-          // Check if this is a reconnection attempt
-          const existingReconnectingPlayer = Object.values(room.players).find(p => 
-            p.username.toLowerCase() === requestedName.toLowerCase() && 
-            (p.isDisconnected || (sessionToken && p.sessionToken === sessionToken))
-          );
+          // Reconnection is trivial under durable identity: the seat is keyed by the stable
+          // seatId (== playerId), so a returning client re-claims its own seat and session
+          // with NO id remapping across turnOrder/tokens/treasures/tiles.
+          const existing = room.players[playerId];
+          if (existing) {
+            existing.activeSessionId = sessionId ?? null;   // take over the session (newest wins)
+            existing.isDisconnected = false;
+            delete existing.concessionExpiresAt;
 
-          if (existingReconnectingPlayer) {
-            // Reconnection path!
-            const oldPlayerId = existingReconnectingPlayer.id;
-            const newPlayerId = playerId || 'guest_' + crypto.randomUUID();
-
-            // Update player ID and key in room
-            existingReconnectingPlayer.id = newPlayerId;
-            room.players[newPlayerId] = existingReconnectingPlayer;
-            delete room.players[oldPlayerId];
-
-            // Update in turnOrder
-            room.turnOrder = room.turnOrder.map(id => id === oldPlayerId ? newPlayerId : id);
-
-            // Update in tokenPositions
-            if (room.tokenPositions[oldPlayerId]) {
-              room.tokenPositions[newPlayerId] = room.tokenPositions[oldPlayerId];
-              delete room.tokenPositions[oldPlayerId];
-            }
-
-            // Update in treasures
-            if (room.treasures) {
-              for (const tId of Object.keys(room.treasures)) {
-                const treasure = room.treasures[tId];
-                if (treasure.ownerId === oldPlayerId) {
-                  treasure.ownerId = newPlayerId;
-                }
-                if (treasure.carrierId === oldPlayerId) {
-                  treasure.carrierId = newPlayerId;
-                }
-              }
-            }
-
-            // Update in placedTiles
-            if (room.placedTiles) {
-              for (const tileKey of Object.keys(room.placedTiles)) {
-                const tile = room.placedTiles[tileKey];
-                if (tile.placedBy === oldPlayerId) {
-                  tile.placedBy = newPlayerId;
-                }
-              }
-            }
-
-
-            // Update in roomMetadata
-            // const meta = null;
-            
-
-            // Map this connection's playerId variable to the new ID
-            playerId = newPlayerId;
-            existingReconnectingPlayer.isDisconnected = false;
-            delete existingReconnectingPlayer.concessionExpiresAt;
-
-            // Clear any active disconnect timer for this player
-
-            
-            // Resume turn timer if it was paused and this player is the active player
-            if (room.isTurnPaused && room.turnOrder[room.activePlayerIndex] === newPlayerId) {
-              const remaining = room.turnPausedRemainingMs || 45000;
-              console.log(`Resuming paused turn timer for ${existingReconnectingPlayer.username} with ${remaining}ms remaining`);
+            // Resume the turn timer if this seat is the active player and the turn was paused.
+            if (room.isTurnPaused && room.turnOrder[room.activePlayerIndex] === playerId) {
               startTurnTimer(room.roomCode, room);
             }
 
-            console.log(`Player ${existingReconnectingPlayer.username} reconnected to room ${room.roomCode}`);
-            broadcastSystemMessage(room, `${existingReconnectingPlayer.username} reconnected.`);
+            console.log(`Seat ${existing.username} (${playerId}) reconnected to ${room.roomCode}`);
+            broadcastSystemMessage(room, `${existing.username} reconnected.`);
             return;
           }
 
@@ -815,6 +779,7 @@ app.post('/api/match/:matchId/join', (req, res, next) => {
             isFirstTurnOfMatch: true,
             form: 'normal',
             sessionToken: newSessionToken,
+            activeSessionId: sessionId ?? null,
             thorns: 0,
             spiritSkin: 0
           };
