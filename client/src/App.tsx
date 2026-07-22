@@ -1193,6 +1193,20 @@ export default function App() {
     sendEvent({ event: 'RESET_GAME' });
   };
 
+  // Quit from the game-over screen. Casual (matchmade) games have no lobby to return to, so
+  // they go back to the clubhouse; custom lobby games reset for a rematch in place.
+  const handleQuitMatch = () => {
+    if (gameState?.mode === 'casual') {
+      sessionStorage.removeItem('hollowfall_active_room');
+      sessionStorage.removeItem('hollowfall_active_username');
+      localStorage.removeItem('hollowfall_latest_room');
+      localStorage.removeItem('hollowfall_latest_username');
+      window.location.href = '/club';
+      return;
+    }
+    handleResetGame();
+  };
+
   const handleConcede = () => {
     sessionStorage.removeItem('hollowfall_active_room');
     sessionStorage.removeItem('hollowfall_active_username');
@@ -4689,7 +4703,7 @@ export default function App() {
             </div>
 
             <button
-              onClick={handleResetGame}
+              onClick={handleQuitMatch}
               className="btn-primary"
               style={{
                 width: '100%',
@@ -4703,7 +4717,7 @@ export default function App() {
                 gap: '8px'
               }}
             >
-              🚪 Quit to Lobby
+              🚪 {gameState.mode === 'casual' ? 'Quit to Clubhouse' : 'Quit to Lobby'}
             </button>
           </div>
         </div>
