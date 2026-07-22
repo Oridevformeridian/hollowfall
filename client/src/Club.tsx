@@ -7,10 +7,18 @@ import { HEROES } from './shared/constants';
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id.apps.googleusercontent.com';
 
 export default function Club() {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('hollowfall_auth_token'));
-  const [displayName, setDisplayName] = useState<string>('');
+  const initialToken = localStorage.getItem('hollowfall_auth_token');
+  const storedDisplayName = localStorage.getItem('hollowfall_display_name');
+  
+  const [token, setToken] = useState<string | null>(initialToken);
+  const [displayName, setDisplayName] = useState<string>(storedDisplayName || '');
   const [emoji, setEmoji] = useState<string>(HEROES[0].emoji);
-  const [view, setView] = useState<'login' | 'setup' | 'park'>(token ? 'setup' : 'login');
+  
+  // If they have a token and have completed setup, drop them right into the park
+  const [view, setView] = useState<'login' | 'setup' | 'park'>(
+    initialToken ? (localStorage.getItem('hollowfall_setup_complete') ? 'park' : 'setup') : 'login'
+  );
+  
   const [onlineCount, setOnlineCount] = useState<number>(0);
 
   const latestRoom = localStorage.getItem('hollowfall_latest_room');
@@ -58,7 +66,14 @@ export default function Club() {
         localStorage.setItem('hollowfall_display_name', data.displayName || '');
         setToken(data.token);
         setDisplayName(data.displayName || '');
-        setView('setup');
+        
+        // If the backend already has an emoji saved for them, they've completed setup previously
+        if (data.emoji) {
+          localStorage.setItem('hollowfall_setup_complete', 'true');
+          setView('park');
+        } else {
+          setView('setup');
+        }
       }
     } catch (e) {
       console.error('Login failed', e);
@@ -82,6 +97,7 @@ export default function Club() {
         throw new Error(errorData.error || 'Failed to update profile');
       }
       // Success! Move to park view
+      localStorage.setItem('hollowfall_setup_complete', 'true');
       setView('park');
     } catch (e: any) {
       console.error('Error saving profile', e);

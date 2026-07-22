@@ -99,7 +99,8 @@ app.post('/api/auth/google', async (req, res) => {
       success: true, 
       token,
       playerId: playerAccount.id,
-      displayName: playerAccount.displayName
+      displayName: playerAccount.displayName,
+      emoji: playerAccount.emoji
     });
 
   } catch (error) {
