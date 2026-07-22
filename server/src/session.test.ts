@@ -32,7 +32,7 @@ vi.mock('@google-cloud/firestore', () => {
   };
 });
 
-import { app, removeSeatFromTurnOrder } from './index';
+import { app, removeSeatFromTurnOrder, reconcileMatchConnectivity } from './index';
 
 const ROOM = 'SESSIONTEST';
 const join = (seatId: string, sessionId: string, username: string) =>
@@ -235,5 +235,66 @@ describe('authorization & turn guards (negative paths)', () => {
     expect(rejected.status).toBe(400);
     expect(rejected.body.error).toMatch(/not your turn/i);
     expect(Object.keys(store.get(`matches/${ROOM}`).placedTiles)).toHaveLength(0); // nothing placed
+  });
+});
+
+describe('reconcileMatchConnectivity (game loop per-tick logic)', () => {
+  const mkPlayer = (id: string) => ({ id, username: id, hand: [], deck: [], graveyard: [], ap: 3, isDisconnected: false });
+  const mkRoom = (order: string[], activeIdx: number, extra: any = {}) => ({
+    roomCode: 'X', phase: 'GAMEPLAY', turnOrder: [...order], activePlayerIndex: activeIdx,
+    players: Object.fromEntries(order.map(id => [id, mkPlayer(id)])),
+    turnExpiresAt: Date.now() + 45000, isTurnPaused: false, victoryPointsTarget: 2, gameLogs: [], ...extra
+  } as any);
+  const online = (...ids: string[]) => (seat: any) => ids.includes(seat.id);
+
+  it('active player going offline pauses the turn', () => {
+    const room = mkRoom(['A', 'B'], 0);
+    expect(reconcileMatchConnectivity(room, Date.now(), online('B'))).toBe(true);
+    expect(room.players['A'].isDisconnected).toBe(true);
+    expect(typeof room.players['A'].concessionExpiresAt).toBe('number');
+    expect(room.isTurnPaused).toBe(true);
+  });
+
+  it('non-active player offline does NOT pause the turn', () => {
+    const room = mkRoom(['A', 'B'], 0); // A active
+    reconcileMatchConnectivity(room, Date.now(), online('A')); // B offline
+    expect(room.players['B'].isDisconnected).toBe(true);
+    expect(room.isTurnPaused).toBeFalsy();
+  });
+
+  it('reconnecting the active player resumes the timer', () => {
+    const room = mkRoom(['A', 'B'], 0, { isTurnPaused: true, turnPausedRemainingMs: 30000, turnExpiresAt: undefined });
+    room.players['A'].isDisconnected = true;
+    room.players['A'].concessionExpiresAt = Date.now() + 45000;
+    reconcileMatchConnectivity(room, Date.now(), online('A', 'B'));
+    expect(room.players['A'].isDisconnected).toBe(false);
+    expect(room.isTurnPaused).toBe(false);
+    expect(room.turnExpiresAt).toBeGreaterThan(Date.now());
+  });
+
+  it('forfeits past the concession window; 2p -> GAME_OVER and the other wins', () => {
+    const room = mkRoom(['A', 'B'], 0);
+    room.players['A'].isDisconnected = true;
+    room.players['A'].concessionExpiresAt = Date.now() - 1;
+    expect(reconcileMatchConnectivity(room, Date.now(), online('B'))).toBe(true);
+    expect(room.turnOrder).toEqual(['B']);
+    expect(room.phase).toBe('GAME_OVER');
+    expect(room.players['B'].points).toBe(room.victoryPointsTarget);
+  });
+
+  it('is a no-op when everyone is connected', () => {
+    const room = mkRoom(['A', 'B'], 0);
+    expect(reconcileMatchConnectivity(room, Date.now(), online('A', 'B'))).toBe(false);
+    expect(room.isTurnPaused).toBeFalsy();
+  });
+
+  it('does not re-forfeit an already-removed player on the next tick', () => {
+    const room = mkRoom(['A', 'B'], 0);
+    room.players['A'].isDisconnected = true;
+    room.players['A'].concessionExpiresAt = Date.now() - 1;
+    reconcileMatchConnectivity(room, Date.now(), online('B')); // forfeits A
+    reconcileMatchConnectivity(room, Date.now(), online('B')); // A now out of turnOrder
+    expect(room.turnOrder).toEqual(['B']);
+    expect(room.gameLogs.filter((l: string) => /forfeited/.test(l)).length).toBe(1);
   });
 });

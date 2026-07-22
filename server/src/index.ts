@@ -136,64 +136,7 @@ setInterval(async () => {
           const doc = await t.get(matchRef);
           if (!doc.exists) return;
           const currentRoom = doc.data() as GameState;
-          let changed = false;
-          
-          for (const p of Object.values(currentRoom.players)) {
-            const isOnline = isSeatOnline(matchId, p);
-            
-            // Mark as disconnected
-            if (!isOnline && !p.isDisconnected) {
-              p.isDisconnected = true;
-              p.concessionExpiresAt = now + 45000;
-              currentRoom.gameLogs = currentRoom.gameLogs || [];
-              currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} disconnected. They have 45 seconds to return.`);
-              
-              // If it's their turn, pause the timer
-              if (currentRoom.turnOrder[currentRoom.activePlayerIndex] === p.id) {
-                pauseTurn(currentRoom);
-              }
-              changed = true;
-            } 
-            // Mark as reconnected
-            else if (isOnline && p.isDisconnected) {
-              p.isDisconnected = false;
-              p.concessionExpiresAt = undefined;
-              currentRoom.gameLogs = currentRoom.gameLogs || [];
-              currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} reconnected.`);
-              
-              // If it's their turn, resume the timer
-              if (currentRoom.turnOrder[currentRoom.activePlayerIndex] === p.id && currentRoom.isTurnPaused) {
-                resumeTurn(currentRoom);
-              }
-              changed = true;
-            }
-            
-            // Check concession. The `includes` guard stops an already-forfeited player
-            // (still in players{} but out of turnOrder) from being re-processed every tick.
-            if (p.isDisconnected && p.concessionExpiresAt && p.concessionExpiresAt <= now && currentRoom.turnOrder.includes(p.id)) {
-               // Remove the forfeiter from the turn order (re-aligns activePlayerIndex, and
-               // advances the turn first if they were active).
-               removeSeatFromTurnOrder(currentRoom, p.id);
-
-               // Stop this player from being forfeited again on subsequent ticks.
-               p.concessionExpiresAt = undefined;
-
-               currentRoom.gameLogs = currentRoom.gameLogs || [];
-               currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} forfeited due to disconnect.`);
-
-               if (currentRoom.turnOrder.length === 1) {
-                 const remainingPlayerId = currentRoom.turnOrder[0];
-                 const remainingPlayer = currentRoom.players[remainingPlayerId];
-                 if (remainingPlayer) remainingPlayer.points = currentRoom.victoryPointsTarget || 2;
-                 currentRoom.phase = 'GAME_OVER';
-                 currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] Match ended.`);
-               } else if (currentRoom.turnOrder.length === 0) {
-                 currentRoom.phase = 'GAME_OVER';
-               }
-               changed = true;
-            }
-          }
-          
+          const changed = reconcileMatchConnectivity(currentRoom, now, (seat) => isSeatOnline(matchId, seat));
           if (changed) {
             t.update(matchRef, currentRoom as any);
           }
@@ -492,6 +435,61 @@ export function removeSeatFromTurnOrder(room: GameState, seatId: string) {
   room.turnOrder = room.turnOrder.filter(id => id !== seatId);
   const newIndex = room.turnOrder.indexOf(currentTurnPlayerId);
   room.activePlayerIndex = newIndex !== -1 ? newIndex : 0;
+}
+
+// Reconcile presence-driven state for one match against live connectivity: mark seats
+// disconnected/reconnected (pausing/resuming the active player's timer), and forfeit any seat
+// past its concession window (removing it from the turn order, ending the match if <=1 remain).
+// Pure mutation of `room`; returns whether anything changed. `isOnline(seat)` reports whether
+// that seat currently has a live connection. This is the game loop's per-tick logic, extracted
+// so it can be unit-tested without Firestore/RTDB.
+export function reconcileMatchConnectivity(room: GameState, now: number, isOnline: (seat: Player) => boolean): boolean {
+  let changed = false;
+  for (const p of Object.values(room.players)) {
+    const online = isOnline(p);
+
+    // Mark as disconnected (and pause the timer if it's their turn).
+    if (!online && !p.isDisconnected) {
+      p.isDisconnected = true;
+      p.concessionExpiresAt = now + 45000;
+      room.gameLogs = room.gameLogs || [];
+      room.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} disconnected. They have 45 seconds to return.`);
+      if (room.turnOrder[room.activePlayerIndex] === p.id) {
+        pauseTurn(room);
+      }
+      changed = true;
+    }
+    // Mark as reconnected (and resume the timer if it's their turn).
+    else if (online && p.isDisconnected) {
+      p.isDisconnected = false;
+      p.concessionExpiresAt = undefined;
+      room.gameLogs = room.gameLogs || [];
+      room.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} reconnected.`);
+      if (room.turnOrder[room.activePlayerIndex] === p.id && room.isTurnPaused) {
+        resumeTurn(room);
+      }
+      changed = true;
+    }
+
+    // Forfeit past the concession window. The `includes` guard stops an already-forfeited
+    // player (still in players{} but out of turnOrder) from being re-processed every tick.
+    if (p.isDisconnected && p.concessionExpiresAt && p.concessionExpiresAt <= now && room.turnOrder.includes(p.id)) {
+      removeSeatFromTurnOrder(room, p.id);
+      p.concessionExpiresAt = undefined;
+      room.gameLogs = room.gameLogs || [];
+      room.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} forfeited due to disconnect.`);
+      if (room.turnOrder.length === 1) {
+        const remainingPlayer = room.players[room.turnOrder[0]];
+        if (remainingPlayer) remainingPlayer.points = room.victoryPointsTarget || 2;
+        room.phase = 'GAME_OVER';
+        room.gameLogs.push(`[${new Date().toLocaleTimeString()}] Match ended.`);
+      } else if (room.turnOrder.length === 0) {
+        room.phase = 'GAME_OVER';
+      }
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 function recalculatePoints(room: GameState) {
