@@ -109,11 +109,7 @@ export default function Club() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         minHeight: '100vh', backgroundColor: '#0f0f11', color: 'white', fontFamily: 'system-ui, sans-serif'
       }}>
-        <h1 style={{ fontSize: '3rem', fontWeight: 'bold', marginBottom: '1rem', background: 'linear-gradient(to right, #00E5FF, #FF6D00)', WebkitBackgroundClip: 'text', color: 'transparent' }}>
-          Welcome to the Hollowfall Club
-        </h1>
-        <p style={{ fontSize: '1.25rem', color: '#a1a1aa', marginBottom: '2rem' }}>Select an area of the park to visit.</p>
-        
+
         <style>
           {`
             @keyframes spin { 100% { transform: rotate(360deg); } }
