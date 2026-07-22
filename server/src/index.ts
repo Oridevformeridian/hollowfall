@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import { GameState, Player, PlayerId, ClientMessage, ServerMessage, PlacedTile, Card } from '../../shared/types';
+import { GameState, Player, PlacedTile, Card } from '../../shared/types';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget, isValidStoneGlideTarget, calculateScores } from '../../shared/validation';
 import { HEROES, BASIC_CARDS } from '../../shared/constants';
 import { buildDeckForEmoji, shuffle } from '../../shared/deck';
@@ -28,7 +28,7 @@ function broadcastSystemMessage(room: any, message: string) {
   if (room.systemMessages.length > 50) room.systemMessages.shift();
 }
 
-function startTurnTimer(roomCode: string, room: any) {
+function startTurnTimer(_roomCode: string, _room: any) {
   // timers removed in stateless pivot
 }
 
@@ -478,7 +478,7 @@ app.post('/api/match/:matchId/join', (req, res, next) => {
   }
 }, withMatchTransaction('JOIN_ROOM', async (room, req, playerId) => {
 
-          const { username, roomCode, color, emoji, sessionToken } = req.body;
+          const { username, color, emoji, sessionToken } = req.body;
           
 
           if (!room.roomCode) {
@@ -541,7 +541,7 @@ app.post('/api/match/:matchId/join', (req, res, next) => {
 
 
             // Update in roomMetadata
-            const meta = null;
+            // const meta = null;
             
 
             // Map this connection's playerId variable to the new ID
@@ -550,7 +550,7 @@ app.post('/api/match/:matchId/join', (req, res, next) => {
             delete existingReconnectingPlayer.concessionExpiresAt;
 
             // Clear any active disconnect timer for this player
-            const timerKey = `${room.roomCode}:${existingReconnectingPlayer.username}`;
+
             
             // Resume turn timer if it was paused and this player is the active player
             if (room.isTurnPaused && room.turnOrder[room.activePlayerIndex] === newPlayerId) {
@@ -628,7 +628,7 @@ app.post('/api/match/:matchId/join', (req, res, next) => {
           };
 
           room.players[playerId] = player;
-          room.roomCode = room.roomCode;
+          // self assign removed
           
 
           console.log(`Player ${player.username} joined room ${room.roomCode}`);
@@ -1693,8 +1693,7 @@ app.post('/api/match/:matchId/lash-attack', (req, res, next) => {
 
             // Aura protection check
             let tookDamage = false;
-            let damageDealt = 0;
-            let blockedBySpiritSkin = false;
+            
             if (targetPlayer.hasSpiritSkin && (targetPlayer.spiritSkin || 0) > 0) {
               const spiritSkinStacks = targetPlayer.spiritSkin || 0;
               targetPlayer.spiritSkin = spiritSkinStacks - 1;
@@ -1703,12 +1702,12 @@ app.post('/api/match/:matchId/lash-attack', (req, res, next) => {
               }
               const ssCard = BASIC_CARDS.find(c => c.id === 'ash_spirit_skin')!;
               handlePlayedCard(targetPlayer, ssCard, true);
-              blockedBySpiritSkin = true;
+              
               broadcastSystemMessage(room, `${targetPlayer.username}'s Spirit-Skin aura blocked the Lash damage! (1 stack consumed, ${targetPlayer.spiritSkin} stacks left).`);
             } else {
               targetPlayer.thread = Math.max(0, targetPlayer.thread - 1);
               tookDamage = true;
-              damageDealt = 1;
+
               broadcastSystemMessage(room, `${player.username} lashed ${targetPlayer.username} for 1 damage!`);
             }
 

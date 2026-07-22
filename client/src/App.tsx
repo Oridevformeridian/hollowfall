@@ -943,21 +943,33 @@ export default function App() {
       'CONCEDE': 'concede',
       'RESTART_GAME': 'restart'
     };
+    console.log('[sendEvent] Triggered:', event);
     const action = endpointMap[event.event];
-    if (!action) return;
+    if (!action) {
+      console.log('[sendEvent] No action mapped for', event.event);
+      return;
+    }
     try {
       const token = localStorage.getItem('hollowfall_auth_token');
-      const res = await fetch(`/api/match/${roomCode}/${action}`, {
+      const payloadObj = ('payload' in event ? event.payload : {}) as any;
+      const targetRoom = (payloadObj && payloadObj.roomCode) ? payloadObj.roomCode : roomCode;
+      
+      console.log(`[sendEvent] Fetching /api/match/${targetRoom}/${action}`);
+      const res = await fetch(`/api/match/${targetRoom}/${action}`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: JSON.stringify({ ...( 'payload' in event ? event.payload : {} ), playerId: myPlayerId })
       });
+      console.log(`[sendEvent] Fetch response status:`, res.status);
       const data = await res.json();
+      console.log(`[sendEvent] Fetch response data:`, data);
       if (action === 'join' && data.playerId) {
         setMyPlayerId(data.playerId);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('[sendEvent] Fetch error:', e);
+      alert(`Network Error: ${e.message}\nPlease copy this error and tell me what it says!`);
     }
   };
 
@@ -971,9 +983,10 @@ export default function App() {
     const cleanUsername = username.trim().toLowerCase();
     const sessionToken = localStorage.getItem(`hollowfall_session_${cleanRoomCode}_${cleanUsername}`) || undefined;
 
+    setRoomCode(cleanRoomCode);
     sendEvent({
       event: 'JOIN_ROOM',
-      payload: { username, roomCode, color: '', emoji: '', sessionToken }
+      payload: { username, roomCode: cleanRoomCode, color: '', emoji: '', sessionToken }
     });
   };
 
@@ -983,15 +996,14 @@ export default function App() {
       return;
     }
     const newRoomCode = generateLobbyName();
-    setRoomCode(newRoomCode);
-    
     const cleanRoomCode = newRoomCode.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
     const cleanUsername = username.trim().toLowerCase();
     const sessionToken = localStorage.getItem(`hollowfall_session_${cleanRoomCode}_${cleanUsername}`) || undefined;
 
+    setRoomCode(cleanRoomCode);
     sendEvent({
       event: 'JOIN_ROOM',
-      payload: { username, roomCode: newRoomCode, color: '', emoji: '', sessionToken }
+      payload: { username, roomCode: cleanRoomCode, color: '', emoji: '', sessionToken }
     });
   };
 

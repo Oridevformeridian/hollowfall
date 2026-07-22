@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /matches/{matchId} {
+      // ANYONE can read a match if they know the room code
+      allow read: if true; 
+      
+      // NOBODY can write directly from the browser. 
+      // This forces all moves through our Node.js Express backend for validation!
+      allow write: if false; 
+    }
+  }
+}

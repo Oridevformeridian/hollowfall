@@ -66,6 +66,7 @@ export default function Club() {
     try {
       const res = await fetch('/api/player/profile', {
         method: 'POST',
+        credentials: 'include',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
