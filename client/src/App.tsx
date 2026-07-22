@@ -971,14 +971,55 @@ export default function App() {
       console.log(`[sendEvent] Fetch response status:`, res.status);
       const data = await res.json();
       console.log(`[sendEvent] Fetch response data:`, data);
-      if (action === 'join' && data.playerId) {
+      if (action === 'join' && data.playerId && data.gameState) {
         setMyPlayerId(data.playerId);
+        const myPlayer = data.gameState.players[data.playerId];
+        if (myPlayer && myPlayer.sessionToken) {
+           const cleanRoom = data.gameState.roomCode.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+           localStorage.setItem(`hollowfall_session_${cleanRoom}_${myPlayer.username.toLowerCase()}`, myPlayer.sessionToken);
+           sessionStorage.setItem('hollowfall_active_room', data.gameState.roomCode);
+           sessionStorage.setItem('hollowfall_active_username', myPlayer.username);
+        }
       }
     } catch (e: any) {
       console.error('[sendEvent] Fetch error:', e);
       alert(`Network Error: ${e.message}\nPlease copy this error and tell me what it says!`);
     }
   };
+
+  // Auto-rejoin logic on mount
+  useEffect(() => {
+    const savedRoom = sessionStorage.getItem('hollowfall_active_room');
+    const savedUsername = sessionStorage.getItem('hollowfall_active_username');
+    if (savedRoom && savedUsername && !roomCode) {
+      const cleanRoom = savedRoom.replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+      const cleanUsername = savedUsername.trim().toLowerCase();
+      const sessionToken = localStorage.getItem(`hollowfall_session_${cleanRoom}_${cleanUsername}`) || undefined;
+
+      console.log(`Auto-rejoining room ${cleanRoom} as ${savedUsername}...`);
+      setUsername(savedUsername);
+      setRoomCode(cleanRoom);
+      
+      const doRejoin = async () => {
+        try {
+          const res = await fetch(`/api/match/${cleanRoom}/join`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: savedUsername, roomCode: cleanRoom, color: '', emoji: '', sessionToken })
+          });
+          const data = await res.json();
+          if (data.playerId && data.gameState) {
+             setMyPlayerId(data.playerId);
+             // We could update localStorage again here, but it's redundant
+          }
+        } catch (e) {
+          console.error("Auto-rejoin failed", e);
+        }
+      };
+      doRejoin();
+    }
+  }, []);
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
