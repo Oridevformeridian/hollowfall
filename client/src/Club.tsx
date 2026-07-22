@@ -175,58 +175,56 @@ export default function Club() {
           )}
 
           {/* =========================================================
-              CENTER CROSS (5 BUTTONS) 
+              CENTER STACK (4 BUTTONS) 
              ========================================================= */}
           
-          {/* 1. Casual Match (Top of Center) */}
-          <button 
-            className="park-label"
-            onClick={() => alert('Casual Match coming soon!')}
-            style={{ top: '35%', left: '50%', background: 'rgba(0, 200, 83, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(0, 200, 83, 0.5)' }}
-          >
-            ⚔️ Casual Match
-          </button>
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            alignItems: 'center',
+            zIndex: 10
+          }}>
+            {/* 1. Casual Match */}
+            <button 
+              className="park-label"
+              onClick={() => alert('Casual Match coming soon!')}
+              style={{ position: 'relative', transform: 'none', background: 'rgba(0, 200, 83, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(0, 200, 83, 0.5)' }}
+            >
+              ⚔️ Casual Match
+            </button>
 
-          {/* 2. Practice Match (Left of Center) */}
-          <button 
-            className="park-label"
-            onClick={() => alert('Practice Match (CPU) coming soon!')}
-            style={{ top: '50%', left: '30%', background: 'rgba(96, 125, 139, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(96, 125, 139, 0.5)' }}
-          >
-            🤖 Practice (CPU)
-          </button>
+            {/* 2. Competitive Arena */}
+            <button 
+              className="park-label"
+              onClick={() => alert('Competitive Arena coming soon!')}
+              style={{ position: 'relative', transform: 'none', background: 'rgba(255, 109, 0, 0.85)', color: 'white', boxShadow: '0 0 20px rgba(255, 109, 0, 0.5)' }}
+            >
+              🎢 Competitive Arena
+            </button>
 
-          {/* 3. Central Park (Center) */}
-          <button 
-            className="park-label"
-            onClick={() => alert('Central Park coming soon!')}
-            style={{ 
-              top: '50%', left: '50%', 
-              background: `rgba(0, 229, 255, ${Math.min(0.85 + (onlineCount * 0.05), 1)})`, 
-              color: 'black', 
-              boxShadow: `0 0 ${20 + (onlineCount * 10)}px rgba(0, 229, 255, ${Math.min(0.5 + (onlineCount * 0.1), 1)})` 
-            }}
-          >
-            ⛲ Central Park ({onlineCount})
-          </button>
+            {/* 3. Custom Match */}
+            <button 
+              className="park-label"
+              onClick={() => window.location.href = '/lobby'}
+              style={{ position: 'relative', transform: 'none', background: 'rgba(213, 0, 249, 0.85)', color: 'white', boxShadow: '0 0 20px rgba(213, 0, 249, 0.5)' }}
+            >
+              🎲 Custom Match
+            </button>
 
-          {/* 4. Competitive Arena (Right of Center) */}
-          <button 
-            className="park-label"
-            onClick={() => alert('Competitive Arena coming soon!')}
-            style={{ top: '50%', left: '70%', background: 'rgba(255, 109, 0, 0.85)', color: 'white', boxShadow: '0 0 20px rgba(255, 109, 0, 0.5)' }}
-          >
-            🎢 Competitive Arena
-          </button>
-
-          {/* 5. Custom Match (Bottom of Center) */}
-          <button 
-            className="park-label"
-            onClick={() => window.location.href = '/lobby'}
-            style={{ top: '65%', left: '50%', background: 'rgba(213, 0, 249, 0.85)', color: 'white', boxShadow: '0 0 20px rgba(213, 0, 249, 0.5)' }}
-          >
-            🎲 Custom Match
-          </button>
+            {/* 4. Practice Match (CPU) */}
+            <button 
+              className="park-label"
+              onClick={() => alert('Practice Match (CPU) coming soon!')}
+              style={{ position: 'relative', transform: 'none', background: 'rgba(96, 125, 139, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(96, 125, 139, 0.5)' }}
+            >
+              🤖 Practice (CPU)
+            </button>
+          </div>
 
 
           {/* =========================================================
