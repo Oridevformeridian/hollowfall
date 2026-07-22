@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from './firebase';
+import { ref, set, onDisconnect, remove } from 'firebase/database';
+import { db, rtdb } from './firebase';
 import { GameState, ClientMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget, isValidStoneGlideTarget } from './shared/validation.ts';
@@ -919,7 +920,13 @@ export default function App() {
 
   // Initialize Firebase Listener
   useEffect(() => {
-    if (!roomCode) return;
+    if (!roomCode || !myPlayerId) return;
+
+    // Set up Firebase Realtime Database Presence
+    const presenceRef = ref(rtdb, `matchPresence/${roomCode}/${myPlayerId}`);
+    set(presenceRef, true);
+    onDisconnect(presenceRef).remove();
+
     const matchRef = doc(db, 'matches', roomCode);
     const unsubscribe = onSnapshot(matchRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -929,8 +936,11 @@ export default function App() {
         
       }
     });
-    return () => unsubscribe();
-  }, [roomCode]);
+    return () => {
+      unsubscribe();
+      remove(presenceRef).catch(console.error);
+    };
+  }, [roomCode, myPlayerId]);
 
   const sendEvent = async (event: ClientMessage) => {
     const endpointMap: Record<string, string> = {

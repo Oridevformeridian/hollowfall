@@ -43,6 +43,10 @@ resource "google_cloud_run_v2_service" "app" {
         name  = "NODE_ENV"
         value = "production"
       }
+
+      resources {
+        cpu_idle = false
+      }
     }
   }
 

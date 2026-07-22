@@ -12,6 +12,7 @@
     "@google-cloud/firestore": "^8.7.0",
     "cors": "^2.8.5",
     "express": "^4.19.2",
+    "firebase-admin": "^14.2.0",
     "google-auth-library": "^9.10.0",
     "jsonwebtoken": "^9.0.3"
   },

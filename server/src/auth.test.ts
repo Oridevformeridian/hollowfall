@@ -35,24 +35,51 @@ vi.mock('google-auth-library', () => {
   };
 });
 
-// Mock Firestore
-const mockUpdate = vi.fn();
-const mockSet = vi.fn();
-const mockGet = vi.fn();
-const mockLimit = vi.fn(() => ({ get: mockGet }));
-const mockWhere = vi.fn(() => ({ limit: mockLimit }));
-const mockDoc = vi.fn(() => ({ update: mockUpdate, set: mockSet, id: 'mock-player-id' }));
+// Mock Firestore using vi.hoisted to prevent ReferenceError
+const mocks = vi.hoisted(() => {
+  const mockUpdate = vi.fn();
+  const mockSet = vi.fn();
+  const mockGet = vi.fn();
+  const mockLimit = vi.fn(() => ({ get: mockGet }));
+  const mockWhere = vi.fn(() => ({ limit: mockLimit }));
+  
+  // We need to return an object with an onSnapshot function to prevent top-level errors in index.ts
+  const mockOnSnapshot = vi.fn();
+  mockWhere.mockImplementation(() => ({
+    limit: mockLimit,
+    onSnapshot: mockOnSnapshot
+  }));
+  
+  const mockDoc = vi.fn(() => ({ update: mockUpdate, set: mockSet, id: 'mock-player-id' }));
+  
+  return { mockUpdate, mockSet, mockGet, mockLimit, mockWhere, mockDoc, mockOnSnapshot };
+});
+
+const { mockUpdate, mockSet, mockGet, mockWhere } = mocks;
 
 vi.mock('@google-cloud/firestore', () => {
   return {
     Firestore: vi.fn().mockImplementation(() => ({
       collection: vi.fn(() => ({
-        where: mockWhere,
-        doc: mockDoc
+        where: mocks.mockWhere,
+        doc: mocks.mockDoc
       }))
     }))
   };
 });
+
+// Also mock firebase-admin to prevent errors when index.ts initializes it
+vi.mock('firebase-admin/app', () => ({
+  initializeApp: vi.fn()
+}));
+
+vi.mock('firebase-admin/database', () => ({
+  getDatabase: vi.fn(() => ({
+    ref: vi.fn(() => ({
+      on: vi.fn()
+    }))
+  }))
+}));
 
 describe('Authentication and Profile REST API', () => {
   beforeEach(() => {

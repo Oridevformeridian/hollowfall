@@ -9,12 +9,170 @@ import { Firestore } from '@google-cloud/firestore';
 import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import { initializeApp } from 'firebase-admin/app';
+import { getDatabase } from 'firebase-admin/database';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'hollowfall_dev_secret';
+const PROJECT_ID = process.env.GOOGLE_CLOUD_PROJECT || 'hollowfall-game';
+
+initializeApp({
+  projectId: PROJECT_ID,
+  databaseURL: `https://${PROJECT_ID}-default-rtdb.firebaseio.com`
+});
+const rtdb = getDatabase();
 
 const firestore = new Firestore({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT || 'hollowfall-game'
+  projectId: PROJECT_ID
 });
+
+const activePresence = new Map<string, Set<string>>();
+
+rtdb.ref('matchPresence').on('value', (snapshot: any) => {
+  activePresence.clear();
+  const val = snapshot.val();
+  if (!val) return;
+  for (const matchId of Object.keys(val)) {
+    const players = Object.keys(val[matchId]);
+    activePresence.set(matchId, new Set(players));
+  }
+});
+
+const activeMatchesCache = new Map<string, GameState>();
+
+firestore.collection('matches')
+  .where('phase', 'in', ['GAMEPLAY', 'PLACEMENT'])
+  .onSnapshot((snapshot) => {
+    snapshot.docChanges().forEach((change) => {
+      if (change.type === 'removed') {
+        activeMatchesCache.delete(change.doc.id);
+      } else {
+        activeMatchesCache.set(change.doc.id, change.doc.data() as GameState);
+      }
+    });
+  });
+
+setInterval(async () => {
+  const now = Date.now();
+
+  for (const [matchId, room] of activeMatchesCache.entries()) {
+    // 1. Process Turn Expiration
+    if (!room.isTurnPaused && room.turnExpiresAt && room.turnExpiresAt <= now) {
+      // It's safer to process this inside a transaction to prevent race conditions
+      // But since we are the only server (always-on CPU), we can just execute passTurn here
+      // However, to be perfectly safe, we'll run a transaction.
+      try {
+        await firestore.runTransaction(async (t) => {
+          const matchRef = firestore.collection('matches').doc(matchId);
+          const doc = await t.get(matchRef);
+          if (!doc.exists) return;
+          const currentRoom = doc.data() as GameState;
+          if (!currentRoom.isTurnPaused && currentRoom.turnExpiresAt && currentRoom.turnExpiresAt <= now) {
+            passTurn(currentRoom);
+            t.update(matchRef, currentRoom as any);
+          }
+        });
+      } catch (err) {
+        console.error(`Failed to pass turn for match ${matchId}:`, err);
+      }
+      continue; // Skip disconnect processing this tick if we just passed turn
+    }
+
+    // 2. Process Presence & Disconnects
+    const presenceSet = activePresence.get(matchId);
+
+    // We need to work with a mutable copy if we intend to save it, but we can't save it without a transaction.
+    // So we'll detect if a change is needed, and then run a transaction.
+    let requiresTransaction = false;
+    
+    for (const p of Object.values(room.players)) {
+      const isOnline = presenceSet ? presenceSet.has(p.id) : false;
+      
+      if (!isOnline && !p.isDisconnected) {
+        requiresTransaction = true;
+      } else if (isOnline && p.isDisconnected) {
+        requiresTransaction = true;
+      }
+      
+      if (p.isDisconnected && p.concessionExpiresAt && p.concessionExpiresAt <= now) {
+        requiresTransaction = true;
+      }
+    }
+
+    if (requiresTransaction) {
+      try {
+        await firestore.runTransaction(async (t) => {
+          const matchRef = firestore.collection('matches').doc(matchId);
+          const doc = await t.get(matchRef);
+          if (!doc.exists) return;
+          const currentRoom = doc.data() as GameState;
+          let changed = false;
+          
+          for (const p of Object.values(currentRoom.players)) {
+            const isOnline = presenceSet ? presenceSet.has(p.id) : false;
+            
+            // Mark as disconnected
+            if (!isOnline && !p.isDisconnected) {
+              p.isDisconnected = true;
+              p.concessionExpiresAt = now + 45000;
+              currentRoom.gameLogs = currentRoom.gameLogs || [];
+              currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} disconnected. They have 45 seconds to return.`);
+              
+              // If it's their turn, pause the timer
+              if (currentRoom.turnOrder[currentRoom.activePlayerIndex] === p.id && !currentRoom.isTurnPaused) {
+                currentRoom.isTurnPaused = true;
+                currentRoom.turnPausedRemainingMs = currentRoom.turnExpiresAt ? Math.max(0, currentRoom.turnExpiresAt - now) : 45000;
+              }
+              changed = true;
+            } 
+            // Mark as reconnected
+            else if (isOnline && p.isDisconnected) {
+              p.isDisconnected = false;
+              p.concessionExpiresAt = undefined;
+              currentRoom.gameLogs = currentRoom.gameLogs || [];
+              currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} reconnected.`);
+              
+              // If it's their turn, resume the timer
+              if (currentRoom.turnOrder[currentRoom.activePlayerIndex] === p.id && currentRoom.isTurnPaused) {
+                startTurnTimer(matchId, currentRoom);
+              }
+              changed = true;
+            }
+            
+            // Check concession
+            if (p.isDisconnected && p.concessionExpiresAt && p.concessionExpiresAt <= now) {
+               // They forfeit
+               const activeId = currentRoom.turnOrder[currentRoom.activePlayerIndex];
+               if (activeId === p.id) {
+                 passTurn(currentRoom);
+               }
+               currentRoom.turnOrder = currentRoom.turnOrder.filter(id => id !== p.id);
+               currentRoom.gameLogs = currentRoom.gameLogs || [];
+               currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} forfeited due to disconnect.`);
+               
+               if (currentRoom.turnOrder.length === 1) {
+                 const remainingPlayerId = currentRoom.turnOrder[0];
+                 const remainingPlayer = currentRoom.players[remainingPlayerId];
+                 if (remainingPlayer) remainingPlayer.points = currentRoom.victoryPointsTarget || 2;
+                 currentRoom.phase = 'GAME_OVER';
+                 currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] Match ended.`);
+               } else if (currentRoom.turnOrder.length === 0) {
+                 currentRoom.phase = 'GAME_OVER';
+               }
+               changed = true;
+            }
+          }
+          
+          if (changed) {
+            t.update(matchRef, currentRoom as any);
+          }
+        });
+      } catch (err) {
+        console.error(`Failed to process disconnects for match ${matchId}:`, err);
+      }
+    }
+  }
+}, 1000);
+
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const app = express();
