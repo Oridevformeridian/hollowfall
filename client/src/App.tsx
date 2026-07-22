@@ -884,7 +884,8 @@ export default function App() {
   }, [gameState?.phase, playedGameOverSound]);
 
   // Form states
-  const [username, setUsername] = useState('');
+  const lockedDisplayName = typeof window !== 'undefined' ? localStorage.getItem('hollowfall_display_name') : null;
+  const [username, setUsername] = useState(lockedDisplayName || '');
   const [roomCode, setRoomCode] = useState('');
 
   const usernameRef = React.useRef(username);
@@ -1372,9 +1373,10 @@ export default function App() {
               type="text"
               value={username}
               onChange={e => setUsername(e.target.value)}
+              disabled={!!lockedDisplayName}
               placeholder="Spirit Walker"
               className="input-field text-center"
-              style={{ width: '100%', textAlign: 'center' }}
+              style={{ width: '100%', textAlign: 'center', opacity: lockedDisplayName ? 0.6 : 1, cursor: lockedDisplayName ? 'not-allowed' : 'text' }}
               maxLength={15}
             />
           </div>

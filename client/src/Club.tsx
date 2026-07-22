@@ -55,6 +55,7 @@ export default function Club() {
       if (!res.ok) throw new Error(data.error || 'Failed to login');
       if (data.token) {
         localStorage.setItem('hollowfall_auth_token', data.token);
+        localStorage.setItem('hollowfall_display_name', data.displayName || '');
         setToken(data.token);
         setDisplayName(data.displayName || '');
         setView('setup');
