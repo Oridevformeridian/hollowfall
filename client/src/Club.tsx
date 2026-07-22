@@ -98,6 +98,7 @@ export default function Club() {
       }
       // Success! Move to park view
       localStorage.setItem('hollowfall_setup_complete', 'true');
+      localStorage.setItem('hollowfall_display_name', displayName);
       setView('park');
     } catch (e: any) {
       console.error('Error saving profile', e);
@@ -215,6 +216,20 @@ export default function Club() {
             style={{ top: '80%', left: '75%', background: 'rgba(0, 230, 118, 0.85)', color: 'black', boxShadow: '0 0 20px rgba(0, 230, 118, 0.5)' }}
           >
             🎲 Custom Match
+          </button>
+
+          {/* Sign Out (Bottom Left) */}
+          <button 
+            className="park-label"
+            onClick={() => {
+              localStorage.removeItem('hollowfall_auth_token');
+              localStorage.removeItem('hollowfall_setup_complete');
+              localStorage.removeItem('hollowfall_display_name');
+              window.location.reload();
+            }}
+            style={{ top: '90%', left: '15%', background: 'rgba(50, 50, 50, 0.85)', color: 'white', border: '1px solid #666', fontSize: '0.8rem' }}
+          >
+            🚪 Sign Out
           </button>
         </div>
       </div>
