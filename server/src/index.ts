@@ -459,7 +459,10 @@ function passTurn(room: GameState) {
     room.gameLogs.push(`[${timestamp}] ➔ ${nextPlayer.username}'s turn began.`);
   }
 
-  
+  // Re-arm the turn timer for the next player. Without this, turnExpiresAt keeps the
+  // previous turn's (soon-past) value, so the next player's clock never resets and, once
+  // it lapses, the 1s loop passes turns every tick forever.
+  startTurnTimer(room.roomCode, room);
 }
 
 function recalculatePoints(room: GameState) {
