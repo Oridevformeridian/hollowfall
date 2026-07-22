@@ -196,3 +196,44 @@ describe('concede ends a 2-player game (through real endpoints)', () => {
     expect(m.players[other].hasConceded).toBeFalsy();
   });
 });
+
+describe('authorization & turn guards (negative paths)', () => {
+  beforeEach(() => store.clear());
+  const sess: Record<string, string> = { A: 'sA', B: 'sB' };
+  const send = (action: string, seatId: string, body: any = {}) =>
+    request(app).post(`/api/match/${ROOM}/${action}`).send({ seatId, sessionId: sess[seatId], roomCode: ROOM, ...body });
+
+  it('only the host can set victory points, and the value must be in range', async () => {
+    await send('join', 'A', { username: 'alice' }); // A is host (first in)
+    await send('join', 'B', { username: 'bob' });
+
+    const ok = await send('set-victory-points', 'A', { victoryPointsTarget: 3 });
+    expect(ok.status).toBe(200);
+    expect(store.get(`matches/${ROOM}`).victoryPointsTarget).toBe(3);
+
+    const notHost = await send('set-victory-points', 'B', { victoryPointsTarget: 4 });
+    expect(notHost.status).toBe(400);
+    expect(store.get(`matches/${ROOM}`).victoryPointsTarget).toBe(3); // unchanged
+
+    const outOfRange = await send('set-victory-points', 'A', { victoryPointsTarget: 99 });
+    expect(outOfRange.status).toBe(400);
+    expect(store.get(`matches/${ROOM}`).victoryPointsTarget).toBe(3); // unchanged
+  });
+
+  it('a non-active player cannot place a tile during PLACEMENT', async () => {
+    await send('join', 'A', { username: 'alice' });
+    await send('join', 'B', { username: 'bob' });
+    await send('toggle-ready', 'A');
+    await send('toggle-ready', 'B');
+    await send('start', 'A');
+
+    const m = store.get(`matches/${ROOM}`);
+    const active = m.turnOrder[m.activePlayerIndex];
+    const other = active === 'A' ? 'B' : 'A';
+
+    const rejected = await send('place-tile', other, { x: 0, y: 0, rotation: 0 });
+    expect(rejected.status).toBe(400);
+    expect(rejected.body.error).toMatch(/not your turn/i);
+    expect(Object.keys(store.get(`matches/${ROOM}`).placedTiles)).toHaveLength(0); // nothing placed
+  });
+});
