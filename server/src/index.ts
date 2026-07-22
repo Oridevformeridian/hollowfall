@@ -66,6 +66,25 @@ rtdb.ref('matchPresence').on('value', (snapshot: any) => {
   }
 });
 
+// Queue presence (seatId -> live sessionIds), written by clients while they are searching
+// (queuePresence/{seatId}/{sessionId}=true). Lets the matchmaker skip/clean ghost entries.
+const activeQueuePresence = new Map<string, Set<string>>();
+rtdb.ref('queuePresence').on('value', (snapshot: any) => {
+  activeQueuePresence.clear();
+  const val = snapshot.val();
+  if (!val) return;
+  for (const seatId of Object.keys(val)) {
+    const leaf = val[seatId];
+    activeQueuePresence.set(seatId, leaf === true ? new Set([LEGACY_WILDCARD]) : new Set(Object.keys(leaf)));
+  }
+});
+function isQueueEntryLive(entry: { seatId: string; sessionId?: string }): boolean {
+  const sessions = activeQueuePresence.get(entry.seatId);
+  if (!sessions || sessions.size === 0) return false;
+  if (sessions.has(LEGACY_WILDCARD)) return true;
+  return entry.sessionId ? sessions.has(entry.sessionId) : false;
+}
+
 const activeMatchesCache = new Map<string, GameState>();
 
 firestore.collection('matches')
@@ -148,6 +167,53 @@ setInterval(async () => {
   }
 }, 1000);
 
+// Pure pairing logic (testable): drop non-live entries and pair the oldest remaining two-by-two.
+export function computeQueuePairings<T extends { seatId: string; sessionId?: string; enqueuedAt?: number }>(
+  entries: T[],
+  isLive: (e: T) => boolean
+): { pairs: [T, T][]; stale: T[] } {
+  const stale = entries.filter(e => !isLive(e));
+  const live = entries.filter(isLive).sort((a, b) => (a.enqueuedAt || 0) - (b.enqueuedAt || 0));
+  const pairs: [T, T][] = [];
+  for (let i = 0; i + 1 < live.length; i += 2) pairs.push([live[i], live[i + 1]]);
+  return { pairs, stale };
+}
+
+// Matchmaker sweep: every ~2s, pair present waiting players into casual 1v1 matches.
+// Skipped under test so it doesn't race with tests that populate the queue directly.
+const matchmakerSweep = async () => {
+  try {
+    const snap = await firestore.collection('casualQueue').where('status', '==', 'waiting').get();
+    const entries = snap.docs.map((d: any) => d.data() as { seatId: string; sessionId?: string; displayName?: string; enqueuedAt?: number });
+    if (entries.length === 0) return;
+
+    const { pairs, stale } = computeQueuePairings(entries, isQueueEntryLive);
+
+    // Clean ghost entries (searching client disconnected).
+    for (const e of stale) {
+      firestore.collection('casualQueue').doc(e.seatId).delete().catch(() => {});
+    }
+
+    for (const [a, b] of pairs) {
+      const room = createMatch([
+        { seatId: a.seatId, sessionId: a.sessionId || '', displayName: a.displayName || 'Wanderer' },
+        { seatId: b.seatId, sessionId: b.sessionId || '', displayName: b.displayName || 'Wanderer' }
+      ], 'RANDOM');
+      await firestore.runTransaction(async (t) => {
+        t.set(firestore.collection('matches').doc(room.roomCode), room as any);
+        t.update(firestore.collection('casualQueue').doc(a.seatId), { status: 'matched', matchId: room.roomCode });
+        t.update(firestore.collection('casualQueue').doc(b.seatId), { status: 'matched', matchId: room.roomCode });
+      });
+      console.log(`[matchmaker] paired ${a.seatId} vs ${b.seatId} -> ${room.roomCode}`);
+    }
+  } catch (err) {
+    console.error('Matchmaker sweep failed:', err);
+  }
+};
+if (process.env.NODE_ENV !== 'test') {
+  setInterval(matchmakerSweep, 2000);
+}
+
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const app = express();
@@ -171,6 +237,53 @@ function startTurnTimer(_roomCode: string, room: any) {
 app.use('/api', (req, res, next) => {
   console.log(`[API] ${req.method} ${req.url}`);
   next();
+});
+
+// Optional JWT parse: attaches req.user when a valid token is present, else proceeds as guest.
+const optionalAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    jwt.verify(authHeader.split(' ')[1], JWT_SECRET, (err: any, user: any) => {
+      if (!err) (req as any).user = user;
+      next();
+    });
+  } else {
+    next();
+  }
+};
+
+// --- Casual queue endpoints (see HOLLOWFALL_casual_queue.md) --------------------------------
+// seatId = authed userId (JWT) or a durable guest seatId; sessionId fences the entry.
+app.post('/api/queue/join', optionalAuth, async (req, res) => {
+  try {
+    const seatId = (req as any).user?.playerId || req.body.seatId;
+    const sessionId = req.body.sessionId;
+    const displayName = req.body.displayName || 'Wanderer';
+    if (!seatId || !sessionId) return res.status(400).json({ error: 'seatId and sessionId are required.' });
+    await firestore.collection('casualQueue').doc(seatId).set({ seatId, sessionId, displayName, enqueuedAt: Date.now(), status: 'waiting' });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('queue/join failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/queue/leave', optionalAuth, async (req, res) => {
+  try {
+    const seatId = (req as any).user?.playerId || req.body.seatId;
+    const sessionId = req.body.sessionId;
+    if (!seatId) return res.status(400).json({ error: 'seatId is required.' });
+    const ref = firestore.collection('casualQueue').doc(seatId);
+    // Fenced: only the current session may cancel its own queue slot.
+    await firestore.runTransaction(async (t) => {
+      const doc = await t.get(ref);
+      if (doc.exists && (doc.data() as any).sessionId === sessionId) t.delete(ref);
+    });
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('queue/leave failed:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Serve client build in production
@@ -490,6 +603,70 @@ export function reconcileMatchConnectivity(room: GameState, now: number, isOnlin
     }
   }
   return changed;
+}
+
+// A player joining a match via the matchmaker (vs. the manual lobby).
+export type SeatInit = { seatId: string; sessionId: string; displayName: string };
+
+// Generate an uppercase-alphanumeric match code (matches withMatchTransaction's id normalization).
+function generateMatchCode(): string {
+  return 'Q' + Math.random().toString(36).slice(2, 8).toUpperCase().replace(/[^A-Z0-9]/g, '0');
+}
+
+// Create a fully-formed match from a set of seats, ready to play — used by the casual queue.
+// heroStrategy 'RANDOM' assigns each seat a distinct random hero (no lobby pick); then we run the
+// shared startPlacement. The seatId keys are durable, so clients later just JOIN this roomCode and
+// re-claim their pre-created seat. Draft (later) becomes a different heroStrategy (see queue doc §8).
+export function createMatch(seats: SeatInit[], heroStrategy: 'RANDOM' = 'RANDOM'): GameState {
+  void heroStrategy; // only RANDOM implemented today
+  const heroPool = [...HEROES].sort(() => random() - 0.5); // distinct, shuffled
+  const players: Record<string, Player> = {};
+  seats.forEach((s, i) => {
+    const hero = heroPool[i % heroPool.length];
+    players[s.seatId] = {
+      id: s.seatId,
+      username: s.displayName || `Player_${s.seatId.substring(0, 4)}`,
+      color: hero.color,
+      emoji: hero.emoji,
+      isReady: true,
+      isHost: i === 0,
+      assignedTileIndex: null,
+      ap: 0,
+      thread: 15,
+      maxThread: 15,
+      hand: [],
+      deck: [],
+      graveyard: [],
+      expendPile: [],
+      points: 0,
+      severPoints: 0,
+      hasAttackedThisTurn: false,
+      isFirstTurnOfMatch: true,
+      form: 'normal',
+      activeSessionId: s.sessionId,
+      thorns: 0,
+      spiritSkin: 0
+    };
+  });
+
+  const room: GameState = {
+    roomCode: generateMatchCode(),
+    phase: 'LOBBY',
+    players,
+    turnOrder: [],
+    activePlayerIndex: 0,
+    placedTiles: {},
+    doorsState: {},
+    wallsState: {},
+    wallHp: {},
+    tokenPositions: {},
+    treasures: {},
+    systemMessages: [],
+    victoryPointsTarget: 2
+  } as unknown as GameState;
+
+  startPlacement(room); // -> PLACEMENT, turnOrder, tiles
+  return room;
 }
 
 // Transition a room whose players are set (heroes chosen, ready) from LOBBY into PLACEMENT:

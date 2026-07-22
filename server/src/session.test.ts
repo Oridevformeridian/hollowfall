@@ -17,22 +17,41 @@ vi.mock('google-auth-library', () => ({
 
 vi.mock('@google-cloud/firestore', () => {
   const clone = (o: any) => JSON.parse(JSON.stringify(o)); // also drops `undefined`, like ignoreUndefinedProperties
+  const docRef = (col: string, id: string) => {
+    const key = `${col}/${id}`;
+    return {
+      id, _key: key,
+      set: async (data: any) => { store.set(key, clone(data)); },
+      get: async () => ({ exists: store.has(key), data: () => store.get(key) }),
+      update: async (data: any) => { store.set(key, { ...store.get(key), ...clone(data) }); },
+      delete: async () => { store.delete(key); }
+    };
+  };
   return {
     Firestore: vi.fn().mockImplementation(() => ({
       collection: (col: string) => ({
-        doc: (id: string) => ({ id, _key: `${col}/${id}` }),
-        where: () => ({ onSnapshot: vi.fn(), limit: () => ({ get: vi.fn() }) })
+        doc: (id: string) => docRef(col, id),
+        where: (field?: string, op?: string, val?: any) => ({
+          onSnapshot: vi.fn(),
+          limit: () => ({ get: vi.fn() }),
+          get: async () => ({
+            docs: [...store.entries()]
+              .filter(([k, v]) => k.startsWith(`${col}/`) && (op === '==' ? (v as any)[field!] === val : true))
+              .map(([k, v]) => ({ id: k.split('/')[1], data: () => v }))
+          })
+        })
       }),
       runTransaction: async (fn: any) => fn({
         get: async (ref: any) => ({ exists: store.has(ref._key), data: () => store.get(ref._key) }),
         set: (ref: any, data: any) => { store.set(ref._key, clone(data)); },
-        update: (ref: any, data: any) => { store.set(ref._key, { ...store.get(ref._key), ...clone(data) }); }
+        update: (ref: any, data: any) => { store.set(ref._key, { ...store.get(ref._key), ...clone(data) }); },
+        delete: (ref: any) => { store.delete(ref._key); }
       })
     }))
   };
 });
 
-import { app, removeSeatFromTurnOrder, reconcileMatchConnectivity, startPlacement } from './index';
+import { app, removeSeatFromTurnOrder, reconcileMatchConnectivity, startPlacement, createMatch, computeQueuePairings } from './index';
 
 const ROOM = 'SESSIONTEST';
 const join = (seatId: string, sessionId: string, username: string) =>
@@ -314,5 +333,63 @@ describe('startPlacement (shared LOBBY -> PLACEMENT setup)', () => {
       expect(room.players[id].assignedTileIndex).toBeGreaterThanOrEqual(0);
       expect(room.players[id].assignedTileIndex).toBeLessThanOrEqual(3);
     }
+  });
+});
+
+describe('casual queue: createMatch', () => {
+  it('builds a ready 1v1 in PLACEMENT with distinct heroes and durable seat keys', () => {
+    const room: any = createMatch([
+      { seatId: 'seat-A', sessionId: 'sA', displayName: 'alice' },
+      { seatId: 'seat-B', sessionId: 'sB', displayName: 'bob' }
+    ], 'RANDOM');
+    expect(room.phase).toBe('PLACEMENT');
+    expect(Object.keys(room.players).sort()).toEqual(['seat-A', 'seat-B']);
+    expect(room.players['seat-A'].isReady && room.players['seat-B'].isReady).toBe(true);
+    // heroes assigned and distinct
+    expect(room.players['seat-A'].emoji).toBeTruthy();
+    expect(room.players['seat-A'].emoji).not.toBe(room.players['seat-B'].emoji);
+    // durable seats carry their session; each got a starting tile
+    expect(room.players['seat-A'].activeSessionId).toBe('sA');
+    expect([...room.turnOrder].sort()).toEqual(['seat-A', 'seat-B']);
+    for (const id of room.turnOrder) expect(room.players[id].assignedTileIndex).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('casual queue: computeQueuePairings', () => {
+  const live = (present: string[]) => (e: any) => present.includes(e.seatId);
+  it('drops non-present entries and pairs the oldest two', () => {
+    const entries = [
+      { seatId: 'C', sessionId: 's', enqueuedAt: 30 },
+      { seatId: 'A', sessionId: 's', enqueuedAt: 10 },
+      { seatId: 'GHOST', sessionId: 's', enqueuedAt: 5 },
+      { seatId: 'B', sessionId: 's', enqueuedAt: 20 }
+    ];
+    const { pairs, stale } = computeQueuePairings(entries, live(['A', 'B', 'C']));
+    expect(stale.map(e => e.seatId)).toEqual(['GHOST']);
+    expect(pairs).toHaveLength(1);                 // C is left waiting (odd one out)
+    expect(pairs[0].map(e => e.seatId)).toEqual(['A', 'B']); // oldest two, in order
+  });
+});
+
+describe('casual queue: join/leave endpoints', () => {
+  beforeEach(() => store.clear());
+  const q = (action: string, body: any) => request(app).post(`/api/queue/${action}`).send(body);
+
+  it('join enqueues a waiting entry; leave (fenced) removes it', async () => {
+    expect((await q('join', { seatId: 'A', sessionId: 's1', displayName: 'alice' })).status).toBe(200);
+    const e = store.get('casualQueue/A');
+    expect(e).toMatchObject({ seatId: 'A', sessionId: 's1', status: 'waiting' });
+
+    // a stale session cannot cancel someone else's slot
+    await q('leave', { seatId: 'A', sessionId: 'WRONG' });
+    expect(store.has('casualQueue/A')).toBe(true);
+
+    // the current session can
+    await q('leave', { seatId: 'A', sessionId: 's1' });
+    expect(store.has('casualQueue/A')).toBe(false);
+  });
+
+  it('rejects join without seatId/sessionId', async () => {
+    expect((await q('join', { seatId: 'A' })).status).toBe(400);
   });
 });
