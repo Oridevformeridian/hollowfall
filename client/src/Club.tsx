@@ -19,7 +19,6 @@ export default function Club() {
     initialToken ? (localStorage.getItem('hollowfall_setup_complete') ? 'park' : 'setup') : 'login'
   );
   
-  const [onlineCount, setOnlineCount] = useState<number>(0);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const latestRoom = localStorage.getItem('hollowfall_latest_room');
@@ -31,25 +30,15 @@ export default function Club() {
     // Generate a random session ID for presence
     const sessionId = Math.random().toString(36).substring(2, 15);
     const userRef = ref(rtdb, `presence/${sessionId}`);
-    const presenceRef = ref(rtdb, 'presence');
-
-    // Set ourselves as online and schedule removal on disconnect
+    
+    // Set user online
     set(userRef, true);
+    
+    // Remove on disconnect
     onDisconnect(userRef).remove();
-
-    // Listen to global presence count
-    const unsubscribe = onValue(presenceRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        setOnlineCount(Object.keys(data).length);
-      } else {
-        setOnlineCount(0);
-      }
-    });
 
     return () => {
       remove(userRef);
-      unsubscribe();
     };
   }, [view]);
 
