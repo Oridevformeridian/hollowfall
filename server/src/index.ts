@@ -2125,6 +2125,10 @@ app.post('/api/match/:matchId/reset-game', (req, res, next) => {
           room.tokenPositions = {};
           room.treasures = {};
           room.turnOrder = [];
+          delete room.turnExpiresAt;
+          delete room.gameEndedAt;
+          delete room.gameLogs;
+          
           for (const pId of Object.keys(room.players)) {
             const p = room.players[pId];
             p.isReady = false;
@@ -2138,6 +2142,9 @@ app.post('/api/match/:matchId/reset-game', (req, res, next) => {
             p.hasAttackedThisTurn = false;
             p.isFirstTurnOfMatch = true;
             p.form = 'normal';
+            p.hasConceded = false;
+            p.isDisconnected = false;
+            p.concessionExpiresAt = undefined;
           }
 
           
