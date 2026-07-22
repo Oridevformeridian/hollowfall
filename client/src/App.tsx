@@ -698,7 +698,6 @@ export default function App() {
   const desktopLogRef = React.useRef<HTMLDivElement>(null);
   const mobileLogRef = React.useRef<HTMLDivElement>(null);
   const hasPlayed10sWarningRef = React.useRef(false);
-  const autoEndTurnSentRef = React.useRef(-1);
   useEffect(() => {
     if (desktopLogRef.current) {
       desktopLogRef.current.scrollTop = desktopLogRef.current.scrollHeight;
@@ -731,19 +730,6 @@ export default function App() {
 
       const isActiveTurn = gameState.turnOrder && myPlayerId && gameState.turnOrder[gameState.activePlayerIndex] === myPlayerId;
       
-      if (isActiveTurn && seconds === 0 && autoEndTurnSentRef.current !== gameState.activePlayerIndex) {
-        autoEndTurnSentRef.current = gameState.activePlayerIndex;
-        console.log("Turn timer expired, auto-ending turn!");
-        const token = localStorage.getItem('hollowfall_auth_token');
-        fetch(`/api/match/${gameState.roomCode}/end-turn`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        }).catch(err => console.error("Error auto-ending turn:", err));
-      }
-
       if (isActiveTurn && seconds === 10 && !hasPlayed10sWarningRef.current) {
         hasPlayed10sWarningRef.current = true;
         console.log("10s warning triggered! Playing drum roll...");
