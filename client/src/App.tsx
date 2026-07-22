@@ -734,7 +734,8 @@ export default function App() {
       if (isActiveTurn && seconds === 0 && autoEndTurnSentRef.current !== gameState.activePlayerIndex) {
         autoEndTurnSentRef.current = gameState.activePlayerIndex;
         console.log("Turn timer expired, auto-ending turn!");
-        fetch(`/api/match/${matchId}/end-turn`, {
+        const token = localStorage.getItem('hollowfall_auth_token');
+        fetch(`/api/match/${gameState.roomCode}/end-turn`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
