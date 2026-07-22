@@ -979,6 +979,10 @@ export default function App() {
            localStorage.setItem(`hollowfall_session_${cleanRoom}_${myPlayer.username.toLowerCase()}`, myPlayer.sessionToken);
            sessionStorage.setItem('hollowfall_active_room', data.gameState.roomCode);
            sessionStorage.setItem('hollowfall_active_username', myPlayer.username);
+           
+           // Cross-tab tracking for Club.tsx
+           localStorage.setItem('hollowfall_latest_room', data.gameState.roomCode);
+           localStorage.setItem('hollowfall_latest_username', myPlayer.username);
         }
       }
     } catch (e: any) {
@@ -1134,12 +1138,16 @@ export default function App() {
   const handleResetGame = () => {
     sessionStorage.removeItem('hollowfall_active_room');
     sessionStorage.removeItem('hollowfall_active_username');
+    localStorage.removeItem('hollowfall_latest_room');
+    localStorage.removeItem('hollowfall_latest_username');
     sendEvent({ event: 'RESET_GAME' });
   };
 
   const handleConcede = () => {
     sessionStorage.removeItem('hollowfall_active_room');
     sessionStorage.removeItem('hollowfall_active_username');
+    localStorage.removeItem('hollowfall_latest_room');
+    localStorage.removeItem('hollowfall_latest_username');
     sendEvent({ event: 'CONCEDE' });
   };
 
@@ -1462,6 +1470,8 @@ export default function App() {
             onClick={() => {
               sessionStorage.removeItem('hollowfall_active_room');
               sessionStorage.removeItem('hollowfall_active_username');
+              localStorage.removeItem('hollowfall_latest_room');
+              localStorage.removeItem('hollowfall_latest_username');
               window.location.reload();
             }}
             style={{

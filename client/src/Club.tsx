@@ -13,6 +13,9 @@ export default function Club() {
   const [view, setView] = useState<'login' | 'setup' | 'park'>(token ? 'setup' : 'login');
   const [onlineCount, setOnlineCount] = useState<number>(0);
 
+  const latestRoom = localStorage.getItem('hollowfall_latest_room');
+  const latestUsername = localStorage.getItem('hollowfall_latest_username');
+
   useEffect(() => {
     if (view !== 'park') return undefined;
 
@@ -99,6 +102,11 @@ export default function Club() {
         <style>
           {`
             @keyframes spin { 100% { transform: rotate(360deg); } }
+            @keyframes pulse { 
+              0% { transform: translate(-50%, -50%) scale(1); }
+              50% { transform: translate(-50%, -50%) scale(1.05); }
+              100% { transform: translate(-50%, -50%) scale(1); }
+            }
             .park-label {
               position: absolute;
               transform: translate(-50%, -50%);
@@ -125,6 +133,28 @@ export default function Club() {
         <div style={{ position: 'relative', width: '80%', maxWidth: '900px', borderRadius: '16px', overflow: 'hidden', border: '4px solid #333' }}>
           <img src="/club_park_map.jpg" alt="Amusement Park Map" style={{ width: '100%', display: 'block' }} />
           
+          {/* Active Game Reconnect */}
+          {latestRoom && latestUsername && (
+            <button 
+              className="park-label"
+              onClick={() => {
+                sessionStorage.setItem('hollowfall_active_room', latestRoom);
+                sessionStorage.setItem('hollowfall_active_username', latestUsername);
+                window.location.href = '/lobby';
+              }}
+              style={{ 
+                top: '15%', left: '50%', 
+                background: 'linear-gradient(45deg, #FF0055, #FF9900)', 
+                color: 'white', 
+                boxShadow: '0 0 30px rgba(255, 0, 85, 0.8)',
+                zIndex: 20,
+                animation: 'pulse 2s infinite'
+              }}
+            >
+              ⚡ Reconnect to Active Match ({latestRoom})
+            </button>
+          )}
+
           {/* Competitive Arena (Top Left Coaster) */}
           <button 
             className="park-label"
