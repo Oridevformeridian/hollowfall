@@ -167,15 +167,23 @@ setInterval(async () => {
   }
 }, 1000);
 
-// Pure pairing logic (testable): drop non-live entries and pair the oldest remaining two-by-two.
+// Pure pairing logic (testable). An entry is pairable if it's live OR still within the presence
+// grace window (a just-enqueued entry hasn't had time to register queue presence yet — pairing
+// on the very next tick must not delete it). Only entries that are BOTH not-live AND old are
+// stale (garbage-collected). Pairs the oldest pairable entries two-by-two.
+export const QUEUE_PRESENCE_GRACE_MS = 15000;
 export function computeQueuePairings<T extends { seatId: string; sessionId?: string; enqueuedAt?: number }>(
   entries: T[],
-  isLive: (e: T) => boolean
+  isLive: (e: T) => boolean,
+  now: number = Date.now()
 ): { pairs: [T, T][]; stale: T[] } {
-  const stale = entries.filter(e => !isLive(e));
-  const live = entries.filter(isLive).sort((a, b) => (a.enqueuedAt || 0) - (b.enqueuedAt || 0));
+  const stale = entries.filter(e => !isLive(e) && (now - (e.enqueuedAt || 0)) >= QUEUE_PRESENCE_GRACE_MS);
+  const staleSet = new Set(stale);
+  const pairable = entries
+    .filter(e => !staleSet.has(e))
+    .sort((a, b) => (a.enqueuedAt || 0) - (b.enqueuedAt || 0));
   const pairs: [T, T][] = [];
-  for (let i = 0; i + 1 < live.length; i += 2) pairs.push([live[i], live[i + 1]]);
+  for (let i = 0; i + 1 < pairable.length; i += 2) pairs.push([pairable[i], pairable[i + 1]]);
   return { pairs, stale };
 }
 
@@ -188,9 +196,11 @@ const matchmakerSweep = async () => {
     if (entries.length === 0) return;
 
     const { pairs, stale } = computeQueuePairings(entries, isQueueEntryLive);
+    console.log(`[matchmaker] tick: ${entries.length} waiting, ${pairs.length} pair(s), ${stale.length} stale`);
 
-    // Clean ghost entries (searching client disconnected).
+    // GC ghost entries (non-live and past the presence grace window).
     for (const e of stale) {
+      console.log(`[matchmaker] GC stale entry ${e.seatId}`);
       firestore.collection('casualQueue').doc(e.seatId).delete().catch(() => {});
     }
 

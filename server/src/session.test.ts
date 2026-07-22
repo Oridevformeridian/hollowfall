@@ -393,3 +393,23 @@ describe('casual queue: join/leave endpoints', () => {
     expect((await q('join', { seatId: 'A' })).status).toBe(400);
   });
 });
+
+describe('casual queue: pairing grace window', () => {
+  const now = 1_000_000;
+  it('pairs two just-enqueued entries even before presence registers', () => {
+    const entries = [
+      { seatId: 'A', sessionId: 's', enqueuedAt: now - 1000 },
+      { seatId: 'B', sessionId: 's', enqueuedAt: now - 500 }
+    ];
+    const { pairs, stale } = computeQueuePairings(entries, () => false, now); // nobody "live" yet
+    expect(stale).toHaveLength(0);
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0].map(e => e.seatId)).toEqual(['A', 'B']);
+  });
+  it('GCs a non-live entry once past the grace window', () => {
+    const entries = [{ seatId: 'OLD', sessionId: 's', enqueuedAt: now - 60000 }];
+    const { pairs, stale } = computeQueuePairings(entries, () => false, now);
+    expect(pairs).toHaveLength(0);
+    expect(stale.map(e => e.seatId)).toEqual(['OLD']);
+  });
+});
