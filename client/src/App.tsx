@@ -1336,9 +1336,32 @@ export default function App() {
             flexDirection: 'column',
             gap: '24px',
             alignItems: 'center',
-            textAlign: 'center'
+            textAlign: 'center',
+            position: 'relative'
           }}
         >
+          <button
+            onClick={() => window.location.href = '/club'}
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              background: 'transparent',
+              border: 'none',
+              color: '#94a3b8',
+              fontSize: '24px',
+              cursor: 'pointer',
+              lineHeight: 1,
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 10
+            }}
+            title="Return to Club"
+          >
+            ✕
+          </button>
           <div>
             <h1 className="text-3xl font-extrabold text-[#00E5FF] m-0 mb-2 tracking-wide" style={{ textAlign: 'center' }}>
               HOLLOWFALL
