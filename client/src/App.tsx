@@ -935,13 +935,20 @@ export default function App() {
   const sendEvent = async (event: ClientMessage) => {
     const endpointMap: Record<string, string> = {
       'JOIN_ROOM': 'join',
-      'PLACE_TOKENS': 'place-tokens',
-      'PLAY_CARD': 'play-card',
+      'TOGGLE_READY': 'toggle-ready',
+      'SELECT_HERO': 'select-hero',
+      'START_GAME': 'start',
+      'SET_VICTORY_POINTS_TARGET': 'set-victory-points',
+      'PLACE_TILE': 'place-tile',
       'MOVE_TOKEN': 'move-token',
-      'RESOLVE_ATTACK': 'attack',
+      'INTERACT_DOOR': 'interact-door',
       'END_TURN': 'end-turn',
-      'CONCEDE': 'concede',
-      'RESTART_GAME': 'restart'
+      'PLAY_CARD': 'play-card',
+      'LASH_ATTACK': 'lash-attack',
+      'PICKUP_TREASURE': 'pickup-treasure',
+      'DROP_TREASURE': 'drop-treasure',
+      'RESET_GAME': 'reset-game',
+      'CONCEDE': 'concede'
     };
     console.log('[sendEvent] Triggered:', event);
     const action = endpointMap[event.event];
