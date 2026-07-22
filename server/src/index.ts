@@ -261,7 +261,7 @@ app.post('/api/queue/join', optionalAuth, async (req, res) => {
     const displayName = req.body.displayName || 'Wanderer';
     if (!seatId || !sessionId) return res.status(400).json({ error: 'seatId and sessionId are required.' });
     await firestore.collection('casualQueue').doc(seatId).set({ seatId, sessionId, displayName, enqueuedAt: Date.now(), status: 'waiting' });
-    res.json({ success: true });
+    res.json({ success: true, seatId });
   } catch (err: any) {
     console.error('queue/join failed:', err);
     res.status(500).json({ error: err.message });

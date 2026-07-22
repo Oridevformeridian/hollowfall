@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import { ref, set, onDisconnect, remove } from 'firebase/database';
-import { rtdb } from './firebase';
+import { ref, set, onDisconnect, remove, onValue } from 'firebase/database';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { rtdb, db } from './firebase';
 import { HEROES } from './shared/constants';
+import { GUEST_SEAT_ID, SESSION_ID } from './identity';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id.apps.googleusercontent.com';
 
@@ -27,6 +29,84 @@ export default function Club() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // --- Casual matchmaking ---
+  const [casualState, setCasualState] = useState<'idle' | 'searching' | 'matched'>('idle');
+  const [matchup, setMatchup] = useState<{ me: { emoji: string; name: string }; opp: { emoji: string; name: string }; matchId: string } | null>(null);
+  const searchCleanup = useRef<null | (() => void)>(null);
+  const stopCasual = () => { if (searchCleanup.current) { searchCleanup.current(); searchCleanup.current = null; } };
+
+  const startCasual = async () => {
+    setCasualState('searching');
+    setMatchup(null);
+    try {
+      const res = await fetch('/api/queue/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ seatId: GUEST_SEAT_ID, sessionId: SESSION_ID, displayName: displayName || 'Wanderer' })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to join queue');
+      const seatId: string = data.seatId;
+
+      // Queue presence: re-registers on reconnect, removed on disconnect — the sweep never pairs a ghost.
+      const presenceRef = ref(rtdb, `queuePresence/${seatId}/${SESSION_ID}`);
+      const connectedRef = ref(rtdb, '.info/connected');
+      const unsubConn = onValue(connectedRef, (snap) => {
+        if (snap.val() !== true) return;
+        onDisconnect(presenceRef).remove().then(() => set(presenceRef, true).catch(() => {})).catch(() => {});
+      });
+
+      // Wait for the matchmaker; on match, reveal the VS then enter the match (App auto-rejoins).
+      const unsubQueue = onSnapshot(doc(db, 'casualQueue', seatId), async (snap) => {
+        const entry = snap.data() as any;
+        if (entry && entry.status === 'matched' && entry.matchId) {
+          const matchSnap = await getDoc(doc(db, 'matches', entry.matchId));
+          const match = matchSnap.data() as any;
+          if (match && match.players) {
+            const me = match.players[seatId];
+            const opp = Object.values(match.players).find((p: any) => p.id !== seatId) as any;
+            setMatchup({
+              me: { emoji: me?.emoji || '❔', name: me?.username || (displayName || 'You') },
+              opp: { emoji: opp?.emoji || '❔', name: opp?.username || 'Challenger' },
+              matchId: entry.matchId
+            });
+          }
+          setCasualState('matched');
+          setTimeout(() => {
+            sessionStorage.setItem('hollowfall_active_room', entry.matchId);
+            sessionStorage.setItem('hollowfall_active_username', displayName || 'Wanderer');
+            window.location.href = '/lobby';
+          }, 1800);
+        }
+      });
+
+      searchCleanup.current = () => {
+        unsubConn();
+        unsubQueue();
+        onDisconnect(presenceRef).cancel().catch(() => {});
+        remove(presenceRef).catch(() => {});
+      };
+    } catch (e) {
+      console.error('Casual queue join failed', e);
+      setCasualState('idle');
+    }
+  };
+
+  const cancelCasual = async () => {
+    stopCasual();
+    setCasualState('idle');
+    setMatchup(null);
+    try {
+      await fetch('/api/queue/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ seatId: GUEST_SEAT_ID, sessionId: SESSION_ID })
+      });
+    } catch (e) { console.error('Casual queue leave failed', e); }
+  };
+
+  useEffect(() => () => stopCasual(), []); // cancel any in-flight search on unmount
 
   const latestRoom = localStorage.getItem('hollowfall_latest_room');
   const latestUsername = localStorage.getItem('hollowfall_latest_username');
@@ -110,6 +190,40 @@ export default function Club() {
         minHeight: '100vh', backgroundColor: '#0f0f11', color: 'white', fontFamily: 'system-ui, sans-serif'
       }}>
 
+        {/* Casual matchmaking VS overlay */}
+        {casualState !== 'idle' && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(6,8,12,0.96)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 28 }}>
+            <div style={{ fontSize: 18, letterSpacing: 2, opacity: 0.8, textTransform: 'uppercase' }}>
+              {casualState === 'matched' ? 'Match Found' : 'Finding an opponent…'}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 20 : 56 }}>
+              {/* You (left) */}
+              <div style={{ textAlign: 'center', width: 150 }}>
+                <div style={{ fontSize: 76, lineHeight: 1 }}>{matchup ? matchup.me.emoji : '❔'}</div>
+                <div style={{ marginTop: 10, fontWeight: 700 }}>{matchup ? matchup.me.name : (displayName || 'You')}</div>
+              </div>
+              <div style={{ fontSize: 44, fontWeight: 900, color: '#FF6D00' }}>VS</div>
+              {/* Challenger (right) */}
+              <div style={{ textAlign: 'center', width: 150 }}>
+                {casualState === 'matched' && matchup ? (
+                  <>
+                    <div style={{ fontSize: 76, lineHeight: 1 }}>{matchup.opp.emoji}</div>
+                    <div style={{ marginTop: 10, fontWeight: 700 }}>{matchup.opp.name}</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ width: 68, height: 68, margin: '4px auto', borderRadius: '50%', border: '5px solid #2a2a2a', borderTopColor: '#00C853', animation: 'spin 1s linear infinite' }} />
+                    <div style={{ marginTop: 10, opacity: 0.7 }}>Searching…</div>
+                  </>
+                )}
+              </div>
+            </div>
+            {casualState === 'searching'
+              ? <button onClick={cancelCasual} style={{ marginTop: 8, padding: '10px 28px', borderRadius: 8, border: '1px solid #555', background: 'transparent', color: 'white', cursor: 'pointer' }}>Cancel</button>
+              : <div style={{ opacity: 0.7 }}>Entering match…</div>}
+          </div>
+        )}
+
         <style>
           {`
             @keyframes spin { 100% { transform: rotate(360deg); } }
@@ -184,7 +298,7 @@ export default function Club() {
             {/* 1. Casual Match */}
             <button 
               className="park-label"
-              onClick={() => alert('Casual Match coming soon!')}
+              onClick={startCasual}
               style={{ position: 'relative', transform: 'none', background: 'rgba(0, 200, 83, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(0, 200, 83, 0.5)' }}
             >
               ⚔️ Casual Match

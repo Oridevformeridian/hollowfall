@@ -3,11 +3,18 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /matches/{matchId} {
       // ANYONE can read a match if they know the room code
-      allow read: if true; 
-      
-      // NOBODY can write directly from the browser. 
+      allow read: if true;
+
+      // NOBODY can write directly from the browser.
       // This forces all moves through our Node.js Express backend for validation!
-      allow write: if false; 
+      allow write: if false;
+    }
+
+    // Casual matchmaking queue. Clients watch their own entry for the match assignment;
+    // only the backend (admin SDK, which bypasses rules) writes entries.
+    match /casualQueue/{seatId} {
+      allow read: if true;
+      allow write: if false;
     }
   }
 }

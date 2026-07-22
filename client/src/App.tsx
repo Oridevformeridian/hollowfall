@@ -7,29 +7,7 @@ import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, rotateBorderCoordinate, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, getActiveRainbowBridges, isValidMiststepTarget, isValidStoneGlideTarget } from './shared/validation.ts';
 import { buildDeckForEmoji } from './shared/deck.ts';
 
-// --- Durable identity + per-tab session (see HOLLOWFALL_match_session_architecture.md) ---
-const uuid = () =>
-  (typeof crypto !== 'undefined' && crypto.randomUUID)
-    ? crypto.randomUUID()
-    : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-
-// Durable guest seat id — persists across reloads so a guest re-claims the same seat.
-// (Authenticated users get their seat from the server via their JWT; this is the guest fallback.)
-function getGuestSeatId(): string {
-  let id = localStorage.getItem('hollowfall_guest_seat_id');
-  if (!id) { id = `guest_${uuid()}`; localStorage.setItem('hollowfall_guest_seat_id', id); }
-  return id;
-}
-const GUEST_SEAT_ID = getGuestSeatId();
-
-// Per-tab session id (fencing token). sessionStorage = one per browser tab, survives reload;
-// a second tab gets its own id and, being the newer session, takes over — the old tab is fenced.
-function getSessionId(): string {
-  let id = sessionStorage.getItem('hollowfall_session_id');
-  if (!id) { id = uuid(); sessionStorage.setItem('hollowfall_session_id', id); }
-  return id;
-}
-const SESSION_ID = getSessionId();
+import { GUEST_SEAT_ID, SESSION_ID } from './identity';
 
 const getClassShapeSvg = (heroClass: string, color: string, addGlow: boolean = false) => {
   const glowStyle = addGlow ? { filter: `drop-shadow(0 0 5px ${color})` } : {};
