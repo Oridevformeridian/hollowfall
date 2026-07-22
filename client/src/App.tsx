@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { ref, set, onDisconnect, remove } from 'firebase/database';
+import { ref, set, onDisconnect, remove, onValue } from 'firebase/database';
 import { db, rtdb } from './firebase';
 import { GameState, ClientMessage } from './shared/types.ts';
 import { FIXED_TILES, TileLayout, HEROES, BASIC_CARDS } from './shared/constants.ts';
@@ -922,10 +922,20 @@ export default function App() {
   useEffect(() => {
     if (!roomCode || !myPlayerId) return;
 
-    // Set up Firebase Realtime Database Presence
+    // Set up Firebase Realtime Database Presence.
+    // Drive presence off `.info/connected` so it RE-REGISTERS on every (re)connection.
+    // Otherwise a single websocket blip fires the onDisconnect().remove() and presence is
+    // gone forever (the server then marks the player offline and forfeits them after 45s).
     const presenceRef = ref(rtdb, `matchPresence/${roomCode}/${myPlayerId}`);
-    set(presenceRef, true);
-    onDisconnect(presenceRef).remove();
+    const connectedRef = ref(rtdb, '.info/connected');
+    const unsubConnected = onValue(connectedRef, (snap) => {
+      if (snap.val() !== true) return; // only (re)arm once actually connected
+      // Register the onDisconnect cleanup FIRST, then assert presence, so a drop between
+      // the two still leaves a correct onDisconnect handler on the server.
+      onDisconnect(presenceRef).remove().then(() => {
+        set(presenceRef, true).catch(console.error);
+      }).catch(console.error);
+    });
 
     const matchRef = doc(db, 'matches', roomCode);
     const unsubscribe = onSnapshot(matchRef, (docSnap) => {
@@ -937,7 +947,9 @@ export default function App() {
       }
     });
     return () => {
+      unsubConnected();
       unsubscribe();
+      onDisconnect(presenceRef).cancel().catch(() => {});
       remove(presenceRef).catch(console.error);
     };
   }, [roomCode, myPlayerId]);

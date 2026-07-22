@@ -26,8 +26,13 @@ const firestore = new Firestore({
 });
 
 const activePresence = new Map<string, Set<string>>();
+// Guards against the loop treating "presence snapshot not loaded yet" (e.g. right after
+// an instance start/deploy) as "everyone is offline" — which would mark all players
+// disconnected in the same tick. Only trust presence once RTDB has delivered a snapshot.
+let presenceInitialized = false;
 
 rtdb.ref('matchPresence').on('value', (snapshot: any) => {
+  presenceInitialized = true;
   activePresence.clear();
   const val = snapshot.val();
   if (!val) return;
@@ -78,6 +83,9 @@ setInterval(async () => {
     }
 
     // 2. Process Presence & Disconnects
+    // Don't act on presence until RTDB has delivered its first snapshot, otherwise a
+    // freshly-started instance would mark every player offline on its first tick.
+    if (!presenceInitialized) continue;
     const presenceSet = activePresence.get(matchId);
 
     // We need to work with a mutable copy if we intend to save it, but we can't save it without a transaction.
