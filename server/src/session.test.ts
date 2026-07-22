@@ -164,3 +164,35 @@ describe('gameplay flow: setup -> GAMEPLAY -> turn pass (through real endpoints)
     expect(m.turnExpiresAt).toBeGreaterThan(Date.now());  // re-armed for the next player
   });
 });
+
+describe('concede ends a 2-player game (through real endpoints)', () => {
+  beforeEach(() => store.clear());
+  const sess: Record<string, string> = { A: 'sA', B: 'sB' };
+  const send = (action: string, seatId: string, body: any = {}) =>
+    request(app).post(`/api/match/${ROOM}/${action}`).send({ seatId, sessionId: sess[seatId], roomCode: ROOM, ...body });
+
+  async function reachGameplay() {
+    await send('join', 'A', { username: 'alice' });
+    await send('join', 'B', { username: 'bob' });
+    await send('toggle-ready', 'A');
+    await send('toggle-ready', 'B');
+    await send('start', 'A');
+    let m = store.get(`matches/${ROOM}`);
+    await send('place-tile', m.turnOrder[m.activePlayerIndex], { x: 0, y: 0, rotation: 0 });
+    m = store.get(`matches/${ROOM}`);
+    await send('place-tile', m.turnOrder[m.activePlayerIndex], { x: 1, y: 0, rotation: 0 });
+    return store.get(`matches/${ROOM}`);
+  }
+
+  it('the active player conceding ends the match; the other survives', async () => {
+    let m = await reachGameplay();
+    expect(m.phase).toBe('GAMEPLAY');
+    const conceder = m.turnOrder[m.activePlayerIndex];
+    expect((await send('concede', conceder)).status).toBe(200);
+    m = store.get(`matches/${ROOM}`);
+    expect(m.phase).toBe('GAME_OVER');
+    expect(m.players[conceder].hasConceded).toBe(true);
+    const other = conceder === 'A' ? 'B' : 'A';
+    expect(m.players[other].hasConceded).toBeFalsy();
+  });
+});
