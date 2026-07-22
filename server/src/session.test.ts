@@ -32,7 +32,7 @@ vi.mock('@google-cloud/firestore', () => {
   };
 });
 
-import { app } from './index';
+import { app, removeSeatFromTurnOrder } from './index';
 
 const ROOM = 'SESSIONTEST';
 const join = (seatId: string, sessionId: string, username: string) =>
@@ -90,5 +90,37 @@ describe('durable seat identity + session fencing', () => {
     expect(after.turnOrder).toEqual(['seat-A', 'seat-B']);      // unchanged
     expect(after.tokenPositions['seat-A']).toBeTruthy();         // not moved to a new id
     expect(after.players['seat-A'].activeSessionId).toBe('sess-1b');
+  });
+});
+
+describe('turn FSM: removeSeatFromTurnOrder keeps activePlayerIndex valid', () => {
+  const mkPlayer = (id: string) => ({ id, username: id, hand: [], deck: [], graveyard: [], ap: 0, isFirstTurnOfMatch: false, form: 'normal' });
+  const mkRoom = (order: string[], activeIdx: number) => ({
+    roomCode: 'X', turnOrder: [...order], activePlayerIndex: activeIdx,
+    players: Object.fromEntries(order.map(id => [id, mkPlayer(id)])), gameLogs: []
+  } as any);
+
+  const cases: [string[], number, string, string][] = [
+    // [turnOrder, activeIdx, seatToRemove, expectedActiveAfter]
+    [['A', 'B', 'C'], 0, 'A', 'B'],        // active leaves -> next
+    [['A', 'B', 'C'], 2, 'A', 'C'],        // non-active leaves -> active unchanged
+    [['A', 'B', 'C'], 1, 'A', 'B'],        // earlier non-active leaves -> active unchanged
+    [['A', 'B', 'C'], 2, 'C', 'A'],        // active (last) leaves -> wraps
+    [['A', 'B', 'C', 'D'], 3, 'A', 'D'],   // non-active leaves, active near end
+    [['A', 'B', 'C', 'D'], 1, 'B', 'C'],   // active leaves -> next (mid)
+  ];
+
+  it.each(cases)('order=%j active=%i remove=%s -> active %s', (order, idx, remove, expected) => {
+    const room = mkRoom(order, idx);
+    removeSeatFromTurnOrder(room, remove);
+    expect(room.turnOrder).not.toContain(remove);
+    expect(room.turnOrder[room.activePlayerIndex]).toBe(expected);
+  });
+
+  it('2 players, active leaves -> the single remaining seat is active', () => {
+    const room = mkRoom(['A', 'B'], 0);
+    removeSeatFromTurnOrder(room, 'A');
+    expect(room.turnOrder).toEqual(['B']);
+    expect(room.turnOrder[room.activePlayerIndex]).toBe('B');
   });
 });

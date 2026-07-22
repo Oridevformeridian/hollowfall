@@ -149,9 +149,8 @@ setInterval(async () => {
               currentRoom.gameLogs.push(`[${new Date().toLocaleTimeString()}] ${p.username} disconnected. They have 45 seconds to return.`);
               
               // If it's their turn, pause the timer
-              if (currentRoom.turnOrder[currentRoom.activePlayerIndex] === p.id && !currentRoom.isTurnPaused) {
-                currentRoom.isTurnPaused = true;
-                currentRoom.turnPausedRemainingMs = currentRoom.turnExpiresAt ? Math.max(0, currentRoom.turnExpiresAt - now) : 45000;
+              if (currentRoom.turnOrder[currentRoom.activePlayerIndex] === p.id) {
+                pauseTurn(currentRoom);
               }
               changed = true;
             } 
@@ -164,7 +163,7 @@ setInterval(async () => {
               
               // If it's their turn, resume the timer
               if (currentRoom.turnOrder[currentRoom.activePlayerIndex] === p.id && currentRoom.isTurnPaused) {
-                startTurnTimer(matchId, currentRoom);
+                resumeTurn(currentRoom);
               }
               changed = true;
             }
@@ -172,20 +171,9 @@ setInterval(async () => {
             // Check concession. The `includes` guard stops an already-forfeited player
             // (still in players{} but out of turnOrder) from being re-processed every tick.
             if (p.isDisconnected && p.concessionExpiresAt && p.concessionExpiresAt <= now && currentRoom.turnOrder.includes(p.id)) {
-               // If the forfeiting player is the active one, advance the turn first
-               // (this also re-arms the timer for whoever is next).
-               if (currentRoom.turnOrder[currentRoom.activePlayerIndex] === p.id) {
-                 passTurn(currentRoom);
-               }
-
-               // Capture who is active NOW, remove the forfeiter, then re-align the index
-               // to that same player. Filtering shifts indices, so activePlayerIndex must be
-               // recomputed — otherwise it points at the wrong player or off the end, which
-               // silently rejects the real active player's actions (the "stuck" bug).
-               const currentTurnPlayerId = currentRoom.turnOrder[currentRoom.activePlayerIndex];
-               currentRoom.turnOrder = currentRoom.turnOrder.filter(id => id !== p.id);
-               const newIndex = currentRoom.turnOrder.indexOf(currentTurnPlayerId);
-               currentRoom.activePlayerIndex = newIndex !== -1 ? newIndex : 0;
+               // Remove the forfeiter from the turn order (re-aligns activePlayerIndex, and
+               // advances the turn first if they were active).
+               removeSeatFromTurnOrder(currentRoom, p.id);
 
                // Stop this player from being forfeited again on subsequent ticks.
                p.concessionExpiresAt = undefined;
@@ -400,27 +388,7 @@ function concedePlayer(room: GameState, pId: string) {
     }
   } else {
     // More than 1 player remains. The game continues.
-    // If it was the conceding player's turn, we must pass the turn first.
-    const activePlayerId = room.turnOrder[room.activePlayerIndex];
-    if (pId === activePlayerId) {
-      passTurn(room);
-    }
-
-    // Capture the ID of the player whose turn it now is
-    const currentTurnPlayerId = room.turnOrder[room.activePlayerIndex];
-
-    // Filter out the conceding player from turnOrder
-    room.turnOrder = room.turnOrder.filter(id => id !== pId);
-
-    // Re-align activePlayerIndex
-    const newIndex = room.turnOrder.indexOf(currentTurnPlayerId);
-    if (newIndex !== -1) {
-      room.activePlayerIndex = newIndex;
-    } else {
-      room.activePlayerIndex = 0;
-    }
-    
-    // Re-calculate points
+    removeSeatFromTurnOrder(room, pId);
     recalculatePoints(room);
   }
 
@@ -447,6 +415,28 @@ function handlePlayedCard(player: Player, card: Card, isConsumption = false) {
   }
 }
 
+// --- Turn FSM transitions (see HOLLOWFALL_match_session_architecture.md §6) -----------------
+// These are the ONLY functions that mutate turn state (activePlayerIndex, turnExpiresAt,
+// isTurnPaused, turnPausedRemainingMs, turnOrder). Every caller (move auto-end, end-turn,
+// play-card, lash, drop-treasure, loop timeout, forfeit/concede/defeat, reconnect-resume)
+// routes through them, so the timer can't be forgotten and the index can't drift.
+
+// Begin `seatId`'s turn: make it active, grant AP, reset per-turn flags, arm the timer.
+function beginTurn(room: GameState, seatId: string) {
+  room.activePlayerIndex = Math.max(0, room.turnOrder.indexOf(seatId));
+  const p = room.players[seatId];
+  if (p) {
+    p.ap = 3;
+    p.hasAttackedThisTurn = false;
+    if (!room.gameLogs) room.gameLogs = [];
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    room.gameLogs.push(`[${timestamp}] ➔ ${p.username}'s turn began.`);
+  }
+  startTurnTimer(room.roomCode, room);
+}
+
+// End the active seat's turn (upkeep: draw to 5 / reshuffle / discard down to 7), then begin
+// the next seat's turn. Named passTurn for historical call sites; this is the endTurn transition.
 function passTurn(room: GameState) {
   const currentPid = room.turnOrder[room.activePlayerIndex];
   const endingPlayer = room.players[currentPid];
@@ -475,23 +465,33 @@ function passTurn(room: GameState) {
       endingPlayer.graveyard.push(...discarded);
     }
   }
-  room.activePlayerIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
-  const nextPid = room.turnOrder[room.activePlayerIndex];
-  if (room.players[nextPid]) {
-    const nextPlayer = room.players[nextPid];
-    nextPlayer.ap = 3;
-    nextPlayer.hasAttackedThisTurn = false;
-    
-    // Log turn transition
-    if (!room.gameLogs) room.gameLogs = [];
-    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    room.gameLogs.push(`[${timestamp}] ➔ ${nextPlayer.username}'s turn began.`);
-  }
+  const nextIndex = (room.activePlayerIndex + 1) % room.turnOrder.length;
+  beginTurn(room, room.turnOrder[nextIndex]);
+}
 
-  // Re-arm the turn timer for the next player. Without this, turnExpiresAt keeps the
-  // previous turn's (soon-past) value, so the next player's clock never resets and, once
-  // it lapses, the 1s loop passes turns every tick forever.
+// Pause the active seat's timer (active player went offline), banking the remaining time.
+function pauseTurn(room: GameState) {
+  if (room.isTurnPaused) return;
+  room.isTurnPaused = true;
+  room.turnPausedRemainingMs = room.turnExpiresAt ? Math.max(0, room.turnExpiresAt - Date.now()) : 45000;
+}
+
+// Resume a paused turn — startTurnTimer consumes turnPausedRemainingMs when paused.
+function resumeTurn(room: GameState) {
   startTurnTimer(room.roomCode, room);
+}
+
+// Remove a seat from the turn order and keep activePlayerIndex pointing at the correct
+// still-active seat. THE single place turnOrder shrinks — used by forfeit, concede, defeat.
+// If the leaving seat is active, advance the turn first (which also re-arms the timer).
+export function removeSeatFromTurnOrder(room: GameState, seatId: string) {
+  if (room.turnOrder[room.activePlayerIndex] === seatId) {
+    passTurn(room);
+  }
+  const currentTurnPlayerId = room.turnOrder[room.activePlayerIndex];
+  room.turnOrder = room.turnOrder.filter(id => id !== seatId);
+  const newIndex = room.turnOrder.indexOf(currentTurnPlayerId);
+  room.activePlayerIndex = newIndex !== -1 ? newIndex : 0;
 }
 
 function recalculatePoints(room: GameState) {
@@ -564,23 +564,9 @@ function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: str
   // Remove player token from map
   delete room.tokenPositions[defeatedId];
 
-  // If the defeated player was active, pass the turn
-  const activePlayerId = room.turnOrder[room.activePlayerIndex];
-  if (defeatedId === activePlayerId) {
-    passTurn(room);
-  }
-
-  const currentTurnPlayerId = room.turnOrder[room.activePlayerIndex];
-  room.turnOrder = room.turnOrder.filter(id => id !== defeatedId);
-
-  if (room.turnOrder.length > 0) {
-    const newIndex = room.turnOrder.indexOf(currentTurnPlayerId);
-    if (newIndex !== -1) {
-      room.activePlayerIndex = newIndex;
-    } else {
-      room.activePlayerIndex = 0;
-    }
-  }
+  // Remove the defeated player from the turn order (advances the turn first if they were
+  // active, and re-aligns activePlayerIndex).
+  removeSeatFromTurnOrder(room, defeatedId);
 
   // System message
   broadcastSystemMessage(room, message);
@@ -728,7 +714,7 @@ app.post('/api/match/:matchId/join', (req, res, next) => {
 
             // Resume the turn timer if this seat is the active player and the turn was paused.
             if (room.isTurnPaused && room.turnOrder[room.activePlayerIndex] === playerId) {
-              startTurnTimer(room.roomCode, room);
+              resumeTurn(room);
             }
 
             console.log(`Seat ${existing.username} (${playerId}) reconnected to ${room.roomCode}`);
