@@ -32,11 +32,23 @@ const firestore = new Firestore({
   ignoreUndefinedProperties: true
 });
 
-const activePresence = new Map<string, Set<string>>();
+// matchId -> seatId -> set of live sessionIds. Presence is keyed per session leaf
+// (matchPresence/{room}/{seatId}/{sessionId}=true) so two tabs don't clobber one node.
+const activePresence = new Map<string, Map<string, Set<string>>>();
 // Guards against the loop treating "presence snapshot not loaded yet" (e.g. right after
 // an instance start/deploy) as "everyone is offline" — which would mark all players
 // disconnected in the same tick. Only trust presence once RTDB has delivered a snapshot.
 let presenceInitialized = false;
+
+// A seat is online iff a presence leaf exists for its CURRENT active session. A legacy
+// boolean node (old client wrote `= true`) is treated as a wildcard so it still counts.
+const LEGACY_WILDCARD = '*';
+function isSeatOnline(matchId: string, seat: { id: string; activeSessionId?: string | null }): boolean {
+  const sessions = activePresence.get(matchId)?.get(seat.id);
+  if (!sessions || sessions.size === 0) return false;
+  if (sessions.has(LEGACY_WILDCARD)) return true;
+  return seat.activeSessionId ? sessions.has(seat.activeSessionId) : false;
+}
 
 rtdb.ref('matchPresence').on('value', (snapshot: any) => {
   presenceInitialized = true;
@@ -44,8 +56,13 @@ rtdb.ref('matchPresence').on('value', (snapshot: any) => {
   const val = snapshot.val();
   if (!val) return;
   for (const matchId of Object.keys(val)) {
-    const players = Object.keys(val[matchId]);
-    activePresence.set(matchId, new Set(players));
+    const seatMap = new Map<string, Set<string>>();
+    for (const seatId of Object.keys(val[matchId])) {
+      const leaf = val[matchId][seatId];
+      // New shape: { [sessionId]: true }. Legacy shape: `true` (boolean).
+      seatMap.set(seatId, leaf === true ? new Set([LEGACY_WILDCARD]) : new Set(Object.keys(leaf)));
+    }
+    activePresence.set(matchId, seatMap);
   }
 });
 
@@ -93,14 +110,13 @@ setInterval(async () => {
     // Don't act on presence until RTDB has delivered its first snapshot, otherwise a
     // freshly-started instance would mark every player offline on its first tick.
     if (!presenceInitialized) continue;
-    const presenceSet = activePresence.get(matchId);
 
     // We need to work with a mutable copy if we intend to save it, but we can't save it without a transaction.
     // So we'll detect if a change is needed, and then run a transaction.
     let requiresTransaction = false;
-    
+
     for (const p of Object.values(room.players)) {
-      const isOnline = presenceSet ? presenceSet.has(p.id) : false;
+      const isOnline = isSeatOnline(matchId, p);
       
       if (!isOnline && !p.isDisconnected) {
         requiresTransaction = true;
@@ -123,7 +139,7 @@ setInterval(async () => {
           let changed = false;
           
           for (const p of Object.values(currentRoom.players)) {
-            const isOnline = presenceSet ? presenceSet.has(p.id) : false;
+            const isOnline = isSeatOnline(matchId, p);
             
             // Mark as disconnected
             if (!isOnline && !p.isDisconnected) {

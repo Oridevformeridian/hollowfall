@@ -102,9 +102,25 @@ concrete need appears (replay / anti-cheat).
   with `409 SESSION_SUPERSEDED`. This single check subsumes the old "stale disconnect from a
   superseded connection" handling.
 
-**Presence:** RTDB `presence/{roomCode}/{seatId} = { sessionId, online:true }`, re-registered
-on `.info/connected` (already implemented). The loop treats a seat online only if
-`presence.sessionId === activeSessionId` (ignores a lingering old session's node).
+**Presence = live connection, NOT foreground.** Presence means "this seat has a live RTDB
+connection," period. It is **deliberately not gated on tab visibility** — alt-tabbing to read
+rules and coming back for your turn must keep you present. We rely on RTDB's protocol-level
+keep-alive (which survives background tabs) via `.info/connected` + `onDisconnect`, re-registered
+on every reconnect. **No JS heartbeat / `lastSeen` staleness** — background tabs throttle
+`setInterval`, so a timer-based liveness signal can't tell "backgrounded-but-connected" from
+"gone" and would wrongly drop alt-tabbed players.
+
+Keyed per session to avoid two tabs clobbering one node:
+`presence/{roomCode}/{seatId}/{sessionId} = true`, with `onDisconnect().remove()` on that leaf.
+The loop marks a seat online iff a leaf exists for its **current `activeSessionId`** (a legacy
+boolean node counts as a wildcard). So a superseded tab's lingering leaf is ignored, and the
+active session leaving cleanly drops the seat.
+
+"Present but idle" is not a disconnect: if a connected player simply doesn't act, the normal turn
+timer expires and the turn passes — handled by the turn FSM, independent of presence.
+
+Optional (deferred, cosmetic only): a `visibilitychange`-driven "away" indicator for the UI that
+**never** affects turns or forfeit.
 
 ## 6. Turn FSM
 
@@ -155,8 +171,10 @@ Incremental; no big-bang merge. Each phase ships and is verified on its own.
 
 - **Phase 0 (infra, tiny):** make min=1/max=1 explicit in terraform.
 - **Phase 1 (identity + session):** introduce `seatId` + `activeSessionId` fencing; client sends
-  both; delete the id-remap block and the username-match reconnect; presence keyed by seat+session.
-  *Biggest bug-class win, self-contained.*
+  both; delete the id-remap block and the username-match reconnect. *Biggest bug-class win.*
+- **Phase 1.5 (session-bound presence):** presence keyed per session leaf
+  (`{seatId}/{sessionId}`), loop trusts only the active session's leaf; connection-based and
+  explicitly not foreground-gated; no heartbeat. Fixes the two-tab presence flap.
 - **Phase 2 (turn FSM):** extract `beginTurn/endTurn/pauseTurn/resumeTurn/removeSeat`; route every
   caller through them; derive turn/time on client from `turn`.
 - **Phase 3 (light ordering):** add a `version` compare-and-set guard only. **Intent log is

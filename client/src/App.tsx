@@ -948,10 +948,11 @@ export default function App() {
     if (!roomCode || !myPlayerId) return;
 
     // Set up Firebase Realtime Database Presence.
-    // Drive presence off `.info/connected` so it RE-REGISTERS on every (re)connection.
-    // Otherwise a single websocket blip fires the onDisconnect().remove() and presence is
-    // gone forever (the server then marks the player offline and forfeits them after 45s).
-    const presenceRef = ref(rtdb, `matchPresence/${roomCode}/${myPlayerId}`);
+    // Presence = live connection (NOT foreground): re-registered off `.info/connected` so a
+    // websocket blip doesn't strand it, and deliberately not tied to tab visibility so
+    // alt-tabbing keeps you present. Keyed per SESSION_ID leaf so a second tab (its own
+    // session) doesn't clobber this one's node — the server only trusts the active session's leaf.
+    const presenceRef = ref(rtdb, `matchPresence/${roomCode}/${myPlayerId}/${SESSION_ID}`);
     const connectedRef = ref(rtdb, '.info/connected');
     const unsubConnected = onValue(connectedRef, (snap) => {
       if (snap.val() !== true) return; // only (re)arm once actually connected
