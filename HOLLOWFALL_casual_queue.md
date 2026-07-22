@@ -59,11 +59,20 @@ the lobby share it (no parallel implementation to drift).
 - Match assignment is delivered via the client's Firestore listener on `casualQueue/{seatId}`
   (no polling endpoint needed). Entering the match reuses the existing join/gameplay flow.
 
-## 7. Client UX
+## 7. Client UX (Q2b)
 
-"Play Casual (1v1)" → enqueue → "Searching for an opponent…" with a Cancel button. On `matched`,
-auto-navigate into the match. Cancel → `queue/leave`. Disconnect while searching → presence drops →
-sweep removes the entry (no ghost pairing).
+Wire the **existing casual-match button** (do not add a new one). On click:
+1. Enqueue (`queue/join`) and write **queue presence** `queuePresence/{seatId}/{sessionId}=true`
+   (RTDB, `onDisconnect().remove()` + `.info/connected` re-register — same pattern as match
+   presence). Disconnect while searching → presence drops → the sweep removes the entry (no ghost).
+2. Show a **VS screen**: current player on the **left**, challenger on the **right**, each as their
+   **character icon (profile emoji) with their name beneath**. While still searching the right side
+   is a "Searching for an opponent…" placeholder with a **Cancel** button (`queue/leave`).
+3. Listen on `casualQueue/{seatId}`; when `matched`, fill the challenger side from the match doc
+   (both players' `emoji` + `username` are already there), then auto-navigate into `matchId`.
+
+**MMR/rank is NOT shown here.** Rank/MMR is displayed only on the **GAME_OVER screen** (ties into
+the Club/MMR work, task #7). The VS/matchmaking screen shows icons + names only.
 
 ## 8. Hero-selection seam (draft later)
 
