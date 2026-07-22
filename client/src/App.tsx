@@ -1362,6 +1362,23 @@ export default function App() {
 
   // Render Join / Lobby
   if (!gameState) {
+    // Entering an active match (from matchmaking or a reconnect): show a simple transition
+    // instead of flashing the join/landing screen while the match state loads.
+    if (typeof window !== 'undefined' && sessionStorage.getItem('hollowfall_active_room')) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#0a0b0f', color: 'white', fontFamily: 'system-ui, sans-serif' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', border: '5px solid #1e1e26', borderTopColor: '#00C853', animation: 'spin 1s linear infinite' }} />
+          <div style={{ opacity: 0.85, letterSpacing: 1 }}>Entering match…</div>
+          <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
+          <button
+            onClick={() => { sessionStorage.removeItem('hollowfall_active_room'); sessionStorage.removeItem('hollowfall_active_username'); window.location.href = '/club'; }}
+            style={{ marginTop: 8, background: 'none', border: 'none', color: '#556', cursor: 'pointer', fontSize: 12 }}
+          >
+            Taking too long? Back to menu
+          </button>
+        </div>
+      );
+    }
     return (
       <div
         style={{
@@ -4810,40 +4827,46 @@ export default function App() {
             {gameState && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
                 <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Match Info</span>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '13px', color: '#cbd5e1' }}>Room Link</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <a
-                      href={`${window.location.origin}/?room=${gameState.roomCode}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        color: 'var(--accent-cyan)',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        textDecoration: 'underline',
-                      }}
-                    >
-                      {gameState.roomCode}
-                    </a>
-                    <button
-                      onClick={handleCopyRoomCode}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: copied ? 'var(--accent-green)' : '#64748b',
-                        cursor: 'pointer',
-                        fontSize: '12px',
-                        padding: '2px',
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                      title="Copy Join Link"
-                    >
-                      {copied ? '✓' : '📋'}
-                    </button>
+                {gameState.mode === 'casual' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1' }}>
+                    <span>⚔️</span><span style={{ fontWeight: 'bold' }}>Casual Matchmaking</span>
                   </div>
-                </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '13px', color: '#cbd5e1' }}>Room Link</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <a
+                        href={`${window.location.origin}/?room=${gameState.roomCode}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          color: 'var(--accent-cyan)',
+                          fontSize: '13px',
+                          fontWeight: 'bold',
+                          textDecoration: 'underline',
+                        }}
+                      >
+                        {gameState.roomCode}
+                      </a>
+                      <button
+                        onClick={handleCopyRoomCode}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: copied ? 'var(--accent-green)' : '#64748b',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Copy Join Link"
+                      >
+                        {copied ? '✓' : '📋'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

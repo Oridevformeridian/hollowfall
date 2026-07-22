@@ -84,6 +84,7 @@ export interface GameState {
   treasures: Record<string, Treasure>;
   gameLogs?: string[];
   victoryPointsTarget?: number;
+  mode?: 'casual' | 'custom'; // 'casual' = matchmade (hide join code); undefined/'custom' = lobby match
   turnStartedAt?: number;
   turnExpiresAt?: number;
   isTurnPaused?: boolean;

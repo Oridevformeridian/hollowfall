@@ -662,6 +662,7 @@ export function createMatch(seats: SeatInit[], heroStrategy: 'RANDOM' = 'RANDOM'
   const room: GameState = {
     roomCode: generateMatchCode(),
     phase: 'LOBBY',
+    mode: 'casual',
     players,
     turnOrder: [],
     activePlayerIndex: 0,
