@@ -57,6 +57,7 @@ vi.mock('@google-cloud/firestore', () => {
 });
 
 import { app, removeSeatFromTurnOrder, reconcileMatchConnectivity, startPlacement, createMatch, computeQueuePairings, recordMatchOutcome } from './index';
+import { evaluateAchievements } from '../../shared/achievements';
 
 const ROOM = 'SESSIONTEST';
 const join = (seatId: string, sessionId: string, username: string) =>
@@ -473,5 +474,38 @@ describe('recordMatchOutcome (casual/competitive stats -> profiles, once)', () =
     expect(store.get('players/A').stats.casualAces).toBeUndefined();  // 4 spells -> no ace
     expect(store.get('players/A').stats.flawlessWins).toBeUndefined(); // took damage -> not flawless
     expect(store.get('players/A').stats.casualWins).toBe(1);
+  });
+});
+
+describe('achievements: evaluateAchievements', () => {
+  it('unlocks by threshold, never re-locks, preserves unlockedAt', () => {
+    const a = evaluateAchievements({ casualSevers: 12 });
+    expect(a['sever_1'].unlocked).toBe(true);    // 12 >= 10 (pvp = casual+competitive)
+    expect(a['sever_1'].progress).toBe(12);
+    expect(a['sever_2'].unlocked).toBe(false);   // 12 < 50
+    expect(evaluateAchievements({ mirrorSevers: 1 })['mirror_1'].unlocked).toBe(true);
+
+    const prior = { sever_1: { unlocked: true, progress: 10, unlockedAt: 123 } };
+    const b = evaluateAchievements({ casualSevers: 0 }, prior);
+    expect(b['sever_1'].unlocked).toBe(true);     // never re-locks
+    expect(b['sever_1'].unlockedAt).toBe(123);    // preserved
+  });
+
+  it('recordMatchOutcome writes achievements onto the profile', async () => {
+    store.set('players/A', { stats: {}, achievements: {} });
+    store.set('players/B', { stats: {} });
+    store.set('matches/RA', {
+      roomCode: 'RA', mode: 'casual', phase: 'GAME_OVER', turnOrder: ['A', 'B'],
+      damageSpellsCast: { A: 2 }, mirrorSevers: { A: 1 },
+      players: {
+        A: { id: 'A', points: 2, thread: 15, maxThread: 15, severPoints: 1 },
+        B: { id: 'B', points: 0, thread: 0, maxThread: 15, severPoints: 0 }
+      }
+    });
+    await recordMatchOutcome('RA');
+    const ach = store.get('players/A').achievements;
+    expect(ach['sever_1'].progress).toBe(1);        // 1 sever so far
+    expect(ach['sever_1'].unlocked).toBe(false);
+    expect(ach['mirror_1'].unlocked).toBe(true);    // severed own class this match
   });
 });

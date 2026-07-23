@@ -86,6 +86,7 @@ export interface GameState {
   victoryPointsTarget?: number;
   mode?: 'casual' | 'competitive' | 'custom'; // matchmade casual/competitive count for stats; custom never
   damageSpellsCast?: Record<string, number>; // seatId -> attack spells cast this match (for the Ace achievement)
+  mirrorSevers?: Record<string, number>; // seatId -> severs of a same-class opponent this match (Mirror Match)
   statsRecorded?: boolean; // set once outcome/achievements have been written to profiles at GAME_OVER
   // Transient "last visualized action" for combat animations. seq is monotonic; the client
   // fires the animation once per new seq (persisted in state since there's no socket channel).

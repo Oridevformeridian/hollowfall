@@ -4,6 +4,7 @@ import path from 'path';
 import { GameState, Player, PlacedTile, Card } from '../../shared/types';
 import { validateTilePlacement, validateTokenMove, validateDoorInteract, hasLineOfSight, hasLineOfSightToWall, getWrappingManhattanDistance, checkBoundFateEliminations, isValidMiststepTarget, isValidStoneGlideTarget, calculateScores } from '../../shared/validation';
 import { HEROES, BASIC_CARDS } from '../../shared/constants';
+import { evaluateAchievements } from '../../shared/achievements';
 import { buildDeckForEmoji, shuffle } from '../../shared/deck';
 import { Firestore } from '@google-cloud/firestore';
 import { OAuth2Client } from 'google-auth-library';
@@ -278,8 +279,11 @@ export async function recordMatchOutcome(matchId: string) {
         else { bump(isWinner ? 'competitiveWins' : 'competitiveLosses'); bump('competitiveMatches'); bump('competitiveSevers', severs); }
         if (ace) bump('casualAces');
         if (flawless) bump('flawlessWins');
+        bump('mirrorSevers', (room.mirrorSevers && room.mirrorSevers[id]) || 0);
 
-        t.update(firestore.collection('players').doc(id), { stats: newStats });
+        // Evaluate achievements against the updated stats (server-authoritative unlock).
+        const newAchievements = evaluateAchievements(newStats, profiles[id].achievements || {});
+        t.update(firestore.collection('players').doc(id), { stats: newStats, achievements: newAchievements });
       }
       t.update(matchRef, { statsRecorded: true });
     });
@@ -807,6 +811,13 @@ function handlePlayerDefeated(room: GameState, defeatedId: string, killerId: str
   if (killerId && room.players[killerId]) {
     const killer = room.players[killerId];
     killer.severPoints = (killer.severPoints || 0) + 1;
+    // Mirror Match: severing an opponent of your own class.
+    const killerClass = HEROES.find(h => h.emoji === killer.emoji)?.class;
+    const victimClass = HEROES.find(h => h.emoji === defeatedPlayer.emoji)?.class;
+    if (killerClass && killerClass === victimClass) {
+      room.mirrorSevers = room.mirrorSevers || {};
+      room.mirrorSevers[killerId] = (room.mirrorSevers[killerId] || 0) + 1;
+    }
     // Steal hand cards
     killer.hand.push(...defeatedPlayer.hand);
     defeatedPlayer.hand = [];
@@ -1266,6 +1277,7 @@ app.post('/api/match/:matchId/place-tile', (req, res, next) => {
             room.phase = 'GAMEPLAY'; // Board finalized, start gameplay phase
             room.gameStartedAt = Date.now();
             room.damageSpellsCast = {}; // reset per-match attack-spell counters (Ace tracking)
+            room.mirrorSevers = {};     // reset per-match same-class sever counters (Mirror Match)
             
             // Set initial token positions to player Lairs
             // Player 1 spawn at their tile's center (2, 2)
