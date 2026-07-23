@@ -327,8 +327,9 @@ app.post('/api/auth/google', async (req, res) => {
     }
 
     const providerId = payload.sub; // The opaque unique subject ID
-    const displayName = payload.name || 'Unknown Wanderer'; // No email used!
-    
+    // Privacy: do NOT use the Google-provided real name (or email). New accounts get a
+    // neutral placeholder; the user chooses their own display name in profile setup.
+
     // Check if identity exists in Firestore
     const playersRef = firestore.collection('players');
     const snapshot = await playersRef.where('identities.google', '==', providerId).limit(1).get();
@@ -339,11 +340,11 @@ app.post('/api/auth/google', async (req, res) => {
       const doc = snapshot.docs[0];
       playerAccount = { id: doc.id, ...doc.data() };
     } else {
-      // Create new account
+      // Create new account with a neutral placeholder name (never the Google name).
       const newPlayerRef = playersRef.doc(crypto.randomUUID());
       const newPlayerData = {
         createdAt: new Date().toISOString(),
-        displayName,
+        displayName: `Wanderer_${newPlayerRef.id.substring(0, 4)}`,
         identities: {
           google: providerId
         },

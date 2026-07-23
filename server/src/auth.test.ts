@@ -110,8 +110,10 @@ describe('Authentication and Profile REST API', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.token).toBe('mocked-jwt-token');
-      expect(res.body.displayName).toBe('Test Wanderer');
-      
+      // Privacy: a new account must NOT be named with the Google-provided name.
+      expect(res.body.displayName).not.toBe('Test Wanderer');
+      expect(res.body.displayName).toMatch(/^Wanderer_/);
+
       expect(mockWhere).toHaveBeenCalledWith('identities.google', '==', 'google-subject-123');
       expect(mockSet).toHaveBeenCalled();
     });
