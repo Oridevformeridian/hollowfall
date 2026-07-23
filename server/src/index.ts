@@ -232,9 +232,12 @@ app.use(express.json());
 
 function broadcastSystemMessage(room: any, message: string) {
   if (typeof room === 'string') return; // In case some old calls exist
-  if (!room.systemMessages) room.systemMessages = [];
-  room.systemMessages.push(message);
-  if (room.systemMessages.length > 50) room.systemMessages.shift();
+  // Push to gameLogs — the array the client's Ritual Feed renders — so every action
+  // (casts, counters, attacks, movement, treasures, placements) shows up, not just turn events.
+  if (!room.gameLogs) room.gameLogs = [];
+  const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  room.gameLogs.push(`[${timestamp}] ${message}`);
+  if (room.gameLogs.length > 60) room.gameLogs.shift();
 }
 
 function startTurnTimer(_roomCode: string, room: any) {
