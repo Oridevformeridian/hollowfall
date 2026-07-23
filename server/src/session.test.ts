@@ -509,3 +509,19 @@ describe('achievements: evaluateAchievements', () => {
     expect(ach['mirror_1'].unlocked).toBe(true);    // severed own class this match
   });
 });
+
+describe('GET /api/player/me', () => {
+  beforeEach(() => store.clear());
+  it('returns the authed profile stats + achievements', async () => {
+    store.set('players/A', { displayName: 'alice', emoji: '🧙', stats: { casualWins: 3 }, achievements: { sever_1: { unlocked: false, progress: 3 } } });
+    const res = await request(app).get('/api/player/me').set('Authorization', 'Bearer tok-A');
+    expect(res.status).toBe(200);
+    expect(res.body.displayName).toBe('alice');
+    expect(res.body.stats.casualWins).toBe(3);
+    expect(res.body.achievements.sever_1.progress).toBe(3);
+  });
+  it('requires auth', async () => {
+    const res = await request(app).get('/api/player/me');
+    expect(res.status).not.toBe(200);
+  });
+});

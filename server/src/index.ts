@@ -374,7 +374,9 @@ app.post('/api/queue/leave', optionalAuth, async (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const clientBuildPath = path.resolve(process.cwd(), '../client/dist');
   app.use(express.static(clientBuildPath));
-  app.get('*', (req, res) => {
+  app.get('*', (req, res, next) => {
+    // Don't let the SPA fallback swallow API GET routes (e.g. /api/player/me) registered later.
+    if (req.path.startsWith('/api/')) return next();
     res.sendFile(path.join(clientBuildPath, 'index.html'));
   });
 }
