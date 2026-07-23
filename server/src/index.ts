@@ -230,6 +230,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Record a transient combat event for client animations (monotonic seq; see GameState.lastEvent).
+function emitMatchEvent(room: any, event: any) {
+  const seq = ((room.lastEvent && room.lastEvent.seq) || 0) + 1;
+  room.lastEvent = { seq, ...event };
+}
+
 function broadcastSystemMessage(room: any, message: string) {
   if (typeof room === 'string') return; // In case some old calls exist
   // Push to gameLogs — the array the client's Ritual Feed renders — so every action
@@ -1662,7 +1668,15 @@ app.post('/api/match/:matchId/play-card', (req, res, next) => {
               }
             }
 
-            
+            // Animation event: attack spell caster -> target, with any counter (Turn Aside / Spirit-Skin).
+            emitMatchEvent(room, {
+              kind: 'card',
+              cardId: card.id,
+              casterId: playerId,
+              from: room.tokenPositions[playerId],
+              to: target ? { tileX: target.tileX, tileY: target.tileY, r: target.r, c: target.c } : undefined,
+              countered
+            });
 
             // Victory check / Death elimination
             if (targetPlayer.thread <= 0) {
@@ -2058,7 +2072,16 @@ app.post('/api/match/:matchId/lash-attack', (req, res, next) => {
               broadcastSystemMessage(room, `${player.username} lashed ${targetPlayer.username} for 1 damage!`);
             }
 
-            
+            // Animation event: lash attacker -> target player.
+            emitMatchEvent(room, {
+              kind: 'lash',
+              attackerId: playerId,
+              targetPlayerId,
+              from,
+              to,
+              damageDealt: tookDamage ? 1 : 0,
+              blockedBySpiritSkin: !tookDamage
+            });
 
             // Thorns retaliation
             if (targetPlayer.hasThorns && (targetPlayer.thorns || 0) > 0 && tookDamage) {

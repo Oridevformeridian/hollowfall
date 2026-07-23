@@ -679,14 +679,14 @@ export default function App() {
   const [targetingCardId, setTargetingCardId] = useState<string | null>(null);
   const [hoveredHeroIndex, setHoveredHeroIndex] = useState<number | null>(null);
   const [playedGameOverSound, setPlayedGameOverSound] = useState(false);
-  const [activeAnimation] = useState<{
+  const [activeAnimation, setActiveAnimation] = useState<{
     cardId: string;
     casterId: string;
     from: { tileX: number; tileY: number; r: number; c: number };
     to?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' };
     countered?: 'turn_aside' | 'spirit_skin' | null;
   } | null>(null);
-  const [activeLashAnimation] = useState<{
+  const [activeLashAnimation, setActiveLashAnimation] = useState<{
     attackerId: string;
     targetPlayerId?: string;
     targetWall?: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' };
@@ -695,6 +695,8 @@ export default function App() {
     damageDealt: number;
     blockedBySpiritSkin: boolean;
   } | null>(null);
+  // Seq of the last combat event we've already animated (null until the first snapshot baseline).
+  const lastEventSeqRef = React.useRef<number | null>(null);
   const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
@@ -953,8 +955,23 @@ export default function App() {
       if (docSnap.exists()) {
         const state = docSnap.data() as GameState;
         setGameState(state);
-        
-        
+
+        // Drive combat animations off the transient lastEvent, once per new seq. On the first
+        // snapshot we only record the baseline so we don't replay a stale event on (re)join.
+        const ev = state.lastEvent;
+        const seq = ev?.seq ?? 0;
+        if (lastEventSeqRef.current === null) {
+          lastEventSeqRef.current = seq;
+        } else if (ev && seq > lastEventSeqRef.current) {
+          lastEventSeqRef.current = seq;
+          if (ev.kind === 'card' && ev.from) {
+            setActiveAnimation({ cardId: ev.cardId || '', casterId: ev.casterId || '', from: ev.from, to: ev.to, countered: ev.countered ?? null });
+            setTimeout(() => setActiveAnimation(null), 2500);
+          } else if (ev.kind === 'lash' && ev.from && ev.to) {
+            setActiveLashAnimation({ attackerId: ev.attackerId || '', targetPlayerId: ev.targetPlayerId, targetWall: ev.targetWall, from: ev.from, to: ev.to, damageDealt: ev.damageDealt ?? 0, blockedBySpiritSkin: ev.blockedBySpiritSkin ?? false });
+            setTimeout(() => setActiveLashAnimation(null), 2000);
+          }
+        }
       }
     });
     return () => {

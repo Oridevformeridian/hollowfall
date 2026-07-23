@@ -85,6 +85,22 @@ export interface GameState {
   gameLogs?: string[];
   victoryPointsTarget?: number;
   mode?: 'casual' | 'custom'; // 'casual' = matchmade (hide join code); undefined/'custom' = lobby match
+  // Transient "last visualized action" for combat animations. seq is monotonic; the client
+  // fires the animation once per new seq (persisted in state since there's no socket channel).
+  lastEvent?: {
+    seq: number;
+    kind: 'card' | 'lash';
+    cardId?: string;
+    casterId?: string;
+    attackerId?: string;
+    from?: { tileX: number; tileY: number; r: number; c: number };
+    to?: { tileX: number; tileY: number; r: number; c: number; direction?: 'H' | 'V' };
+    targetPlayerId?: string;
+    targetWall?: { tileX: number; tileY: number; r: number; c: number; direction: 'H' | 'V' };
+    countered?: 'turn_aside' | 'spirit_skin' | null;
+    damageDealt?: number;
+    blockedBySpiritSkin?: boolean;
+  };
   turnStartedAt?: number;
   turnExpiresAt?: number;
   isTurnPaused?: boolean;
