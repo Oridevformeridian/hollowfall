@@ -84,7 +84,9 @@ export interface GameState {
   treasures: Record<string, Treasure>;
   gameLogs?: string[];
   victoryPointsTarget?: number;
-  mode?: 'casual' | 'custom'; // 'casual' = matchmade (hide join code); undefined/'custom' = lobby match
+  mode?: 'casual' | 'competitive' | 'custom'; // matchmade casual/competitive count for stats; custom never
+  damageSpellsCast?: Record<string, number>; // seatId -> attack spells cast this match (for the Ace achievement)
+  statsRecorded?: boolean; // set once outcome/achievements have been written to profiles at GAME_OVER
   // Transient "last visualized action" for combat animations. seq is monotonic; the client
   // fires the animation once per new seq (persisted in state since there's no socket channel).
   lastEvent?: {

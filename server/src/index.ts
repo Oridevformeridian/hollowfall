@@ -149,6 +149,7 @@ setInterval(async () => {
     }
 
     if (requiresTransaction) {
+      let endedThisTick = false;
       try {
         await firestore.runTransaction(async (t) => {
           const matchRef = firestore.collection('matches').doc(matchId);
@@ -159,10 +160,13 @@ setInterval(async () => {
           if (changed) {
             t.update(matchRef, currentRoom as any);
           }
+          if (currentRoom.phase === 'GAME_OVER') endedThisTick = true;
         });
       } catch (err) {
         console.error(`Failed to process disconnects for match ${matchId}:`, err);
       }
+      // A disconnect-forfeit may have ended the match — record outcome/stats (idempotent).
+      if (endedThisTick) await recordMatchOutcome(matchId);
     }
   }
 }, 1000);
@@ -230,6 +234,60 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Write casual/competitive match outcome + stat counters to each authed player's profile, ONCE,
+// at GAME_OVER (guarded by room.statsRecorded). Custom matches and guests are never recorded.
+// Server-authoritative: the client only reads these; it never computes them. (See
+// HOLLOWFALL_stats_achievements.md — S1.)
+export async function recordMatchOutcome(matchId: string) {
+  try {
+    await firestore.runTransaction(async (t) => {
+      const matchRef = firestore.collection('matches').doc(matchId);
+      const matchDoc = await t.get(matchRef);
+      if (!matchDoc.exists) return;
+      const room = matchDoc.data() as GameState;
+      if (room.phase !== 'GAME_OVER' || (room as any).statsRecorded) return;
+      if (room.mode !== 'casual' && room.mode !== 'competitive') return; // custom counts for nothing
+
+      // Authed seats only (guests can't play casual; their ids are guest_*).
+      const seatIds = Object.keys(room.players).filter(id => !id.startsWith('guest_'));
+      const profiles: Record<string, any> = {};
+      for (const id of seatIds) {
+        const pd = await t.get(firestore.collection('players').doc(id)); // reads before writes
+        if (pd.exists) profiles[id] = pd.data();
+      }
+
+      // Winner = most points, then highest surviving thread.
+      const ranked = [...Object.values(room.players)].sort((a: any, b: any) =>
+        (b.points || 0) - (a.points || 0) || (b.thread || 0) - (a.thread || 0));
+      const winnerId = ranked.length ? (ranked[0] as any).id : null;
+      const is1v1 = (room.turnOrder?.length === 2) || Object.keys(room.players).length === 2;
+      const casual = room.mode === 'casual';
+
+      for (const id of seatIds) {
+        if (!profiles[id]) continue;
+        const p: any = room.players[id];
+        const isWinner = id === winnerId;
+        const severs = p.severPoints || 0;
+        const spells = (room.damageSpellsCast && room.damageSpellsCast[id]) || 0;
+        const flawless = isWinner && p.thread === p.maxThread;         // thread never heals -> full = untouched
+        const ace = isWinner && casual && is1v1 && severs >= 1 && spells <= 3;
+
+        const newStats: any = { ...(profiles[id].stats || {}) };
+        const bump = (k: string, by = 1) => { newStats[k] = (newStats[k] || 0) + by; };
+        if (casual) { bump(isWinner ? 'casualWins' : 'casualLosses'); bump('casualMatches'); bump('casualSevers', severs); }
+        else { bump(isWinner ? 'competitiveWins' : 'competitiveLosses'); bump('competitiveMatches'); bump('competitiveSevers', severs); }
+        if (ace) bump('casualAces');
+        if (flawless) bump('flawlessWins');
+
+        t.update(firestore.collection('players').doc(id), { stats: newStats });
+      }
+      t.update(matchRef, { statsRecorded: true });
+    });
+  } catch (err) {
+    console.error(`recordMatchOutcome failed for ${matchId}:`, err);
+  }
+}
+
 // Record a transient combat event for client animations (monotonic seq; see GameState.lastEvent).
 function emitMatchEvent(room: any, event: any) {
   const seq = ((room.lastEvent && room.lastEvent.seq) || 0) + 1;
@@ -275,10 +333,13 @@ const optionalAuth = (req: express.Request, res: express.Response, next: express
 // seatId = authed userId (JWT) or a durable guest seatId; sessionId fences the entry.
 app.post('/api/queue/join', optionalAuth, async (req, res) => {
   try {
-    const seatId = (req as any).user?.playerId || req.body.seatId;
+    // Casual is tracked (stats/achievements), so it requires a signed-in account — guests
+    // can only play custom lobby matches.
+    const seatId = (req as any).user?.playerId;
+    if (!seatId) return res.status(401).json({ error: 'Sign in to play casual matches.' });
     const sessionId = req.body.sessionId;
     const displayName = req.body.displayName || 'Wanderer';
-    if (!seatId || !sessionId) return res.status(400).json({ error: 'seatId and sessionId are required.' });
+    if (!sessionId) return res.status(400).json({ error: 'sessionId is required.' });
     await firestore.collection('casualQueue').doc(seatId).set({ seatId, sessionId, displayName, enqueuedAt: Date.now(), status: 'waiting' });
     res.json({ success: true, seatId });
   } catch (err: any) {
@@ -871,6 +932,11 @@ const withMatchTransaction = (actionName: string, handler: (room: GameState, req
         returnedRoom = room;
       });
 
+      // If this action ended the match, record outcome/stats to profiles (idempotent, once).
+      if (returnedRoom && (returnedRoom as GameState).phase === 'GAME_OVER') {
+        await recordMatchOutcome(matchId);
+      }
+
       if (superseded) {
         res.status(409).json({ error: 'SESSION_SUPERSEDED' });
       } else if (actionName === 'JOIN_ROOM') {
@@ -1199,6 +1265,7 @@ app.post('/api/match/:matchId/place-tile', (req, res, next) => {
           if (newPlacedCount === room.turnOrder.length) {
             room.phase = 'GAMEPLAY'; // Board finalized, start gameplay phase
             room.gameStartedAt = Date.now();
+            room.damageSpellsCast = {}; // reset per-match attack-spell counters (Ace tracking)
             
             // Set initial token positions to player Lairs
             // Player 1 spawn at their tile's center (2, 2)
@@ -1594,6 +1661,10 @@ app.post('/api/match/:matchId/play-card', (req, res, next) => {
  
             // Mark attack used
             player.hasAttackedThisTurn = true;
+
+            // Count attack spells cast this match (for the Ace achievement).
+            room.damageSpellsCast = room.damageSpellsCast || {};
+            room.damageSpellsCast[playerId] = (room.damageSpellsCast[playerId] || 0) + 1;
 
             // Determine damage amount
             let damage = 3;

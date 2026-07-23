@@ -37,6 +37,8 @@ export default function Club() {
   const stopCasual = () => { if (searchCleanup.current) { searchCleanup.current(); searchCleanup.current = null; } };
 
   const startCasual = async () => {
+    // Casual is auth-only (it's tracked). Guests play custom only.
+    if (!token) { alert('Sign in to play Casual Matchmaking.'); setView('login'); return; }
     setCasualState('searching');
     setMatchup(null);
     try {
@@ -45,6 +47,7 @@ export default function Club() {
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ seatId: GUEST_SEAT_ID, sessionId: SESSION_ID, displayName: displayName || 'Wanderer' })
       });
+      if (res.status === 401) { setCasualState('idle'); alert('Sign in to play Casual Matchmaking.'); setView('login'); return; }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to join queue');
       const seatId: string = data.seatId;

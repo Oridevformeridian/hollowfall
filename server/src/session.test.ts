@@ -4,8 +4,13 @@ import request from 'supertest';
 // Stateful in-memory Firestore so we can exercise runTransaction end-to-end.
 const { store } = vi.hoisted(() => ({ store: new Map<string, any>() }));
 
+// Tokens shaped `tok-<id>` authenticate as playerId <id>; anything else is unauthenticated.
 vi.mock('jsonwebtoken', () => ({
-  default: { sign: vi.fn(() => 'jwt'), verify: vi.fn((_t, _s, cb) => cb(new Error('no auth'))) }
+  default: {
+    sign: vi.fn(() => 'jwt'),
+    verify: vi.fn((t: string, _s: any, cb: any) =>
+      typeof t === 'string' && t.startsWith('tok-') ? cb(null, { playerId: t.slice(4) }) : cb(new Error('no auth')))
+  }
 }));
 vi.mock('firebase-admin/app', () => ({ initializeApp: vi.fn() }));
 vi.mock('firebase-admin/database', () => ({
@@ -51,7 +56,7 @@ vi.mock('@google-cloud/firestore', () => {
   };
 });
 
-import { app, removeSeatFromTurnOrder, reconcileMatchConnectivity, startPlacement, createMatch, computeQueuePairings } from './index';
+import { app, removeSeatFromTurnOrder, reconcileMatchConnectivity, startPlacement, createMatch, computeQueuePairings, recordMatchOutcome } from './index';
 
 const ROOM = 'SESSIONTEST';
 const join = (seatId: string, sessionId: string, username: string) =>
@@ -371,26 +376,27 @@ describe('casual queue: computeQueuePairings', () => {
   });
 });
 
-describe('casual queue: join/leave endpoints', () => {
+describe('casual queue: join/leave endpoints (auth-gated)', () => {
   beforeEach(() => store.clear());
-  const q = (action: string, body: any) => request(app).post(`/api/queue/${action}`).send(body);
+  // Authenticated as seat `id` via a tok-<id> token; the server derives seatId from the token.
+  const q = (action: string, id: string, body: any = {}) =>
+    request(app).post(`/api/queue/${action}`).set('Authorization', `Bearer tok-${id}`).send(body);
 
-  it('join enqueues a waiting entry; leave (fenced) removes it', async () => {
-    expect((await q('join', { seatId: 'A', sessionId: 's1', displayName: 'alice' })).status).toBe(200);
+  it('join enqueues a waiting entry keyed by the authed seat; leave (fenced) removes it', async () => {
+    expect((await q('join', 'A', { sessionId: 's1', displayName: 'alice' })).status).toBe(200);
     const e = store.get('casualQueue/A');
     expect(e).toMatchObject({ seatId: 'A', sessionId: 's1', status: 'waiting' });
 
-    // a stale session cannot cancel someone else's slot
-    await q('leave', { seatId: 'A', sessionId: 'WRONG' });
+    await q('leave', 'A', { sessionId: 'WRONG' });   // stale session can't cancel
     expect(store.has('casualQueue/A')).toBe(true);
-
-    // the current session can
-    await q('leave', { seatId: 'A', sessionId: 's1' });
+    await q('leave', 'A', { sessionId: 's1' });       // current session can
     expect(store.has('casualQueue/A')).toBe(false);
   });
 
-  it('rejects join without seatId/sessionId', async () => {
-    expect((await q('join', { seatId: 'A' })).status).toBe(400);
+  it('rejects an unauthenticated (guest) join with 401', async () => {
+    const res = await request(app).post('/api/queue/join').send({ seatId: 'A', sessionId: 's1' });
+    expect(res.status).toBe(401);
+    expect(store.has('casualQueue/A')).toBe(false);
   });
 });
 
@@ -411,5 +417,61 @@ describe('casual queue: pairing grace window', () => {
     const { pairs, stale } = computeQueuePairings(entries, () => false, now);
     expect(pairs).toHaveLength(0);
     expect(stale.map(e => e.seatId)).toEqual(['OLD']);
+  });
+});
+
+describe('recordMatchOutcome (casual/competitive stats -> profiles, once)', () => {
+  beforeEach(() => store.clear());
+
+  it('writes W/L, severs, ace and flawless to authed profiles; idempotent', async () => {
+    store.set('players/A', { displayName: 'alice', stats: {} });
+    store.set('players/B', { displayName: 'bob', stats: {} });
+    // finished casual 1v1: A won (severed B), took no damage, cast 2 attack spells
+    store.set('matches/R', {
+      roomCode: 'R', mode: 'casual', phase: 'GAME_OVER', turnOrder: ['A', 'B'], activePlayerIndex: 0,
+      damageSpellsCast: { A: 2, B: 5 },
+      players: {
+        A: { id: 'A', points: 2, thread: 15, maxThread: 15, severPoints: 1 },
+        B: { id: 'B', points: 0, thread: 0, maxThread: 15, severPoints: 0 }
+      }
+    });
+    await recordMatchOutcome('R');
+    const a = store.get('players/A').stats, b = store.get('players/B').stats;
+    expect(a).toMatchObject({ casualWins: 1, casualMatches: 1, casualSevers: 1, casualAces: 1, flawlessWins: 1 });
+    expect(a.casualLosses).toBeUndefined();
+    expect(b).toMatchObject({ casualLosses: 1, casualMatches: 1, casualSevers: 0 });
+    expect(b.casualAces).toBeUndefined();
+    expect(store.get('matches/R').statsRecorded).toBe(true);
+
+    await recordMatchOutcome('R'); // idempotent
+    expect(store.get('players/A').stats.casualWins).toBe(1);
+  });
+
+  it('does not record custom matches at all', async () => {
+    store.set('players/A', { stats: {} });
+    store.set('matches/C', {
+      roomCode: 'C', mode: 'custom', phase: 'GAME_OVER', turnOrder: ['A'],
+      players: { A: { id: 'A', points: 2, thread: 15, maxThread: 15, severPoints: 0 } }
+    });
+    await recordMatchOutcome('C');
+    expect(store.get('players/A').stats).toEqual({});
+    expect(store.get('matches/C').statsRecorded).toBeUndefined();
+  });
+
+  it('no ace when >3 damage spells were cast', async () => {
+    store.set('players/A', { stats: {} });
+    store.set('players/B', { stats: {} });
+    store.set('matches/R2', {
+      roomCode: 'R2', mode: 'casual', phase: 'GAME_OVER', turnOrder: ['A', 'B'],
+      damageSpellsCast: { A: 4 },
+      players: {
+        A: { id: 'A', points: 2, thread: 12, maxThread: 15, severPoints: 1 },
+        B: { id: 'B', points: 0, thread: 0, maxThread: 15, severPoints: 0 }
+      }
+    });
+    await recordMatchOutcome('R2');
+    expect(store.get('players/A').stats.casualAces).toBeUndefined();  // 4 spells -> no ace
+    expect(store.get('players/A').stats.flawlessWins).toBeUndefined(); // took damage -> not flawless
+    expect(store.get('players/A').stats.casualWins).toBe(1);
   });
 });
