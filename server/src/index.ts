@@ -480,10 +480,20 @@ app.post('/api/player/profile', authenticateJWT, async (req: express.Request, re
     res.status(500).json({ error: 'Failed to update profile' });
   }
 });
-// Stats Route
 
-
-
+// Stats/achievements for the signed-in player (server-authoritative; the client only renders this).
+app.get('/api/player/me', authenticateJWT, async (req: express.Request, res: express.Response) => {
+  const playerId = (req as any).user.playerId;
+  try {
+    const doc = await firestore.collection('players').doc(playerId).get();
+    if (!doc.exists) return res.status(404).json({ error: 'Profile not found' });
+    const d = doc.data() as any;
+    res.json({ displayName: d.displayName, emoji: d.emoji, stats: d.stats || {}, achievements: d.achievements || {} });
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
 
 
 function concedePlayer(room: GameState, pId: string) {

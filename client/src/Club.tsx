@@ -4,6 +4,7 @@ import { ref, set, onDisconnect, remove, onValue } from 'firebase/database';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { rtdb, db } from './firebase';
 import { HEROES } from './shared/constants';
+import { ACHIEVEMENTS } from './shared/achievements';
 import { GUEST_SEAT_ID, SESSION_ID } from './identity';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'dummy-client-id.apps.googleusercontent.com';
@@ -111,6 +112,20 @@ export default function Club() {
 
   useEffect(() => () => stopCasual(), []); // cancel any in-flight search on unmount
 
+  // --- Achievements panel (display-only; server is authoritative) ---
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [profileData, setProfileData] = useState<{ stats: any; achievements: any } | null>(null);
+  const [achLoading, setAchLoading] = useState(false);
+  const openAchievements = async () => {
+    setShowAchievements(true);
+    setAchLoading(true);
+    try {
+      const res = await fetch('/api/player/me', { headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+      if (res.ok) setProfileData(await res.json());
+    } catch (e) { console.error('Failed to load profile', e); }
+    setAchLoading(false);
+  };
+
   const latestRoom = localStorage.getItem('hollowfall_latest_room');
   const latestUsername = localStorage.getItem('hollowfall_latest_username');
 
@@ -195,6 +210,55 @@ export default function Club() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         minHeight: '100vh', backgroundColor: '#0f0f11', color: 'white', fontFamily: 'system-ui, sans-serif'
       }}>
+
+        {/* Achievements panel (display-only) */}
+        {showAchievements && (() => {
+          const stats = profileData?.stats || {};
+          const ach = profileData?.achievements || {};
+          const pvpSevers = (stats.casualSevers || 0) + (stats.competitiveSevers || 0);
+          const cw = stats.casualWins || 0, cl = stats.casualLosses || 0;
+          const winRate = (cw + cl) ? Math.round((cw / (cw + cl)) * 100) : 0;
+          const Stat = ({ label, value }: { label: string; value: any }) => (
+            <div style={{ textAlign: 'center', minWidth: 84 }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#00E5FF' }}>{value}</div>
+              <div style={{ fontSize: 11, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+            </div>
+          );
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(6,8,12,0.97)', overflowY: 'auto', padding: '32px 16px' }}>
+              <div style={{ maxWidth: 760, margin: '0 auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <h2 style={{ margin: 0 }}>🏆 Achievements</h2>
+                  <button onClick={() => setShowAchievements(false)} style={{ background: 'none', border: '1px solid #555', color: 'white', borderRadius: 8, padding: '6px 14px', cursor: 'pointer' }}>Close</button>
+                </div>
+                {achLoading ? <div style={{ opacity: 0.7 }}>Loading…</div> : (
+                  <>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: 12, marginBottom: 20 }}>
+                      <Stat label="Casual W" value={cw} /><Stat label="Casual L" value={cl} /><Stat label="Win %" value={`${winRate}%`} />
+                      <Stat label="PVP Severs" value={pvpSevers} /><Stat label="Aces" value={stats.casualAces || 0} /><Stat label="Flawless" value={stats.flawlessWins || 0} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+                      {ACHIEVEMENTS.map(a => {
+                        const st = ach[a.id] || { unlocked: false, progress: 0 };
+                        const done = !!st.unlocked;
+                        return (
+                          <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, border: `1px solid ${done ? 'rgba(0,229,255,0.5)' : 'rgba(255,255,255,0.08)'}`, background: done ? 'rgba(0,229,255,0.08)' : 'rgba(255,255,255,0.02)', opacity: done ? 1 : 0.75 }}>
+                            <div style={{ fontSize: 26 }}>{done ? '🏅' : '🔒'}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 700 }}>{a.name}</div>
+                              <div style={{ fontSize: 12, opacity: 0.7 }}>{a.description}</div>
+                              {!done && <div style={{ fontSize: 11, marginTop: 4, color: '#00E5FF' }}>{Math.min(st.progress || 0, a.target)} / {a.target}</div>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Casual matchmaking VS overlay */}
         {casualState !== 'idle' && (
@@ -364,7 +428,7 @@ export default function Club() {
           {/* Bottom Left: Achievements */}
           <button 
             className="park-label"
-            onClick={() => alert('Achievements coming soon!')}
+            onClick={openAchievements}
             style={{ top: '85%', left: '15%', background: 'rgba(255, 145, 0, 0.85)', color: 'white', boxShadow: '0 0 15px rgba(255, 145, 0, 0.5)' }}
           >
             🏆 Achievements
