@@ -14,7 +14,7 @@ export default function Club() {
   
   const [token, setToken] = useState<string | null>(initialToken);
   const [displayName, setDisplayName] = useState<string>(storedDisplayName || '');
-  const [emoji, setEmoji] = useState<string>(HEROES[0].emoji);
+  const [emoji, setEmoji] = useState<string>(localStorage.getItem('hollowfall_emoji') || HEROES[0].emoji);
   
   // If they have a token and have completed setup, drop them right into the park
   const [view, setView] = useState<'login' | 'setup' | 'park'>(
@@ -144,8 +144,10 @@ export default function Club() {
         setToken(data.token);
         setDisplayName(data.displayName || '');
         
-        // If the backend already has an emoji saved for them, they've completed setup previously
+        // If the backend already has an emoji (chosen Wanderer) saved, restore it and skip setup.
         if (data.emoji) {
+          setEmoji(data.emoji);
+          localStorage.setItem('hollowfall_emoji', data.emoji);
           localStorage.setItem('hollowfall_setup_complete', 'true');
           setView('park');
         } else {
@@ -173,9 +175,10 @@ export default function Club() {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Failed to update profile');
       }
-      // Success! Move to park view
+      // Success! Cache the chosen Wanderer + name and move to park view.
       localStorage.setItem('hollowfall_setup_complete', 'true');
       localStorage.setItem('hollowfall_display_name', displayName);
+      localStorage.setItem('hollowfall_emoji', emoji);
       setView('park');
     } catch (e: any) {
       console.error('Error saving profile', e);
@@ -410,6 +413,7 @@ export default function Club() {
                     localStorage.removeItem('hollowfall_auth_token');
                     localStorage.removeItem('hollowfall_setup_complete');
                     localStorage.removeItem('hollowfall_display_name');
+                    localStorage.removeItem('hollowfall_emoji');
                     window.location.reload();
                   }}
                   style={{ background: 'transparent', color: '#ff4444', border: 'none', padding: '8px', textAlign: 'left', cursor: 'pointer', borderRadius: '4px' }}
